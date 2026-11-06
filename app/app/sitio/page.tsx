@@ -75,6 +75,7 @@ export default async function Page() {
             <ActionForm action={uploadSiteImage} submitLabel="Subir portada">
               <input type="hidden" name="kind" value="hero" />
               <input type="file" name="file" accept="image/png,image/jpeg,image/webp" required className="text-sm" />
+              <p className="text-xs text-slate-500">Se usa en la portada del sitio y como fondo del inicio de sesión. Recomendado: foto horizontal de 1600 px o más, máximo 3 MB.</p>
             </ActionForm>
           </Card>
         </div>
