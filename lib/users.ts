@@ -18,7 +18,7 @@ export function tempPassword(): string {
  * mode 'invite' envía correo de invitación (requiere SMTP configurado en Supabase);
  * mode 'password' crea la cuenta con una contraseña temporal que se muestra una sola vez.
  */
-export async function ensureAuthUser(email: string, fullName: string, mode: 'invite' | 'password') {
+export async function ensureAuthUser(email: string, fullName: string, mode: 'invite' | 'password', fixedPassword?: string) {
   const admin = createAdminClient();
   const normalized = email.trim().toLowerCase();
   const { data: existing } = await admin.from('profiles').select('id').eq('email', normalized).maybeSingle();
@@ -30,7 +30,7 @@ export async function ensureAuthUser(email: string, fullName: string, mode: 'inv
     if (error || !data.user) throw new Error(error?.message ?? 'No se pudo enviar la invitación');
     return { id: data.user.id, created: true as const };
   }
-  const password = tempPassword();
+  const password = fixedPassword ?? tempPassword();
   const { data, error } = await admin.auth.admin.createUser({
     email: normalized, password, email_confirm: true, user_metadata: { full_name: fullName },
   });

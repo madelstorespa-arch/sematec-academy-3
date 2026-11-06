@@ -4,6 +4,7 @@ import { getContext, can } from '@/lib/context';
 import { fail, guard, ok, reqStr, str, type ActionResult } from '@/lib/actions';
 import { ensureAuthUser, tempPassword } from '@/lib/users';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { workspaceEnabled, createWorkspaceUser } from '@/lib/workspace';
 
 function personFields(fd: FormData) {
   return {
@@ -92,5 +93,32 @@ export async function resetPortalPassword(fd: FormData): Promise<ActionResult> {
       details: { by: ctx.user.id, kind },
     });
     return ok(`Nueva contraseña temporal para ${person.email} (se muestra solo esta vez): ${password}`);
+  });
+}
+
+/**
+ * Crea un buzón institucional real en Google Workspace y, con esa misma dirección,
+ * la cuenta del portal SEMATEC (misma contraseña temporal para ambos).
+ */
+export async function createInstitutionalAccount(fd: FormData): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getContext();
+    const kind = reqStr(fd, 'kind', 'tipo') as 'student' | 'teacher';
+    const id = reqStr(fd, 'id', 'id');
+    if (!can(ctx, kind === 'student' ? 'students.edit' : 'teachers.edit')) return fail('No tiene permisos.');
+    if (!workspaceEnabled()) return fail('Google Workspace no está configurado en el servidor.');
+    const table = kind === 'student' ? 'students' : 'teachers';
+    const { data: person } = await ctx.supabase.from(table).select('first_names, last_names, user_id').eq('id', id).maybeSingle();
+    if (!person) return fail('Ficha no encontrada.');
+    if (person.user_id) return fail('Esta persona ya tiene cuenta en SEMATEC.');
+    const password = tempPassword();
+    const email = await createWorkspaceUser({ firstNames: person.first_names, lastNames: person.last_names, password });
+    const { error: upErr } = await ctx.supabase.from(table).update({ email }).eq('id', id);
+    if (upErr) return fail(`Correo ${email} creado en Google, pero no se pudo guardar en la ficha: ${upErr.message}`);
+    const user = await ensureAuthUser(email, `${person.first_names} ${person.last_names}`, 'password', password);
+    const { error } = await ctx.supabase.rpc('link_person_account', { p_kind: kind, p_person: id, p_user: user.id });
+    if (error) return fail(error);
+    revalidatePath(kind === 'student' ? `/app/estudiantes/${id}` : '/app/profesores');
+    return ok(`Correo institucional creado: ${email}. Contraseña temporal para Gmail y SEMATEC (se muestra solo esta vez): ${password}. Google pedirá cambiarla en el primer ingreso.`);
   });
 }

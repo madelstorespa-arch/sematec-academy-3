@@ -6,7 +6,8 @@ import { ActionForm, Field, SelectField } from '@/components/forms';
 import { PersonFields } from '@/components/person-form';
 import { campusOptions, countryOptions } from '@/lib/options';
 import { fmtDate, fmtMoney, fmtNum, fullName } from '@/lib/format';
-import { updateStudent, grantPortalAccess, resetPortalPassword } from '../actions';
+import { updateStudent, grantPortalAccess, resetPortalPassword, createInstitutionalAccount } from '../actions';
+import { workspaceEnabled, workspaceDomain } from '@/lib/workspace';
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -69,11 +70,18 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
                 <input type="hidden" name="kind" value="student" /><input type="hidden" name="id" value={s.id} />
                 <p className="text-sm text-slate-600">El estudiante ya tiene cuenta. Si olvidó su contraseña, genere una temporal y entréguesela.</p>
               </ActionForm>) : (
+              <div className="space-y-4">
+              {workspaceEnabled() && (
+                <ActionForm action={createInstitutionalAccount} submitLabel={`📧 Crear correo @${workspaceDomain()} y acceso`} resetOnSuccess={false}>
+                  <input type="hidden" name="kind" value="student" /><input type="hidden" name="id" value={s.id} />
+                  <p className="text-sm text-slate-600">Crea un buzón real en Google Workspace y la cuenta SEMATEC con esa dirección.</p>
+                </ActionForm>)}
               <ActionForm action={grantPortalAccess} submitLabel="Crear acceso" resetOnSuccess={false}>
                 <input type="hidden" name="kind" value="student" /><input type="hidden" name="id" value={s.id} />
                 <Field label="Correo de acceso" name="email" type="email" required defaultValue={s.email} />
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="invite" /> Enviar invitación por correo (requiere SMTP)</label>
               </ActionForm>
+              </div>
             )}
           </Card>
         </div>

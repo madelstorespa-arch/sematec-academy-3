@@ -3,7 +3,8 @@ import { PageHeader, Card, StatusBadge, Empty, Badge } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField } from '@/components/forms';
 import { campusOptions, countryOptions } from '@/lib/options';
 import { createTeacher, setTeacherStatus } from './actions';
-import { grantPortalAccess, resetPortalPassword } from '../estudiantes/actions';
+import { grantPortalAccess, resetPortalPassword, createInstitutionalAccount } from '../estudiantes/actions';
+import { workspaceEnabled, workspaceDomain } from '@/lib/workspace';
 
 export const metadata = { title: 'Profesores' };
 
@@ -16,6 +17,7 @@ export default async function Page() {
     campusOptions(ctx), countryOptions(ctx),
   ]);
   const edit = can(ctx, 'teachers.edit');
+  const ws = workspaceEnabled() ? workspaceDomain() : null;
   return (
     <>
       <PageHeader title="Profesores" subtitle="Cuerpo docente y acceso al portal del profesor" />
@@ -50,9 +52,15 @@ export default async function Page() {
                 <ActionForm action={resetPortalPassword} inline submitLabel="🔑 Nueva contraseña" submitClass="btn-secondary btn-sm" resetOnSuccess={false}>
                   <input type="hidden" name="kind" value="teacher" /><input type="hidden" name="id" value={t.id} />
                 </ActionForm>) : (
-                <ActionForm action={grantPortalAccess} inline submitLabel="🔑 Crear contraseña" submitClass="btn-primary btn-sm" resetOnSuccess={false}>
-                  <input type="hidden" name="kind" value="teacher" /><input type="hidden" name="id" value={t.id} /><input type="hidden" name="email" value={t.email} />
-                </ActionForm>)) : t.user_id ? <Badge color="green">Con cuenta</Badge> : <Badge>Sin cuenta</Badge>}</td>
+                <div className="flex flex-col gap-1">
+                  {ws && (
+                    <ActionForm action={createInstitutionalAccount} inline submitLabel={`📧 Crear correo @${ws}`} submitClass="btn-primary btn-sm" resetOnSuccess={false}>
+                      <input type="hidden" name="kind" value="teacher" /><input type="hidden" name="id" value={t.id} />
+                    </ActionForm>)}
+                  <ActionForm action={grantPortalAccess} inline submitLabel="🔑 Crear contraseña" submitClass={ws ? 'btn-secondary btn-sm' : 'btn-primary btn-sm'} resetOnSuccess={false}>
+                    <input type="hidden" name="kind" value="teacher" /><input type="hidden" name="id" value={t.id} /><input type="hidden" name="email" value={t.email} />
+                  </ActionForm>
+                </div>)) : t.user_id ? <Badge color="green">Con cuenta</Badge> : <Badge>Sin cuenta</Badge>}</td>
               <td>{t.email}</td>
               <td>{t.specialty ?? '—'}</td><td>{t.campuses?.name ?? '—'}</td>
               <td>{edit ? (
