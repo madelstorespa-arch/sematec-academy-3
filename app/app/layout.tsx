@@ -4,6 +4,7 @@ import { SiteLogo } from '@/components/site-chrome';
 import { brandStyle } from '@/lib/site';
 import { Nav, type NavItem } from '@/components/nav';
 import { switchOrg } from './actions';
+import { MobileMenu } from '@/components/mobile-menu';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,8 +39,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="lg:flex" style={brandStyle(site?.primary_color, site?.accent_color)}>
-      <aside className="flex flex-col bg-ink px-4 py-5 lg:fixed lg:inset-y-0 lg:w-64">
-        <div className="px-2"><SiteLogo site={site} light /></div>
+      <aside className="sticky top-0 z-30 flex max-h-screen flex-col overflow-y-auto bg-ink px-4 py-3 lg:fixed lg:inset-y-0 lg:w-64 lg:py-5">
+        <MobileMenu header={<div className="px-2"><SiteLogo site={site} light /></div>}>
         {ctx.orgs.length > 0 && (
           <form action={switchOrg} className="mt-5 px-1">
             <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-sky-200/70">Institución</label>
@@ -50,7 +51,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             {ctx.orgs.length > 1 && <button className="mt-1 text-xs text-sky-200 hover:underline">Cambiar</button>}
           </form>
         )}
-        <div className="mt-5 flex-1 overflow-y-auto"><Nav items={items} /></div>
+        <div className="mt-5 flex-1 lg:overflow-y-auto"><Nav items={items} /></div>
         <div className="mt-4 border-t border-white/10 px-2 pt-4 text-xs text-sky-100/70">
           <div className="flex items-center gap-2">
             {avatar
@@ -63,6 +64,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <p className="mt-1">{ctx.aal === 'aal2' ? '🔒 Sesión con MFA' : 'Sesión estándar'}</p>
           <form action="/auth/salir" method="post"><button className="mt-2 text-sky-200 hover:underline">Cerrar sesión</button></form>
         </div>
+        </MobileMenu>
       </aside>
       <main className="min-w-0 flex-1 px-4 py-6 lg:ml-64 lg:px-10 lg:py-8">
         {!ctx.org && !ctx.isPlatformAdmin ? (

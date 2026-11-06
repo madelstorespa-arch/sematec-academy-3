@@ -15,6 +15,7 @@ Stack: **Next.js 15 + TypeScript**, **Supabase** (PostgreSQL, Auth con MFA) y **
 | Base de datos: seguridad, aislamiento entre instituciones, cálculos y finanzas (`npm run test:db`) | **169 / 169** |
 | Navegador real (Chrome), de punta a punta, con usuarios de distintos roles (`tests/e2e/e2e.py`) | **42 / 42** |
 | Sitio público, compras con los 4 medios de pago, postulación, marca y foto de perfil (`tests/e2e/e2e_web.py`) | **50 / 50** |
+| Instalación desde el navegador y uso en tamaño celular (`tests/e2e/e2e_celular.py`) | **11 / 11** |
 | Concurrencia: último cupo y doble pago simultáneos | ✔ |
 | Respaldo y restauración verificados | ✔ |
 
@@ -49,6 +50,37 @@ Las pruebas de punta a punta incluyen: inicio de sesión y MFA reales; registro 
 - **Sin tocar código** (menú **Sitio web y marca**): nombre de la academia, lema, logo, imagen de portada, colores, textos, destacados, contacto, redes sociales, términos, privacidad, publicar/despublicar y el catálogo de cursos con precio, cupos, imagen y modalidad. Cada usuario puede subir su **foto de perfil** en Mi cuenta.
 
 > Los pagos se probaron contra un servidor de pruebas que reproduce las API de los cuatro proveedores (`tests/e2e/payment-mock.mjs`). Antes de cobrar de verdad, haga una compra en el ambiente *sandbox/integración* de cada proveedor que active.
+
+## Probar desde el celular (sin computador, unos 20 minutos)
+
+Todo se hace desde el navegador del teléfono. Use un proyecto de Supabase **solo para pruebas**.
+
+**1. Supabase** ([supabase.com](https://supabase.com), entre con GitHub)
+- **New project** → nombre `sematec-prueba`, región **São Paulo**. Use una contraseña de base de datos **solo con letras y números** y anótela.
+- **Project Settings → API Keys**: copie la *Project URL*, la clave pública (`anon` o *Publishable*) y la secreta (`service_role` o *Secret*).
+- Botón **Connect** (arriba) → **Session pooler** → copie la cadena `postgresql://postgres.…:[YOUR-PASSWORD]@…pooler.supabase.com:5432/postgres` y reemplace `[YOUR-PASSWORD]` por su contraseña.
+
+**2. Vercel** ([vercel.com](https://vercel.com), entre con GitHub)
+- **Add New → Project** → importe `sematec-academy-3`.
+- En **Environment Variables** agregue:
+
+| Variable | Valor |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | clave pública |
+| `SUPABASE_SERVICE_ROLE_KEY` | clave secreta |
+| `DATABASE_URL` | cadena del Session pooler |
+| `SETUP_TOKEN` | una clave inventada de 12+ caracteres |
+| `PAYMENT_LINK_SECRET` | otro texto largo inventado |
+| `WEBPAY_ENABLED` | `1` (Webpay de prueba oficial de Transbank) |
+
+- Presione **Deploy** y espere unos 2 minutos.
+
+**3. Instalar**: abra `https://<su-proyecto>.vercel.app/instalar`, ingrese su `SETUP_TOKEN`, deje marcado «Cargar datos y usuarios de demostración» y presione **Instalar**. Luego **elimine `SETUP_TOKEN`** en Vercel.
+
+**4. Probar**: contraseña de todos los usuarios demo `Sematec-Demo-2026` (`estudiante1.a@…`, `profesor2.a@…`, `secretaria.a@…`, `propietario.a@…` con MFA). Para pagar con Webpay de prueba: tarjeta **4051 8856 0044 6623**, CVV **123**, RUT **11.111.111-1**, clave **123**.
+
+Verificado: `tests/e2e/e2e_celular.py` instala sobre una base vacía equivalente a un proyecto Supabase nuevo y usa la plataforma en tamaño iPhone (11/11).
 
 ## 3. Publicación paso a paso
 

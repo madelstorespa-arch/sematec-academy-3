@@ -5,5 +5,8 @@ function req(name: string, value: string | undefined): string {
 export const env = {
   supabaseUrl: () => req('NEXT_PUBLIC_SUPABASE_URL', process.env.NEXT_PUBLIC_SUPABASE_URL),
   supabaseAnonKey: () => req('NEXT_PUBLIC_SUPABASE_ANON_KEY', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
-  siteUrl: () => process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000',
+  /** Dirección pública. En Vercel se detecta sola si no se define NEXT_PUBLIC_SITE_URL. */
+  siteUrl: () => (process.env.NEXT_PUBLIC_SITE_URL
+    ?? (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
+    ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')).replace(/\/$/, ''),
 };
