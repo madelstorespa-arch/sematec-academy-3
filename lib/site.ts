@@ -16,10 +16,15 @@ export const anonClient = () => createPlain(env.supabaseUrl(), env.supabaseAnonK
 
 /** Sitio público activo (SITE_ORG_ID permite fijar la institución si hay varias publicadas). */
 export const getPublicSite = cache(async (): Promise<Site | null> => {
-  let q = anonClient().from('site_settings').select('*').eq('is_published', true);
-  if (process.env.SITE_ORG_ID) q = q.eq('organization_id', process.env.SITE_ORG_ID);
-  const { data } = await q.order('updated_at').limit(1).maybeSingle();
-  return (data as Site) ?? null;
+  try {
+    let q = anonClient().from('site_settings').select('*').eq('is_published', true);
+    if (process.env.SITE_ORG_ID) q = q.eq('organization_id', process.env.SITE_ORG_ID);
+    const { data } = await q.order('updated_at').limit(1).maybeSingle();
+    return (data as Site) ?? null;
+  } catch (e) {
+    console.error('Sitio público no disponible:', (e as Error).message);
+    return null; // configuración incompleta o base aún sin instalar
+  }
 });
 
 export const mediaUrl = (id?: string | null) => (id ? `/media/${id}` : null);
