@@ -3,7 +3,7 @@ import { PageHeader, Card, StatusBadge, Empty, Badge } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField } from '@/components/forms';
 import { campusOptions, countryOptions } from '@/lib/options';
 import { createTeacher, setTeacherStatus } from './actions';
-import { grantPortalAccess } from '../estudiantes/actions';
+import { grantPortalAccess, resetPortalPassword } from '../estudiantes/actions';
 
 export const metadata = { title: 'Profesores' };
 
@@ -42,10 +42,18 @@ export default async function Page() {
       )}
       <Card>
         {teachers?.length ? <div className="overflow-x-auto"><table className="table">
-          <thead><tr><th>Código</th><th>Nombre</th><th>Correo</th><th>Especialidad</th><th>Sede</th><th>Estado</th><th>Portal</th></tr></thead>
+          <thead><tr><th>Código</th><th>Nombre</th><th>Acceso al portal</th><th>Correo</th><th>Especialidad</th><th>Sede</th><th>Estado</th></tr></thead>
           <tbody>{teachers.map((t: any) => (
             <tr key={t.id}>
-              <td className="font-mono text-xs">{t.teacher_code}</td><td>{t.last_names}, {t.first_names}</td><td>{t.email}</td>
+              <td className="font-mono text-xs">{t.teacher_code}</td><td>{t.last_names}, {t.first_names}</td>
+              <td>{edit ? (t.user_id ? (
+                <ActionForm action={resetPortalPassword} inline submitLabel="🔑 Nueva contraseña" submitClass="btn-secondary btn-sm" resetOnSuccess={false}>
+                  <input type="hidden" name="kind" value="teacher" /><input type="hidden" name="id" value={t.id} />
+                </ActionForm>) : (
+                <ActionForm action={grantPortalAccess} inline submitLabel="🔑 Crear contraseña" submitClass="btn-primary btn-sm" resetOnSuccess={false}>
+                  <input type="hidden" name="kind" value="teacher" /><input type="hidden" name="id" value={t.id} /><input type="hidden" name="email" value={t.email} />
+                </ActionForm>)) : t.user_id ? <Badge color="green">Con cuenta</Badge> : <Badge>Sin cuenta</Badge>}</td>
+              <td>{t.email}</td>
               <td>{t.specialty ?? '—'}</td><td>{t.campuses?.name ?? '—'}</td>
               <td>{edit ? (
                 <ActionForm action={setTeacherStatus} inline submitLabel="✓" submitClass="btn-secondary btn-sm" resetOnSuccess={false}>
@@ -54,10 +62,6 @@ export default async function Page() {
                     <option value="active">Activo</option><option value="inactive">Inactivo</option><option value="suspended">Suspendido</option>
                   </select>
                 </ActionForm>) : <StatusBadge status={t.status} />}</td>
-              <td>{t.user_id ? <Badge color="green">Activo</Badge> : edit ? (
-                <ActionForm action={grantPortalAccess} inline submitLabel="Dar acceso" submitClass="btn-secondary btn-sm" resetOnSuccess={false}>
-                  <input type="hidden" name="kind" value="teacher" /><input type="hidden" name="id" value={t.id} /><input type="hidden" name="email" value={t.email} />
-                </ActionForm>) : <Badge>Sin cuenta</Badge>}</td>
             </tr>))}</tbody>
         </table></div> : <Empty>Aún no hay profesores registrados.</Empty>}
       </Card>

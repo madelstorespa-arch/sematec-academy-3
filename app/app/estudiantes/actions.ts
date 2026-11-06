@@ -2,7 +2,8 @@
 import { revalidatePath } from 'next/cache';
 import { getContext, can } from '@/lib/context';
 import { fail, guard, ok, reqStr, str, type ActionResult } from '@/lib/actions';
-import { ensureAuthUser } from '@/lib/users';
+import { ensureAuthUser, tempPassword } from '@/lib/users';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 function personFields(fd: FormData) {
   return {
@@ -61,5 +62,35 @@ export async function grantPortalAccess(fd: FormData): Promise<ActionResult> {
     if ('password' in user && user.password)
       return ok(`Cuenta creada para ${email}. Contraseña temporal (se muestra solo esta vez): ${user.password}`);
     return ok(user.created ? `Invitación enviada a ${email}.` : `Cuenta existente ${email} vinculada.`);
+  });
+}
+
+/**
+ * Genera una contraseña temporal nueva para la cuenta de portal de un estudiante o profesor.
+ * Solo para cuentas cuyo único rol es estudiante/profesor: nunca restablece cuentas administrativas.
+ */
+export async function resetPortalPassword(fd: FormData): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getContext();
+    const kind = reqStr(fd, 'kind', 'tipo') as 'student' | 'teacher';
+    const id = reqStr(fd, 'id', 'id');
+    if (!can(ctx, kind === 'student' ? 'students.edit' : 'teachers.edit')) return fail('No tiene permisos.');
+    const table = kind === 'student' ? 'students' : 'teachers';
+    // Lectura con RLS: confirma que la ficha pertenece a una institución del usuario actual
+    const { data: person } = await ctx.supabase.from(table).select('user_id, email, organization_id').eq('id', id).maybeSingle();
+    if (!person?.user_id) return fail('Esta ficha aún no tiene cuenta. Use «Dar acceso».');
+    const admin = createAdminClient();
+    const { data: roles } = await admin.from('memberships').select('status, roles(code)').eq('user_id', person.user_id);
+    const privileged = (roles ?? []).some((m: any) => m.status === 'active' && !['estudiante', 'profesor'].includes(m.roles?.code));
+    if (privileged) return fail('La cuenta tiene un rol administrativo: su contraseña solo puede cambiarla su titular.');
+    const password = tempPassword();
+    const { error } = await admin.auth.admin.updateUserById(person.user_id, { password });
+    if (error) return fail(error.message);
+    await admin.from('profiles').update({ status: 'active', status_reason: null }).eq('id', person.user_id).eq('status', 'locked');
+    await admin.from('system_events').insert({
+      organization_id: person.organization_id, user_id: person.user_id, event_type: 'password_reset_by_admin', severity: 'warning',
+      details: { by: ctx.user.id, kind },
+    });
+    return ok(`Nueva contraseña temporal para ${person.email} (se muestra solo esta vez): ${password}`);
   });
 }
