@@ -38,7 +38,7 @@ export function ActionForm({
             }
             onDone?.(r);
           } catch {
-            setResult({ ok: false, error: 'Sin conexión con el servidor: la operación NO fue guardada. Revise su conexión y vuelva a intentarlo.' });
+            setResult({ ok: false, error: 'No se pudo contactar al servidor: la operación NO fue guardada. Recargue la página (F5) y vuelva a intentarlo; si persiste, revise su conexión.' });
           }
         });
       }}
