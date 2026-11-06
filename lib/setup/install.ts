@@ -1,7 +1,7 @@
 import 'server-only';
 import crypto from 'node:crypto';
 import { Client } from 'pg';
-import { MIGRATIONS, DEMO_SQL } from './sql.generated';
+import { MIGRATIONS, DEMO_SQL, DEMO_USERS_SQL } from './sql.generated';
 
 export const setupEnabled = () => !!process.env.SETUP_TOKEN && !!process.env.DATABASE_URL;
 
@@ -68,6 +68,19 @@ export async function runInstall(withDemo: boolean) {
       const unlocked = await c.query(`update public.profiles p set status = 'active', status_reason = null
         from auth.users u where u.id = p.id and u.email like '%@demo.sematec.test' and p.status = 'locked'`);
       log.push(`✓ Acceso de usuarios demo verificado (${fixed.rowCount ?? 0} reparados, ${unlocked.rowCount ?? 0} desbloqueados)`);
+      // Diagnóstico y reparación por usuario: existencia, contraseña demo e identidad de correo
+      await c.query('begin'); await c.query(DEMO_USERS_SQL); await c.query('commit');
+      const pw = await c.query(`update auth.users set encrypted_password = extensions.crypt('Sematec-Demo-2026', extensions.gen_salt('bf')),
+          email_confirmed_at = coalesce(email_confirmed_at, now()), banned_until = null
+        where email like '%@demo.sematec.test'
+          and (encrypted_password is null or encrypted_password <> extensions.crypt('Sematec-Demo-2026', encrypted_password)
+               or email_confirmed_at is null or banned_until is not null)`);
+      const d = (await c.query(`select count(*)::int as users,
+          count(*) filter (where encrypted_password = extensions.crypt('Sematec-Demo-2026', encrypted_password))::int as pass_ok,
+          count(*) filter (where exists (select 1 from auth.identities i where i.user_id = u.id and i.provider = 'email'))::int as ident_ok,
+          count(*) filter (where exists (select 1 from public.profiles p where p.id = u.id and p.status = 'active'))::int as active
+        from auth.users u where u.email like '%@demo.sematec.test'`)).rows[0];
+      log.push(`✓ Usuarios demo: ${d.users} en Auth · ${d.pass_ok} con contraseña demo · ${d.ident_ok} con identidad · ${d.active} activos · ${pw.rowCount ?? 0} contraseñas restablecidas`);
     }
     await c.query("notify pgrst, 'reload schema'");
     return log;

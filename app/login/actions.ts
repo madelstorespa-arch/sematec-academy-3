@@ -21,6 +21,12 @@ export async function signIn(fd: FormData): Promise<ActionResult> {
       const ip = (h.get('x-forwarded-for') ?? '').split(',')[0].trim() || null;
       await createAdminClient().rpc('record_login_failure', { p_email: email, p_ip: ip, p_user_agent: h.get('user-agent') });
     } catch { /* el registro no debe impedir responder */ }
+    const code = (error as { code?: string } | null)?.code;
+    const status = (error as { status?: number } | null)?.status;
+    if (error && code !== 'invalid_credentials' && !(status === 400 && !code)) {
+      console.error('[login] Supabase Auth', status, code, error.message);
+      return { ok: false, error: `No se pudo iniciar sesión: el servicio de autenticación respondió «${code ?? status ?? 'error'}». Si persiste, revise la configuración del proyecto.` };
+    }
     return { ok: false, error: 'Correo o contraseña incorrectos.' };
   }
   const { data: profile } = await supabase.from('profiles').select('status').eq('id', data.user.id).maybeSingle();
