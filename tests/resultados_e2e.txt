@@ -1,0 +1,44 @@
+OK   Ruta protegida redirige al inicio de sesión
+OK   Credenciales incorrectas rechazadas con mensaje claro
+OK   Intento fallido registrado en eventos de seguridad
+OK   Estudiante registrado desde el formulario
+OK   El registro existe en PostgreSQL
+OK   Código duplicado rechazado con mensaje claro
+OK   Estudiante visible desde otro dispositivo/sesión
+OK   Sin internet: mensaje claro de que NO se guardó
+OK   Sin internet: nada se guardó en la base
+OK   Restricción por sede aplicada en la interfaz
+OK   Secretaría no accede a Finanzas (404)
+OK   MFA (TOTP) inscrita y verificada para administrador
+OK   Matrícula con arancel en 4 cuotas
+OK   Pago registrado con recibo correlativo
+OK   Imputación a cuotas más antiguas (300000,150000,0,0)
+OK   Transacción duplicada rechazada
+OK   Pago anulado con reverso
+OK   Pago queda anulado (no borrado) en la base
+OK   Usuario nuevo creado con rol y contraseña temporal
+OK   Auditoría: cadena íntegra verificada desde la interfaz
+OK   Matrículas inscribe EST-0001 en Bases de Datos
+OK   Matrículas inscribe EST-0002 en Bases de Datos
+OK   Clase registrada en libro de clases
+OK   Asistencia guardada
+OK   Evaluación Prueba 1 (40 %)
+OK   Evaluación Proyecto (60 %)
+OK   Planilla de notas guardada
+OK   Nota fuera de escala rechazada
+OK   Acta cerrada por la profesora
+OK   Nota final ponderada y resultado (3.30:failed,5.90:approved)
+OK   Estudiante ve sus notas publicadas en el portal
+OK   Estudiante no accede al listado de estudiantes
+OK   Certificado emitido tras validar aprobación
+OK   Certificado rechazado si la asignatura no está aprobada
+OK   Verificación pública (sin sesión) confirma autenticidad
+OK   Código falso detectado
+OK   Profesora crea aula virtual de su sección
+OK   Sesión programada
+OK   Profesora y estudiante conectados por audio/video en LiveKit
+OK   Webhook de LiveKit registró entradas en la base (2 participantes)
+OK   Usuario de otra institución no obtiene token de la sala
+OK   Profesora finaliza la sesión y se calcula asistencia
+
+Verificaciones de punta a punta: 42/42

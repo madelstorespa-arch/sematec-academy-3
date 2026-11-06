@@ -1,0 +1,37 @@
+{
+  "name": "sematec-academy",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test:db": "bash tests/run_local.sh",
+    "test:e2e": "node tests/e2e/run.mjs",
+    "demo:usuarios": "node scripts/crear-usuarios-demo.mjs"
+  },
+  "dependencies": {
+    "@livekit/components-react": "2.9.25",
+    "@livekit/components-styles": "^1.1.6",
+    "@supabase/ssr": "0.12.7",
+    "@supabase/supabase-js": "2.119.0",
+    "livekit-client": "2.23.0",
+    "livekit-server-sdk": "2.19.2",
+    "next": "15.5.29",
+    "qrcode": "^1.5.4",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "server-only": "^0.0.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.3.4",
+    "@types/node": "^22",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "tailwindcss": "4.3.4",
+    "typescript": "^5.9.3"
+  }
+}

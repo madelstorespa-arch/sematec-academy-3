@@ -1,0 +1,187 @@
+Resultados de pruebas SEMATEC GLOBAL 10.0 — 2026-11-06 10:04 UTC
+Servidor: PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, 64-bit
+
+=== 01_aislamiento_y_roles.sql ===
+  OK   anon no puede leer estudiantes [bloqueado: permission denied for table students]
+  OK   anon no puede leer instituciones [bloqueado: permission denied for table organizations]
+  OK   Propietario A ve solo 1 institución
+  OK   Propietario A ve sus 3 estudiantes
+  OK   Propietario A NO ve estudiantes de B
+  OK   Propietario A no puede crear estudiantes en B [bloqueado: new row violates row-level security policy for table "students"]
+  OK   Lectura directa por id de B devuelve vacío
+  OK   UPDATE cruzado no modificó el registro de B
+  OK   Correo inválido rechazado [bloqueado: new row for relation "students" violates check constraint "students_email_check"]
+  OK   Código de estudiante duplicado rechazado [bloqueado: duplicate key value violates unique constraint "students_organization_id_student_code_key"]
+  OK   Documento de identidad duplicado rechazado [bloqueado: duplicate key value violates unique constraint "students_organization_id_id_document_country_id_document_ty_key"]
+  OK   Secretaría registra estudiante válido
+  OK   Secretaría de Santiago no ve estudiante de Valparaíso
+  OK   Secretaría no registra en otra sede [bloqueado: new row violates row-level security policy for table "students"]
+  OK   No se permite borrar estudiantes [bloqueado: permission denied for table students]
+  OK   Estudiante ve solo su propio registro
+  OK   Estudiante ve solo su matrícula
+  OK   Estudiante no ve pagos ajenos
+  OK   Estudiante no puede editar su expediente (intacto)
+  OK   Profesor sin alumnos inscritos no ve estudiantes
+  OK   Profesor no puede crear cargos [bloqueado: No autorizado (finance.create).]
+  OK   Soporte técnico no ve estudiantes
+  OK   Soporte técnico no ve pagos
+  OK   Soporte técnico ve la configuración institucional
+  OK   Cuenta suspendida no ve datos
+  OK   Membresía vencida no da acceso
+
+=== 02_seguridad_mfa_auditoria.sql ===
+  OK   Propietario sin MFA (aal1) no accede a datos
+  OK   Sin MFA no puede otorgar roles [bloqueado: No autorizado para otorgar el rol secretaria]
+  OK   Con MFA el propietario otorga rol de secretaría
+  OK   Nadie se otorga roles a sí mismo [bloqueado: No puede otorgarse roles a sí mismo]
+  OK   Inserción directa de membresías prohibida [bloqueado: permission denied for table memberships]
+  OK   No puede otorgar roles en otra institución [bloqueado: No autorizado para otorgar el rol secretaria]
+  OK   No puede crear roles con permisos que no tiene [bloqueado: No puede delegar el permiso finance.void que no posee]
+  OK   No puede otorgar un rol con permisos superiores a los suyos [bloqueado: No autorizado para otorgar el rol tesoreria]
+  OK   Sí crea roles personalizados dentro de sus permisos
+  OK   No puede marcarse como superadministrador [bloqueado: permission denied for table profiles]
+  OK   No puede cambiar su propio estado de cuenta [bloqueado: permission denied for table profiles]
+  OK   Sí puede actualizar su nombre
+  OK   Solo superadmin crea instituciones [bloqueado: Solo el superadministrador puede crear instituciones]
+  OK   Superadmin sin MFA no crea instituciones [bloqueado: Solo el superadministrador puede crear instituciones]
+  OK   Superadmin con MFA crea institución con propietario (transacción única)
+  OK   Superadmin no ve estudiantes sin membresía
+  OK   Cuenta bloqueada tras 5 intentos fallidos
+  OK   Evento crítico account_locked registrado
+  OK   Cuenta bloqueada no accede
+  OK   Usuarios no pueden invocar funciones del backend [bloqueado: permission denied for function record_login_failure]
+  OK   Modificación auditada con actor y campos cambiados
+  OK   Auditor lee la auditoría de su institución
+  OK   Auditor no ve auditoría de otra institución
+  OK   Cadena de auditoría de A íntegra
+  OK   Auditor no puede borrar auditoría [bloqueado: permission denied for table audit_events]
+  OK   Ni el superusuario puede editar la auditoría [bloqueado: Registro inmutable (audit_events): UPDATE no permitido]
+  OK   Ni el superusuario puede vaciar la auditoría [bloqueado: Registro inmutable (audit_events): TRUNCATE no permitido]
+  OK   Alteración de auditoría detectada por la cadena de hash
+
+=== 03_academico.sql ===
+  OK   Choque de horario del profesor rechazado [bloqueado: conflicting key value violates exclusion constraint "no_teacher_overlap"]
+  OK   Choque de sala rechazado [bloqueado: conflicting key value violates exclusion constraint "no_room_overlap"]
+  OK   Horario sin conflicto aceptado (bloque contiguo 10:00)
+  OK   Sección no puede apuntar a un periodo de otra institución [bloqueado: insert or update on table "sections" violates foreign key constraint "sections_organization_id_period_id_fkey"]
+  OK   Dos alumnos inscritos
+  OK   Sobrecupo rechazado [bloqueado: Sección sin cupos disponibles (2/2)]
+  OK   Inscripción duplicada rechazada [bloqueado: El estudiante ya está inscrito en la sección]
+  OK   Prerrequisito pendiente rechazado [bloqueado: Prerrequisitos pendientes: PRG101]
+  OK   Choque de horario del estudiante rechazado [bloqueado: Choque de horario con otra asignatura inscrita]
+  OK   Estudiante de otra institución no se inscribe [bloqueado: El estudiante no tiene matrícula activa en el periodo]
+  OK   Estudiante no inscribe a otro [bloqueado: No autorizado]
+  OK   Estudiante se autoinscribe y ve solo sus inscripciones
+  OK   Profesor ve a sus 3 alumnos inscritos
+  OK   Asistencia calculada: 75 %
+  OK   No se registra asistencia de alumno no inscrito [bloqueado: El estudiante no está inscrito en la sección]
+  OK   Ponderaciones > 100 % rechazadas [bloqueado: Las ponderaciones suman 110.00 % (máximo 100 %)]
+  OK   Nota fuera de la escala 1.0-7.0 rechazada [bloqueado: Nota 7.50 fuera de la escala [1.00 - 7.00]]
+  OK   Acta no cierra con notas faltantes [bloqueado: Faltan 1 notas por registrar]
+  OK   Profesor ajeno no ve ni modifica notas de otra sección
+  OK   Estudiante ve solo sus 2 notas publicadas (proyecto oculto)
+  OK   Estudiante no puede ponerse notas [bloqueado: new row violates row-level security policy for table "grades"]
+  OK   est1: nota final 6.0 aprobado
+  OK   est2: nota final 3.9 reprobado
+  OK   est3: reprobado por asistencia 25 % (< 75 %)
+  OK   Acta cerrada bloquea cambios del profesor [bloqueado: Acta cerrada: use la rectificación autorizada]
+  OK   Acta cerrada bloquea cambios de asistencia [bloqueado: Acta cerrada: asistencia bloqueada]
+  OK   Profesor no puede rectificar sin permiso [bloqueado: Rectificación no autorizada (requiere permiso de aprobación y MFA)]
+  OK   Rectificación recalcula: est2 4.2 aprobado
+  OK   Historial de notas conserva valor anterior y motivo
+  OK   Historial de notas inmutable [bloqueado: Registro inmutable (grade_history): DELETE no permitido]
+  OK   est1 aún no cumple requisitos de egreso (faltan asignaturas)
+  OK   Lista de asignaturas pendientes correcta
+
+=== 04_finanzas.sql ===
+  OK   Descuento aplicado: neto 900.000
+  OK   Tres cuotas de 300.000
+  OK   Última cuota absorbe el redondeo; suma exacta
+  OK   Abono 450.000: cuota 1 pagada, cuota 2 parcial
+  OK   Cargo parcialmente pagado
+  OK   Recibo correlativo N° 1
+  OK   Misma transacción del proveedor no se registra dos veces [bloqueado: duplicate key value violates unique constraint "payments_external_reference_uq"]
+  OK   Pago mayor a la deuda rechazado [bloqueado: El monto supera la deuda pendiente seleccionada]
+  OK   Monto negativo rechazado [bloqueado: Monto inválido]
+  OK   Borrado de pagos prohibido [bloqueado: permission denied for table payments]
+  OK   Edición directa de pagos prohibida [bloqueado: permission denied for table payments]
+  OK   Ni el superusuario borra pagos (disparador) [bloqueado: Los registros financieros no se eliminan; use la anulación o el reverso]
+  OK   Ni el superusuario altera montos [bloqueado: Los datos económicos de un pago no se modifican; anule y registre nuevamente]
+  OK   Reembolso 50.000 descontado de la cuota 2
+  OK   Anulación sin MFA rechazada [bloqueado: No autorizado (finance.void).]
+  OK   No se anula un pago con reembolsos vigentes [bloqueado: El pago tiene reembolsos vigentes; anúlelos primero]
+  OK   Pago anulado (no borrado)
+  OK   Anulación genera asientos de reverso
+  OK   Saldos vuelven al estado previo tras el reverso
+  OK   Pago anulado no se anula dos veces [bloqueado: El pago ya está anulado]
+  OK   Saldo pendiente 500.000 (900.000 - 450.000 + 50.000 reembolso)
+  OK   Conciliación detecta transacción faltante
+  OK   Reporte: recaudado neto 400.000
+  OK   Estudiante ve sus 3 cuotas
+  OK   No ve cargos de otro estudiante
+  OK   Estudiante no registra pagos [bloqueado: No autorizado (finance.create).]
+  OK   Secretaría no accede a pagos
+  OK   Institución B no ve pagos de A
+  OK   B no registra pagos a estudiantes de A [bloqueado: No autorizado (finance.create).]
+  OK   Pagos, reembolso y anulación auditados
+  OK   Motivo de anulación registrado en la auditoría
+
+=== 05_certificados_conferencias_documentos.sql ===
+  OK   Certificado de aprobación emitido
+  OK   No se certifica una asignatura no aprobada [bloqueado: La asignatura no está aprobada]
+  OK   No se certifica a estudiantes de otra institución [bloqueado: Estudiante no pertenece a la institución]
+  OK   Certificado de alumno regular con matrícula activa
+  OK   Regla configurable: deuda vencida bloquea certificados [bloqueado: El estudiante registra deuda vencida]
+  OK   Verificación pública: certificado válido e íntegro
+  OK   Código inexistente: not_found
+  OK   Anónimo no lista certificados [bloqueado: permission denied for table certificates]
+  OK   Cada verificación queda registrada
+  OK   Ni el superusuario altera un certificado emitido [bloqueado: El contenido de un certificado emitido no puede alterarse]
+  OK   Certificados no se eliminan [bloqueado: Los certificados no se eliminan; se revocan]
+  OK   Secretaría no puede revocar [bloqueado: No autorizado (requiere permiso de anulación y MFA)]
+  OK   Verificación muestra certificado revocado
+  OK   Estudiante ve su certificado
+  OK   Zona horaria inválida rechazada [bloqueado: Zona horaria inválida: Marte/Olympus]
+  OK   No se invita a usuarios de otra institución [bloqueado: El usuario no pertenece a la institución]
+  OK   Alumno inscrito autorizado como student
+  OK   Alumno: audio/video sí, administración y pantalla no
+  OK   Token temporal (máx. 2 h)
+  OK   Alumno no puede expulsar participantes [bloqueado: No autorizado]
+  OK   Alumno no lee registros de tokens
+  OK   Profesor de la sección recibe permisos de moderación
+  OK   Participante bloqueado no ingresa
+  OK   Usuario de otra institución no ingresa
+  OK   Sesión vencida no emite token
+  OK   Evento repetido del webhook no duplica la asistencia
+  OK   Sala llena (capacidad 3) rechaza ingreso
+  OK   Usuarios no pueden falsificar eventos del webhook [bloqueado: permission denied for function record_conference_event]
+  OK   Tiempo conectado est1 = 50 min (intervalos solapados unidos)
+  OK   Asistencia por regla configurable (75 %): est1 sí, est3 no
+  OK   Asistencia traspasada automáticamente al libro de clases
+  OK   Sesión finalizada
+  OK   Certificado de asistencia emitido a quien cumplió
+  OK   Sin asistencia suficiente no hay certificado [bloqueado: El participante no cumple la asistencia requerida]
+  OK   Versionado: versión 2 sin sobrescribir la 1
+  OK   Ruta de archivo de otra institución rechazada [bloqueado: new row for relation "document_versions" violates check constraint "document_versions_check"]
+  OK   Storage: no se sube a la carpeta de otra institución [bloqueado: new row violates row-level security policy for table "objects"]
+  OK   Storage: archivo legible por personal autorizado
+  OK   Versiones de documentos inmutables [bloqueado: Registro inmutable (document_versions): UPDATE no permitido]
+  OK   Estudiante no ve documentos internos
+  OK   Storage: estudiante no lee el archivo
+  OK   Storage: estudiante no sube archivos institucionales [bloqueado: new row violates row-level security policy for table "objects"]
+  OK   Tipo de archivo no permitido rechazado [bloqueado: new row for relation "enrollment_documents" violates check constraint "enrollment_documents_mime_type_check"]
+  OK   Postulante envía, pero no puede autoaprobarse
+  OK   Postulante no ve estudiantes
+  OK   Postulación aprobada por admisión
+  OK   Admisión lee el documento del postulante
+  OK   Reporte de matrícula: 3 activos en TIN
+  OK   Estudiante no accede a reportes [bloqueado: No autorizado]
+=== concurrencia ===
+  OK   Dos inscripciones simultáneas al último cupo: 1 aceptada, 1 rechazada (sin sobrecupo)
+  OK   Dos pagos simultáneos de la misma deuda: 1 aceptado, 1 rechazado (sin doble cobro)
+NOTICE:  database "sematec_test_restore" does not exist, skipping
+=== backup_restore ===
+  Origen:     audit_events=694,enrollments=4,memberships=14,payments=1,role_permissions=598,students=4
+  Restaurada: audit_events=694,enrollments=4,memberships=14,payments=1,role_permissions=598,students=4
+  OK   Conteos idénticos y cadena de auditoría íntegra en la copia restaurada
+Verificaciones exitosas: 169 · Archivos con fallas: 0

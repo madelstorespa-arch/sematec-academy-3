@@ -1,0 +1,52 @@
+OK   Página de inicio pública visible sin iniciar sesión
+OK   Precios de cursos visibles en la portada
+OK   Detalle de curso con botón de compra
+OK   Página Nosotros con misión y visión
+OK   Formulario de contacto enviado
+OK   Mensaje guardado en la base de datos
+OK   webpay: pago aprobado y verificado con el proveedor
+OK   webpay: pedido pagado con matrícula y pago contable creados (paid|true|true)
+OK   webpay: comprador crea su contraseña
+OK   webpay: comprador accede a su portal de estudiante
+OK   mercadopago: pago aprobado y verificado con el proveedor
+OK   mercadopago: pedido pagado con matrícula y pago contable creados (paid|true|true)
+OK   mercadopago: comprador crea su contraseña
+OK   mercadopago: comprador accede a su portal de estudiante
+OK   flow: pago aprobado y verificado con el proveedor
+OK   flow: pedido pagado con matrícula y pago contable creados (paid|true|true)
+OK   flow: comprador crea su contraseña
+OK   flow: comprador accede a su portal de estudiante
+OK   stripe: pago aprobado y verificado con el proveedor
+OK   stripe: pedido pagado con matrícula y pago contable creados (paid|true|true)
+OK   stripe: comprador crea su contraseña
+OK   stripe: comprador accede a su portal de estudiante
+OK   Los 4 pagos quedan registrados en Finanzas
+OK   Enlace para crear contraseña es de un solo uso
+OK   Resultado de pago protegido: token inválido devuelve 404
+OK   Webpay rechazado: se informa y no se matricula
+OK   Webpay anulado por el comprador
+OK   Monto alterado detectado: pedido rechazado
+OK   Alerta crítica registrada por monto alterado
+OK   Pagos no aprobados no crean matrícula
+OK   Webhook con firma falsa rechazado (401)
+OK   Postulación enviada con código de seguimiento SA-ZYUMGNVM
+OK   Estado: en revisión, aún sin opción de pago
+OK   No se puede pagar una postulación no aprobada
+OK   Admisión aprueba la postulación
+OK   Estado: aprobada con observación y botón de pago
+OK   Postulante aprobado paga con Webpay
+OK   Postulación vinculada a la ficha del estudiante
+OK   Estado: pagado y matrícula activa
+OK   Nombre y color de la academia guardados
+OK   Logo subido desde el panel
+OK   Archivo falso con extensión .png rechazado
+OK   Curso nuevo con precio creado desde el panel
+OK   Mensaje de contacto visible en el panel
+OK   Sitio público muestra el nuevo nombre y el logo
+OK   Curso nuevo publicado con su precio
+OK   Inicio de sesión muestra el logo de la academia
+OK   Foto de perfil subida
+OK   Foto visible en el menú
+OK   Foto de perfil no visible sin sesión
+
+Verificaciones sitio público y pagos: 50/50

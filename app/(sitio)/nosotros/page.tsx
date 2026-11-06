@@ -1,0 +1,18 @@
+import { getPublicSite } from '@/lib/site';
+
+export const metadata = { title: 'Nosotros' };
+
+export default async function Page() {
+  const site = await getPublicSite();
+  return (
+    <main className="mx-auto max-w-4xl px-4 py-12">
+      <h1 className="text-3xl font-bold">Sobre {site?.site_name}</h1>
+      {site?.tagline && <p className="mt-2 text-lg text-slate-600">{site.tagline}</p>}
+      <div className="mt-8 whitespace-pre-line leading-relaxed text-slate-700">{site?.about_text}</div>
+      <div className="mt-10 grid gap-6 md:grid-cols-2">
+        {site?.mission && <div className="rounded-2xl bg-brand-50 p-6"><h2 className="font-bold text-brand-700">Misión</h2><p className="mt-2 whitespace-pre-line text-slate-700">{site.mission}</p></div>}
+        {site?.vision && <div className="rounded-2xl bg-slate-50 p-6"><h2 className="font-bold">Visión</h2><p className="mt-2 whitespace-pre-line text-slate-700">{site.vision}</p></div>}
+      </div>
+    </main>
+  );
+}
