@@ -5,12 +5,15 @@ import { ActionForm, Field, Grid, SelectField } from '@/components/forms';
 import { PersonFields } from '@/components/person-form';
 import { campusOptions, countryOptions } from '@/lib/options';
 import { fmtDate } from '@/lib/format';
-import { addContract, clock, createEmployee, decideLeave, linkEmployeeAccount, requestLeave } from './actions';
+import { addContract, clock, createEmployee, createEmployeeAccount, decideLeave, requestLeave } from './actions';
 
 export const metadata = { title: 'Personal y RR. HH.' };
 const TZ = 'America/Santiago';
 const hm = (iso?: string | null) => iso ? new Date(iso).toLocaleTimeString('es-CL', { timeZone: TZ, hour: '2-digit', minute: '2-digit' }) : '—';
 const LEAVE: Record<string, string> = { vacaciones: 'Vacaciones', administrativo: 'Día administrativo', licencia_medica: 'Licencia médica', sin_goce: 'Permiso sin goce', otro: 'Otro' };
+const STAFF_ROLES = [['secretaria', 'Secretaría académica'], ['admision', 'Admisión'], ['matriculas', 'Matrículas'], ['coordinador', 'Coordinador académico'], ['tesoreria', 'Tesorería (MFA)'],
+  ['contabilidad', 'Contabilidad (MFA)'], ['recursos_humanos', 'Recursos humanos (MFA)'], ['bibliotecario', 'Bibliotecario'], ['soporte_tecnico', 'Soporte técnico (MFA)'], ['administrador_sede', 'Administrador de sede (MFA)']]
+  .map(([value, label]) => ({ value, label }));
 const CT: Record<string, string> = { indefinite: 'Indefinido', fixed_term: 'Plazo fijo', hourly: 'Por horas', fee: 'Honorarios' };
 
 export default async function Page() {
@@ -76,8 +79,12 @@ export default async function Page() {
                           <Field label="Inicio" name="starts_on" type="date" required /><Field label="Término (opcional)" name="ends_on" type="date" />
                           <Field label="Sueldo bruto (CLP)" name="salary_amount" type="number" />
                         </ActionForm></details>) : '—'}</td>
-                    <td>{e.user_id ? <Badge color="green">Vinculada</Badge> : can(ctx, 'employees.edit') && e.email ? (
-                      <ActionForm action={linkEmployeeAccount} inline submitLabel="Vincular" submitClass="btn-secondary btn-sm"><input type="hidden" name="id" value={e.id} /></ActionForm>) : '—'}</td></tr>);
+                    <td>{e.user_id ? <Badge color="green">Con cuenta</Badge> : can(ctx, 'employees.edit') && e.email ? (
+                      <details><summary className="link cursor-pointer text-xs">🔑 Crear cuenta</summary>
+                        <ActionForm action={createEmployeeAccount} submitLabel="Crear cuenta" className="mt-2 w-60 space-y-2"><input type="hidden" name="id" value={e.id} />
+                          <SelectField label="Rol" name="role" required defaultValue="secretaria" options={STAFF_ROLES} />
+                          <Field label="Contraseña" name="password" type="text" autoComplete="new-password" placeholder="Mín. 10, A-z y 0-9" />
+                        </ActionForm></details>) : '—'}</td></tr>);
               })}</tbody></table></div> : <Empty>No hay funcionarios registrados.</Empty>}
           </Card>
           <Card title="Solicitudes de permiso">

@@ -2,7 +2,7 @@
 import { revalidatePath } from 'next/cache';
 import { getContext, can } from '@/lib/context';
 import { fail, guard, num, ok, reqStr, str, type ActionResult } from '@/lib/actions';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { ensureAuthUser, checkPassword } from '@/lib/users';
 
 const back = () => revalidatePath('/app/personal');
 
@@ -33,20 +33,24 @@ export async function addContract(fd: FormData): Promise<ActionResult> {
   });
 }
 
-/** Vincula la ficha con una cuenta existente de la plataforma (para marcar asistencia y pedir permisos). */
-export async function linkEmployeeAccount(fd: FormData): Promise<ActionResult> {
+/** Crea la cuenta del funcionario (contraseña elegida por el administrador), le asigna un rol y la vincula a su ficha. */
+export async function createEmployeeAccount(fd: FormData): Promise<ActionResult> {
   return guard(async () => {
     const ctx = await getContext();
     if (!can(ctx, 'employees.edit')) return fail('No autorizado.');
+    if (!can(ctx, 'security.admin') || ctx.aal !== 'aal2') return fail('Crear cuentas requiere permiso de seguridad y sesión con MFA.');
     const id = reqStr(fd, 'id', 'id');
     const { data: e } = await ctx.supabase.from('employees').select('email, first_names, last_names, user_id').eq('id', id).maybeSingle();
-    if (!e?.email) return fail('La ficha no tiene correo.');
-    const { data: prof } = await createAdminClient().from('profiles').select('id').eq('email', e.email).maybeSingle();
-    if (!prof) return fail('Ese correo no tiene cuenta en la plataforma. Cree primero su usuario en «Usuarios y roles».');
-    const user = { id: prof.id as string };
+    if (!e?.email) return fail('La ficha no tiene correo: agréguelo primero.');
+    const pw = str(fd, 'password');
+    const user = await ensureAuthUser(e.email, `${e.first_names} ${e.last_names}`, 'password', pw ? checkPassword(pw) : undefined);
+    if (user.created && !pw) return fail('Escriba la contraseña para la cuenta nueva.');
+    const { error: e1 } = await ctx.supabase.rpc('grant_membership', { p_user: user.id, p_org: ctx.orgId, p_role_code: reqStr(fd, 'role', 'Rol'), p_campus: null, p_valid_until: null });
+    if (e1) return fail(e1);
     const { error } = await ctx.supabase.from('employees').update({ user_id: user.id }).eq('id', id);
     if (error) return fail(error);
-    back(); return ok('Ficha vinculada a la cuenta. Ya puede marcar asistencia.');
+    back();
+    return ok(user.created ? `Cuenta creada. Usuario: ${e.email} · contraseña: la que usted escribió.` : `Cuenta existente ${e.email} vinculada y con el rol asignado.`);
   });
 }
 

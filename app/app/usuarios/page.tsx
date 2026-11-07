@@ -35,9 +35,10 @@ export default async function Page() {
                 <SelectField label="Rol" name="role" required options={roleOpts} />
                 <SelectField label="Sede (vacío = todas)" name="campus_id" options={campuses} placeholder="Todas las sedes" />
                 <Field label="Vigente hasta (opcional)" name="valid_until" type="date" />
+                <Field label="Contraseña (si la cuenta es nueva)" name="password" type="text" autoComplete="new-password" placeholder="Mín. 10, con A-z y 0-9" />
                 <label className="flex items-center gap-2 self-end pb-2 text-sm"><input type="checkbox" name="invite" /> Invitar por correo (requiere SMTP)</label>
               </Grid>
-              <p className="text-xs text-slate-500">Si el correo no tiene cuenta, se crea. No puede otorgar roles con permisos que usted no posee.</p>
+              <p className="text-xs text-slate-500">Si el correo no tiene cuenta, se crea con la contraseña que usted escriba. No puede otorgar roles con permisos que usted no posee.</p>
             </ActionForm>
           )}
         </Card>

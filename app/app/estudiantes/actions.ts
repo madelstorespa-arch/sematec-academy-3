@@ -2,7 +2,7 @@
 import { revalidatePath } from 'next/cache';
 import { getContext, can } from '@/lib/context';
 import { fail, guard, ok, reqStr, str, type ActionResult } from '@/lib/actions';
-import { ensureAuthUser, tempPassword } from '@/lib/users';
+import { ensureAuthUser, tempPassword, checkPassword } from '@/lib/users';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { workspaceEnabled, createWorkspaceUser } from '@/lib/workspace';
 
@@ -56,12 +56,13 @@ export async function grantPortalAccess(fd: FormData): Promise<ActionResult> {
     const table = kind === 'student' ? 'students' : 'teachers';
     const { data: person } = await ctx.supabase.from(table).select('first_names, last_names').eq('id', id).maybeSingle();
     if (!person) return fail('Ficha no encontrada.');
-    const user = await ensureAuthUser(email, `${person.first_names} ${person.last_names}`, fd.get('invite') ? 'invite' : 'password');
+    const chosen = fd.get('invite') ? null : checkPassword(str(fd, 'password'));
+    const user = await ensureAuthUser(email, `${person.first_names} ${person.last_names}`, fd.get('invite') ? 'invite' : 'password', chosen ?? undefined);
     const { error } = await ctx.supabase.rpc('link_person_account', { p_kind: kind, p_person: id, p_user: user.id });
     if (error) return fail(error);
     revalidatePath(kind === 'student' ? `/app/estudiantes/${id}` : '/app/profesores');
     if ('password' in user && user.password)
-      return ok(`Cuenta creada para ${email}. Contraseña temporal (se muestra solo esta vez): ${user.password}`);
+      return ok(`Cuenta creada. Usuario: ${email} · contraseña: la que usted escribió. Entréguesela a la persona.`);
     return ok(user.created ? `Invitación enviada a ${email}.` : `Cuenta existente ${email} vinculada.`);
   });
 }
@@ -84,7 +85,7 @@ export async function resetPortalPassword(fd: FormData): Promise<ActionResult> {
     const { data: roles } = await admin.from('memberships').select('status, roles(code)').eq('user_id', person.user_id);
     const privileged = (roles ?? []).some((m: any) => m.status === 'active' && !['estudiante', 'profesor'].includes(m.roles?.code));
     if (privileged) return fail('La cuenta tiene un rol administrativo: su contraseña solo puede cambiarla su titular.');
-    const password = tempPassword();
+    const password = checkPassword(str(fd, 'password'));
     const { error } = await admin.auth.admin.updateUserById(person.user_id, { password });
     if (error) return fail(error.message);
     await admin.from('profiles').update({ status: 'active', status_reason: null }).eq('id', person.user_id).eq('status', 'locked');
@@ -92,7 +93,7 @@ export async function resetPortalPassword(fd: FormData): Promise<ActionResult> {
       organization_id: person.organization_id, user_id: person.user_id, event_type: 'password_reset_by_admin', severity: 'warning',
       details: { by: ctx.user.id, kind },
     });
-    return ok(`Nueva contraseña temporal para ${person.email} (se muestra solo esta vez): ${password}`);
+    return ok(`Contraseña actualizada para ${person.email}.`);
   });
 }
 
@@ -111,7 +112,7 @@ export async function createInstitutionalAccount(fd: FormData): Promise<ActionRe
     const { data: person } = await ctx.supabase.from(table).select('first_names, last_names, user_id').eq('id', id).maybeSingle();
     if (!person) return fail('Ficha no encontrada.');
     if (person.user_id) return fail('Esta persona ya tiene cuenta en SEMATEC.');
-    const password = tempPassword();
+    const password = str(fd, 'password') ? checkPassword(str(fd, 'password')) : tempPassword();
     const email = await createWorkspaceUser({ firstNames: person.first_names, lastNames: person.last_names, password });
     const { error: upErr } = await ctx.supabase.from(table).update({ email }).eq('id', id);
     if (upErr) return fail(`Correo ${email} creado en Google, pero no se pudo guardar en la ficha: ${upErr.message}`);

@@ -37,3 +37,11 @@ export async function ensureAuthUser(email: string, fullName: string, mode: 'inv
   if (error || !data.user) throw new Error(error?.message ?? 'No se pudo crear la cuenta');
   return { id: data.user.id, created: true as const, password };
 }
+
+/** Contraseña elegida por el administrador: 10+ caracteres con mayúscula, minúscula y número. */
+export function checkPassword(pw: string | null): string {
+  if (!pw) throw new Error('Escriba la contraseña para la cuenta.');
+  if (pw.length < 10 || !/[A-Z]/.test(pw) || !/[a-z]/.test(pw) || !/[0-9]/.test(pw))
+    throw new Error('La contraseña debe tener al menos 10 caracteres, con mayúsculas, minúsculas y números.');
+  return pw;
+}

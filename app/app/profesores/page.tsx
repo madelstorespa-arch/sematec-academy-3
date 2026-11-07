@@ -3,7 +3,8 @@ import { PageHeader, Card, StatusBadge, Empty, Badge } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField } from '@/components/forms';
 import { campusOptions, countryOptions } from '@/lib/options';
 import { createTeacher, setTeacherStatus } from './actions';
-import { grantPortalAccess, resetPortalPassword, createInstitutionalAccount } from '../estudiantes/actions';
+import { createInstitutionalAccount } from '../estudiantes/actions';
+import { AccessForm } from '@/components/access-form';
 import { workspaceEnabled, workspaceDomain } from '@/lib/workspace';
 
 export const metadata = { title: 'Profesores' };
@@ -48,19 +49,14 @@ export default async function Page() {
           <tbody>{teachers.map((t: any) => (
             <tr key={t.id}>
               <td className="font-mono text-xs">{t.teacher_code}</td><td>{t.last_names}, {t.first_names}</td>
-              <td>{edit ? (t.user_id ? (
-                <ActionForm action={resetPortalPassword} inline submitLabel="🔑 Nueva contraseña" submitClass="btn-secondary btn-sm" resetOnSuccess={false}>
-                  <input type="hidden" name="kind" value="teacher" /><input type="hidden" name="id" value={t.id} />
-                </ActionForm>) : (
+              <td>{edit ? (
                 <div className="flex flex-col gap-1">
-                  {ws && (
-                    <ActionForm action={createInstitutionalAccount} inline submitLabel={`📧 Crear correo @${ws}`} submitClass="btn-primary btn-sm" resetOnSuccess={false}>
+                  {ws && !t.user_id && (
+                    <ActionForm action={createInstitutionalAccount} inline submitLabel={`📧 Crear correo @${ws}`} submitClass="btn-secondary btn-sm" resetOnSuccess={false}>
                       <input type="hidden" name="kind" value="teacher" /><input type="hidden" name="id" value={t.id} />
                     </ActionForm>)}
-                  <ActionForm action={grantPortalAccess} inline submitLabel="🔑 Crear contraseña" submitClass={ws ? 'btn-secondary btn-sm' : 'btn-primary btn-sm'} resetOnSuccess={false}>
-                    <input type="hidden" name="kind" value="teacher" /><input type="hidden" name="id" value={t.id} /><input type="hidden" name="email" value={t.email} />
-                  </ActionForm>
-                </div>)) : t.user_id ? <Badge color="green">Con cuenta</Badge> : <Badge>Sin cuenta</Badge>}</td>
+                  <AccessForm kind="teacher" id={t.id} email={t.email} hasAccount={!!t.user_id} />
+                </div>) : t.user_id ? <Badge color="green">Con cuenta</Badge> : <Badge>Sin cuenta</Badge>}</td>
               <td>{t.email}</td>
               <td>{t.specialty ?? '—'}</td><td>{t.campuses?.name ?? '—'}</td>
               <td>{edit ? (

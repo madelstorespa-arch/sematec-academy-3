@@ -2,20 +2,21 @@
 import { revalidatePath } from 'next/cache';
 import { getContext, can } from '@/lib/context';
 import { fail, guard, ok, reqStr, str, type ActionResult } from '@/lib/actions';
-import { ensureAuthUser } from '@/lib/users';
+import { ensureAuthUser, checkPassword } from '@/lib/users';
 
 export async function grantRole(fd: FormData): Promise<ActionResult> {
   return guard(async () => {
     const ctx = await getContext();
     if (!can(ctx, 'security.admin') || ctx.aal !== 'aal2') return fail('Requiere permiso de seguridad y sesión con MFA.');
     const email = reqStr(fd, 'email', 'Correo').toLowerCase();
-    const user = await ensureAuthUser(email, reqStr(fd, 'full_name', 'Nombre'), fd.get('invite') ? 'invite' : 'password');
+    const pw = str(fd, 'password');
+    const user = await ensureAuthUser(email, reqStr(fd, 'full_name', 'Nombre'), fd.get('invite') ? 'invite' : 'password', pw ? checkPassword(pw) : undefined);
     const { error } = await ctx.supabase.rpc('grant_membership', {
       p_user: user.id, p_org: ctx.orgId, p_role_code: reqStr(fd, 'role', 'Rol'), p_campus: str(fd, 'campus_id'), p_valid_until: str(fd, 'valid_until'),
     });
     if (error) return fail(error);
     revalidatePath('/app/usuarios');
-    if ('password' in user && user.password) return ok(`Rol asignado. Cuenta nueva ${email} · contraseña temporal (se muestra solo esta vez): ${user.password}`);
+    if ('password' in user && user.password) return ok(pw ? `Rol asignado. Cuenta nueva ${email} con la contraseña que usted escribió.` : `Rol asignado. Cuenta nueva ${email} · contraseña temporal (se muestra solo esta vez): ${user.password}`);
     return ok(user.created ? `Rol asignado e invitación enviada a ${email}.` : `Rol asignado a ${email}.`);
   });
 }

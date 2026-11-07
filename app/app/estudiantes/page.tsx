@@ -4,7 +4,8 @@ import { PageHeader, Card, StatusBadge, Empty } from '@/components/ui';
 import { ActionForm } from '@/components/forms';
 import { PersonFields } from '@/components/person-form';
 import { campusOptions, countryOptions } from '@/lib/options';
-import { createStudent, grantPortalAccess, resetPortalPassword } from './actions';
+import { createStudent } from './actions';
+import { AccessForm } from '@/components/access-form';
 
 export const metadata = { title: 'Estudiantes' };
 
@@ -44,13 +45,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
               <tr key={s.id}>
                 <td className="font-mono text-xs">{s.student_code}</td>
                 <td><Link className="link" href={`/app/estudiantes/${s.id}`}>{s.last_names}, {s.first_names}</Link></td>
-                <td>{!edit ? (s.user_id ? 'Con cuenta' : 'Sin cuenta') : s.user_id ? (
-                  <ActionForm action={resetPortalPassword} inline submitLabel="🔑 Nueva contraseña" submitClass="btn-secondary btn-sm" resetOnSuccess={false}>
-                    <input type="hidden" name="kind" value="student" /><input type="hidden" name="id" value={s.id} />
-                  </ActionForm>) : s.email ? (
-                  <ActionForm action={grantPortalAccess} inline submitLabel="🔑 Crear contraseña" submitClass="btn-primary btn-sm" resetOnSuccess={false}>
-                    <input type="hidden" name="kind" value="student" /><input type="hidden" name="id" value={s.id} /><input type="hidden" name="email" value={s.email} />
-                  </ActionForm>) : <Link className="link text-xs" href={`/app/estudiantes/${s.id}`}>Agregar correo</Link>}</td>
+                <td>{!edit ? (s.user_id ? 'Con cuenta' : 'Sin cuenta') : (s.user_id || s.email) ? <AccessForm kind="student" id={s.id} email={s.email} hasAccount={!!s.user_id} />
+                  : <Link className="link text-xs" href={`/app/estudiantes/${s.id}`}>Agregar correo</Link>}</td>
                 <td>{s.id_document_number}</td><td>{s.campuses?.name ?? '—'}</td><td>{s.email ?? '—'}</td>
                 <td><StatusBadge status={s.status} /></td>
               </tr>))}
