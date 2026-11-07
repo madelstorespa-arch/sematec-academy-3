@@ -4,12 +4,12 @@
  * - Imágenes (/media) y materiales del aula: se guardan al verlos.
  * - Nunca se guardan /api, /auth, /instalar ni respuestas de otros sitios.
  * Al cerrar sesión el servidor envía Clear-Site-Data: "cache" y todo se borra del dispositivo. */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const STATIC = 'sematec-static-' + VERSION;
 const PAGES = 'sematec-pages';
 const MEDIA = 'sematec-media';
 const MAX_PAGES = 80;
-const PRECACHE = ['/offline.html', '/icons/icon-192.png', '/icons/icon-512.png', '/manifest.webmanifest'];
+const PRECACHE = ['/offline.html', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(STATIC).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting()));
@@ -72,7 +72,7 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(cacheFirst(req, STATIC));
     return;
   }
-  if (url.pathname.startsWith('/media/') || url.pathname.startsWith('/app/aula/archivo/')) {
+  if (url.pathname.startsWith('/media/') || url.pathname.startsWith('/app/aula/archivo/') || url.pathname.startsWith('/app-icon/') || url.pathname === '/manifest.webmanifest') {
     e.respondWith(staleWhileRevalidate(req, MEDIA));
     return;
   }

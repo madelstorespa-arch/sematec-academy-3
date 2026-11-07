@@ -61,6 +61,7 @@ export default async function Page() {
               // eslint-disable-next-line @next/next/no-img-element
               ? <img src={`/media/${s0.logo_asset_id}`} alt="Logo" className="mb-4 h-20 w-auto rounded bg-slate-100 object-contain p-2" />
               : <p className="mb-4 text-sm text-slate-500">Sin logo (se usan las iniciales).</p>}
+            <p className="mb-4 text-xs text-slate-500">📲 Este logo es también el <b>ícono de la app</b> en celulares y computadores. Use una imagen cuadrada o casi cuadrada (PNG con fondo transparente, 512×512 px o más) para que se vea nítido.</p>
             <ActionForm action={uploadSiteImage} submitLabel="Subir logo">
               <input type="hidden" name="kind" value="logo" />
               <input type="file" name="file" accept="image/png,image/jpeg,image/webp" required className="text-sm" />
