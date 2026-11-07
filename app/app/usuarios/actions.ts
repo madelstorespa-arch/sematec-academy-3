@@ -10,7 +10,8 @@ export async function grantRole(fd: FormData): Promise<ActionResult> {
     if (!can(ctx, 'security.admin') || ctx.aal !== 'aal2') return fail('Requiere permiso de seguridad y sesión con MFA.');
     const email = reqStr(fd, 'email', 'Correo').toLowerCase();
     const pw = str(fd, 'password');
-    const user = await ensureAuthUser(email, reqStr(fd, 'full_name', 'Nombre'), fd.get('invite') ? 'invite' : 'password', pw ? checkPassword(pw) : undefined);
+    // Si escribió contraseña se usa esa (aunque esté marcado «Invitar por correo»)
+    const user = await ensureAuthUser(email, reqStr(fd, 'full_name', 'Nombre'), fd.get('invite') && !pw ? 'invite' : 'password', pw ? checkPassword(pw) : undefined);
     const { error } = await ctx.supabase.rpc('grant_membership', {
       p_user: user.id, p_org: ctx.orgId, p_role_code: reqStr(fd, 'role', 'Rol'), p_campus: str(fd, 'campus_id'), p_valid_until: str(fd, 'valid_until'),
     });
