@@ -30,7 +30,7 @@ export default async function Page({ params }: { params: Promise<{ id: string; t
         {(posts ?? []).map((p: any) => (
           <Card key={p.id}><p className="text-xs text-slate-500">{p.author_name} · {fmtDateTime(p.created_at)}</p><p className="mt-2 whitespace-pre-line text-sm">{p.body}</p></Card>))}
         {(manager || (student && !t.locked)) ? (
-          <Card title="Responder"><ActionForm action={replyThread} submitLabel="Publicar respuesta">{h}<TextArea label="Mensaje" name="body" required rows={4} /></ActionForm></Card>
+          <Card title="Responder"><ActionForm action={replyThread} offline={{ key: 'foro_respuesta', label: 'Respuesta en el foro' }} submitLabel="Publicar respuesta">{h}<TextArea label="Mensaje" name="body" required rows={4} /></ActionForm></Card>
         ) : t.locked ? <p className="text-sm text-slate-500">Este tema está cerrado.</p> : null}
       </div>
     </>

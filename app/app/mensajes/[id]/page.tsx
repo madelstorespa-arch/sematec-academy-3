@@ -21,7 +21,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       <Link href="/app/mensajes" className="link text-sm">← Volver a mensajes</Link>
       <Card className="mt-4"><p className="whitespace-pre-line text-sm">{m.body}</p></Card>
       <Card title="Responder" className="mt-6">
-        <ActionForm action={sendMessage} submitLabel="Enviar respuesta">
+        <ActionForm action={sendMessage} offline={{ key: 'mensaje', label: 'Respuesta a mensaje' }} submitLabel="Enviar respuesta">
           <input type="hidden" name="recipient_id" value={other} />
           <input type="hidden" name="parent_id" value={m.id} />
           <input type="hidden" name="subject" value={m.subject.startsWith('Re: ') ? m.subject : `Re: ${m.subject}`} />

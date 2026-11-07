@@ -5,6 +5,7 @@ import { brandStyle } from '@/lib/site';
 import { Nav, type NavItem } from '@/components/nav';
 import { switchOrg } from './actions';
 import { MobileMenu } from '@/components/mobile-menu';
+import { OfflineBar, LogoutButton } from '@/components/offline-bar';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,11 +79,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
           <p className="truncate">{ctx.org?.roles.join(', ') ?? (ctx.isPlatformAdmin ? 'Superadministrador' : 'Sin rol')}</p>
           <p className="mt-1">{ctx.aal === 'aal2' ? '🔒 Sesión con MFA' : 'Sesión estándar'}</p>
-          <form action="/auth/salir" method="post"><button className="mt-2 text-sky-200 hover:underline">Cerrar sesión</button></form>
+          <LogoutButton className="mt-2 text-sky-200 hover:underline" />
         </div>
         </MobileMenu>
       </aside>
       <main className="min-w-0 flex-1 px-4 py-6 lg:ml-64 lg:px-10 lg:py-8">
+        <OfflineBar userId={ctx.user.id} warmUrls={items.map((i) => i.href)} />
         {!ctx.org && !ctx.isPlatformAdmin ? (
           <div className="card card-pad max-w-xl">
             <h1 className="text-xl font-bold">Cuenta sin institución asignada</h1>

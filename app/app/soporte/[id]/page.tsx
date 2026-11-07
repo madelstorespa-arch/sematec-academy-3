@@ -31,7 +31,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
             </Card>))}
           {t.status !== 'cerrado' || staff ? (
             <Card title="Responder">
-              <ActionForm action={replyTicket} submitLabel="Enviar">
+              <ActionForm action={replyTicket} offline={{ key: 'soporte_respuesta', label: 'Respuesta a soporte' }} submitLabel="Enviar">
                 <input type="hidden" name="ticket_id" value={t.id} />
                 <TextArea label="Mensaje" name="body" required rows={4} />
                 {staff && <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="internal" /> Nota interna (no la ve el solicitante)</label>}

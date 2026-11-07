@@ -29,7 +29,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       {done ? <Card><Empty>✓ Usted ya respondió esta encuesta. ¡Gracias!</Empty></Card>
         : !open ? <Card><Empty>Esta encuesta no está abierta en este momento.</Empty></Card>
         : (
-          <ActionForm action={answerSurvey} submitLabel="Enviar respuestas" confirm="¿Enviar? Solo se puede responder una vez.">
+          <ActionForm action={answerSurvey} offline={{ key: 'encuesta', label: `Encuesta: ${s.title}`.slice(0, 80) }} submitLabel="Enviar respuestas" confirm="¿Enviar? Solo se puede responder una vez.">
             <input type="hidden" name="survey_id" value={s.id} />
             <div className="space-y-4">
               {(questions ?? []).map((q: any, i: number) => (

@@ -25,7 +25,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ v
         <summary className="cursor-pointer px-5 py-3 text-sm font-bold text-brand-700">✉ Nuevo mensaje</summary>
         <div className="border-t border-slate-100 p-5">
           {opts.length ? (
-            <ActionForm action={sendMessage} submitLabel="Enviar">
+            <ActionForm action={sendMessage} offline={{ key: 'mensaje', label: 'Mensaje' }} submitLabel="Enviar">
               <SelectField label="Para" name="recipient_id" options={opts} required defaultValue={para} />
               <Field label="Asunto" name="subject" required />
               <TextArea label="Mensaje" name="body" required rows={5} />

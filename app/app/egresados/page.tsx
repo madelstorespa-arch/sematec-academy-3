@@ -37,7 +37,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ a
       {ctx.studentId && (
         <Card title="Mi perfil de egresado" className="mb-6">
           <p className="mb-3 text-sm text-slate-600">Cuéntenos qué está haciendo: nos ayuda a mejorar los programas y a enviarle ofertas de empleo.</p>
-          <ActionForm action={saveAlumniProfile} submitLabel="Guardar" resetOnSuccess={false}>
+          <ActionForm action={saveAlumniProfile} offline={{ key: 'egresado', label: 'Perfil de egresado' }} submitLabel="Guardar" resetOnSuccess={false}>
             <Grid cols={3}>
               <Field label="Año de egreso" name="graduation_year" type="number" min={1950} max={2100} defaultValue={mine?.graduation_year} />
               <SelectField label="Situación actual" name="employment" required defaultValue={mine?.employment ?? 'sin_info'} options={empOpts} />

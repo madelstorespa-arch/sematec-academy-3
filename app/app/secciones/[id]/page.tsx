@@ -145,7 +145,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
         </div>
         <Card title={current ? `Asistencia: ${fmtDateTime(current.starts_at, tz)} — ${current.topic ?? ''}` : 'Asistencia'} className="xl:col-span-2">
           {!current ? <Empty>Registre una clase para tomar asistencia.</Empty> : !students.length ? <Empty>Sin estudiantes inscritos.</Empty> : (
-            <ActionForm action={saveAttendance} submitLabel="Guardar asistencia" resetOnSuccess={false} hideSubmit={!canWrite}>
+            <ActionForm action={saveAttendance} offline={{ key: 'asistencia', label: `Asistencia ${fmtDateTime(current.starts_at, tz)}` }} submitLabel="Guardar asistencia" resetOnSuccess={false} hideSubmit={!canWrite}>
               <input type="hidden" name="class_session_id" value={current.id} /><input type="hidden" name="section_id" value={id} />
               <table className="table"><thead><tr><th>Estudiante</th><th>Estado</th><th>% acumulado</th></tr></thead>
                 <tbody>{students.map((x: any) => (
@@ -180,7 +180,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
       <div className="space-y-6">
         <Card title={`Planilla de notas · escala ${gs.min_grade}–${gs.max_grade}, aprueba con ${gs.passing_grade} · ponderación total ${totalW} %`}>
           {!assessments?.length ? <Empty>Cree las evaluaciones de la sección.</Empty> : !students.length ? <Empty>Sin estudiantes inscritos.</Empty> : (
-            <ActionForm action={saveGrades} submitLabel="Guardar notas" resetOnSuccess={false} hideSubmit={!canGrade}>
+            <ActionForm action={saveGrades} offline={{ key: 'notas', label: 'Planilla de notas' }} submitLabel="Guardar notas" resetOnSuccess={false} hideSubmit={!canGrade}>
               <input type="hidden" name="section_id" value={id} />
               <div className="overflow-x-auto"><table className="table">
                 <thead><tr><th>Estudiante</th>{assessments.map((a: any) => <th key={a.id} className="text-center">{a.name}<br /><span className="font-normal normal-case">{a.weight_pct} % {a.published ? '· visible' : '· oculta'}</span></th>)}

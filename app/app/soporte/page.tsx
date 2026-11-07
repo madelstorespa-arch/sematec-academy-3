@@ -23,7 +23,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
       <details className="card mb-6" open={!staff && !tickets?.length}>
         <summary className="cursor-pointer px-5 py-3 text-sm font-bold text-brand-700">+ Nueva solicitud de ayuda</summary>
         <div className="border-t border-slate-100 p-5">
-          <ActionForm action={openTicket} submitLabel="Enviar solicitud">
+          <ActionForm action={openTicket} offline={{ key: 'soporte', label: 'Solicitud de soporte' }} submitLabel="Enviar solicitud">
             <Field label="Asunto" name="subject" required />
             <Grid>
               <SelectField label="Tema" name="category" defaultValue="general" options={Object.entries(CATS).map(([value, label]) => ({ value, label }))} />

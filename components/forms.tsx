@@ -1,19 +1,23 @@
 'use client';
 import { useRef, useState, useTransition, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { enqueue, type OfflineKey } from '@/lib/offline-queue';
 
-type Result = { ok: boolean; message?: string; error?: string; data?: unknown };
+type Result = { ok: boolean; message?: string; error?: string; data?: unknown; queued?: boolean };
 
 /**
  * Formulario que llama a una Server Action. Si la conexión falla, informa que NADA
  * se guardó (requisito: nunca mostrar como guardada una operación no confirmada).
+ * Con `offline`, si no hay internet el formulario queda en la bandeja de salida del
+ * dispositivo y se envía solo al volver la conexión (se informa que aún no está en la nube).
  */
 export function ActionForm({
-  action, children, submitLabel = 'Guardar', className = '', confirm, resetOnSuccess = true, submitClass = 'btn-primary', inline = false, onDone, hideSubmit = false,
+  action, children, submitLabel = 'Guardar', className = '', confirm, resetOnSuccess = true, submitClass = 'btn-primary', inline = false, onDone, hideSubmit = false, offline,
 }: {
   action: (fd: FormData) => Promise<Result>;
   children?: ReactNode; submitLabel?: string; className?: string; confirm?: string; resetOnSuccess?: boolean;
   submitClass?: string; inline?: boolean; onDone?: (r: Result) => void; hideSubmit?: boolean;
+  offline?: { key: OfflineKey; label: string };
 }) {
   const [result, setResult] = useState<Result | null>(null);
   const [pending, start] = useTransition();
@@ -28,6 +32,17 @@ export function ActionForm({
         if (confirm && !window.confirm(confirm)) return;
         const fd = new FormData(e.currentTarget);
         setResult(null);
+        const queue = () => {
+          if (!offline) return false;
+          try {
+            setResult({ ok: true, queued: true, message: enqueue(offline.key, offline.label, fd) });
+            if (resetOnSuccess) ref.current?.reset();
+          } catch (err) {
+            setResult({ ok: false, error: `Sin conexión y no se pudo guardar en el dispositivo: ${(err as Error).message}` });
+          }
+          return true;
+        };
+        if (offline && typeof navigator !== 'undefined' && !navigator.onLine) { queue(); return; }
         start(async () => {
           try {
             const r = await action(fd);
@@ -38,6 +53,7 @@ export function ActionForm({
             }
             onDone?.(r);
           } catch {
+            if (queue()) return;
             setResult({ ok: false, error: 'No se pudo contactar al servidor: la operación NO fue guardada. Recargue la página (F5) y vuelva a intentarlo; si persiste, revise su conexión.' });
           }
         });
@@ -52,8 +68,8 @@ export function ActionForm({
         </div>
       </div>
       {result && (
-        <p role="status" className={`mt-3 rounded-lg px-3 py-2 text-sm ${result.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-700'}`}>
-          {result.ok ? `✓ ${result.message ?? 'Guardado en la nube.'}` : `✕ ${result.error}`}
+        <p role="status" className={`mt-3 rounded-lg px-3 py-2 text-sm ${result.queued ? 'bg-amber-50 text-amber-900' : result.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-700'}`}>
+          {result.queued ? result.message : result.ok ? `✓ ${result.message ?? 'Guardado en la nube.'}` : `✕ ${result.error}`}
         </p>
       )}
     </form>

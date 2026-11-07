@@ -145,7 +145,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
       <>
         {(manager || student) && (
           <details className="card mb-6"><summary className="cursor-pointer px-5 py-3 text-sm font-bold text-brand-700">+ Nuevo tema</summary>
-            <div className="border-t border-slate-100 p-5"><ActionForm action={createThread} submitLabel="Publicar">{hidden}
+            <div className="border-t border-slate-100 p-5"><ActionForm action={createThread} offline={{ key: 'foro_tema', label: 'Nuevo tema en el foro' }} submitLabel="Publicar">{hidden}
               <Field label="Título" name="title" required /><TextArea label="Mensaje" name="body" required rows={4} />
               {manager && <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="pinned" /> Fijar arriba</label>}
             </ActionForm></div></details>)}
