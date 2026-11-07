@@ -31,7 +31,7 @@ export default async function Page() {
             <li><Link className="link" href="/app/academico">Oferta académica</Link>: cree el programa, la asignatura y el periodo.</li>
             <li><Link className="link" href="/app/profesores">Profesores</Link>: registre al profesor y use «Crear contraseña».</li>
             <li><Link className="link" href="/app/secciones">Secciones y notas</Link>: cree la sección (asignatura + periodo + profesor).</li>
-            <li><Link className="link" href="/app/estudiantes">Estudiantes</Link> y <Link className="link" href="/app/matriculas">Matrículas</Link>: registre y matricule (se crea su contraseña automáticamente).</li>
+            <li><Link className="link" href="/app/estudiantes">Estudiantes</Link> y <Link className="link" href="/app/matriculas">Matrículas</Link>: registre y matricule. Si el estudiante debe entrar a la plataforma, use «Crear contraseña» en Estudiantes.</li>
             <li>Abra la sección e <b>inscriba</b> a los estudiantes. El curso aparecerá aquí con Contenidos, Tareas, Exámenes y Foro.</li>
           </ol>
         </Card>
