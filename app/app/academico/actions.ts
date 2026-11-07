@@ -96,3 +96,29 @@ export async function removeCurriculumCourse(fd: FormData): Promise<ActionResult
     return count ? done('Asignatura quitada de la malla.') : fail('No tiene permisos (requiere administración académica).');
   });
 }
+
+export async function updateProgram(fd: FormData): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getContext();
+    const { error, count } = await ctx.supabase.from('programs').update({
+      name: reqStr(fd, 'name', 'Nombre'), modality: reqStr(fd, 'modality', 'Modalidad'), duration_terms: num(fd, 'duration_terms'),
+    }, { count: 'exact' }).eq('id', reqStr(fd, 'id', 'id'));
+    if (error) return fail(error);
+    if (!count) return fail('No tiene permisos para editar carreras.');
+    revalidatePath('/app/academico');
+    return ok('Carrera actualizada.');
+  });
+}
+
+export async function updateCourse(fd: FormData): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getContext();
+    const { error, count } = await ctx.supabase.from('courses').update({
+      name: reqStr(fd, 'name', 'Nombre'), credits: num(fd, 'credits'), weekly_hours: num(fd, 'weekly_hours'),
+    }, { count: 'exact' }).eq('id', reqStr(fd, 'id', 'id'));
+    if (error) return fail(error);
+    if (!count) return fail('No tiene permisos para editar asignaturas.');
+    revalidatePath('/app/academico');
+    return ok('Asignatura actualizada.');
+  });
+}

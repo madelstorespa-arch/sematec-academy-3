@@ -13,7 +13,7 @@ const headers = () => ({ 'Tbk-Api-Key-Id': creds().code, 'Tbk-Api-Key-Secret': c
 const PATH = '/rswebpaytransaction/api/webpay/v1.2/transactions';
 
 export const webpay: PaymentProvider = {
-  id: 'webpay', label: 'Webpay Plus', description: 'Tarjetas de crédito, débito y prepago (Transbank)', currencies: ['CLP'],
+  id: 'webpay', label: 'Tarjeta de crédito o débito', description: 'Webpay Plus (Transbank): Visa, Mastercard, Redcompra, American Express y prepago', currencies: ['CLP'],
   enabled: () => process.env.WEBPAY_ENABLED === '1' && !!creds().code && !!creds().key,
   async start(order, urls) {
     const r = await fetch(base() + PATH, {

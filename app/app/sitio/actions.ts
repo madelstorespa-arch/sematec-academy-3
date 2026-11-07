@@ -2,6 +2,7 @@
 import { revalidatePath } from 'next/cache';
 import { getContext, can } from '@/lib/context';
 import { fail, guard, num, ok, reqStr, str, type ActionResult } from '@/lib/actions';
+import { ValidationError } from '@/lib/actions';
 import { saveImage } from '@/lib/media';
 
 const refresh = () => { revalidatePath('/', 'layout'); };
@@ -50,11 +51,17 @@ export async function uploadSiteImage(fd: FormData): Promise<ActionResult> {
 }
 
 function offeringRow(fd: FormData) {
+  const regular = num(fd, 'regular_price') ?? num(fd, 'price');
+  if (!regular || regular <= 0) throw new ValidationError('Escriba el precio normal.');
+  const pct = num(fd, 'discount_pct');
+  if (pct != null && (pct < 0 || pct >= 100)) throw new ValidationError('El descuento debe estar entre 0 y 99 %.');
+  const price = pct ? Math.round(regular * (1 - pct / 100) * 100) / 100 : regular;
   return {
+    kind: str(fd, 'kind') ?? 'curso', regular_price: regular, discount_pct: pct || null, discount_ends_on: pct ? str(fd, 'discount_ends_on') : null,
     slug: reqStr(fd, 'slug', 'Dirección web (slug)').toLowerCase(), title: reqStr(fd, 'title', 'Título'), summary: str(fd, 'summary') ?? '',
     description: str(fd, 'description') ?? '', category: str(fd, 'category') ?? 'Curso', modality: reqStr(fd, 'modality', 'Modalidad'),
     duration_text: str(fd, 'duration_text'), schedule_text: str(fd, 'schedule_text'), starts_on: str(fd, 'starts_on'),
-    price: num(fd, 'price'), currency: reqStr(fd, 'currency', 'Moneda').toUpperCase(), admission_mode: reqStr(fd, 'admission_mode', 'Ingreso'),
+    price, currency: reqStr(fd, 'currency', 'Moneda').toUpperCase(), admission_mode: reqStr(fd, 'admission_mode', 'Ingreso'),
     program_id: reqStr(fd, 'program_id', 'Programa'), period_id: reqStr(fd, 'period_id', 'Periodo'), capacity: num(fd, 'capacity'),
     is_published: fd.get('is_published') === 'on', sort_order: num(fd, 'sort_order') ?? 0,
   };

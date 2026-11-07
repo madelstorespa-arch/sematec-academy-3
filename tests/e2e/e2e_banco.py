@@ -7,7 +7,7 @@ from playwright.sync_api import sync_playwright
 def pay(b, email, doc, bank, button, mobile=False):
     c = b.new_context(viewport={'width': 390, 'height': 844} if mobile else {'width': 1366, 'height': 900}, is_mobile=mobile)
     p = c.new_page(); go(p, f'{BASE}/cursos/sql-desde-cero/inscripcion')
-    p.fill('input[name=name]', 'Pagador Banco'); p.fill('input[name=email]', email); p.fill('input[name=doc_number]', doc)
+    p.fill('input[name=name]', 'Pagador Banco'); p.fill('input[name=email]', email)
     p.check('input[name=provider][value=fintoc]')
     check(p.locator('input[name=bank]').count() == 21, 'Se muestran los 21 bancos e instituciones de Chile')
     p.locator(f'label:has(input[value={bank}])').click(); p.check('input[name=consent]')

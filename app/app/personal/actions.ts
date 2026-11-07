@@ -12,8 +12,8 @@ export async function createEmployee(fd: FormData): Promise<ActionResult> {
     const { error } = await ctx.supabase.from('employees').insert({
       organization_id: ctx.orgId, campus_id: str(fd, 'campus_id'), employee_code: reqStr(fd, 'employee_code', 'Código').toUpperCase(),
       first_names: reqStr(fd, 'first_names', 'Nombres'), last_names: reqStr(fd, 'last_names', 'Apellidos'),
-      id_document_country: reqStr(fd, 'id_document_country', 'País'), id_document_type: reqStr(fd, 'id_document_type', 'Tipo de documento'),
-      id_document_number: reqStr(fd, 'id_document_number', 'N° de documento').toUpperCase(), email: str(fd, 'email')?.toLowerCase() ?? null,
+      id_document_country: str(fd, 'id_document_country'), id_document_type: str(fd, 'id_document_type'),
+      id_document_number: str(fd, 'id_document_number')?.toUpperCase() ?? null, email: str(fd, 'email')?.toLowerCase() ?? null,
       position: reqStr(fd, 'position', 'Cargo'),
     });
     if (error) return fail(error);

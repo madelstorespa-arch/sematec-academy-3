@@ -18,7 +18,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
   if (!sid) notFound();
   const sb = ctx.supabase;
   const [{ data: s }, { data: cred }, { data: enr }] = await Promise.all([
-    sb.from('students').select('id, organization_id, user_id, first_names, last_names, student_code, id_document_type, id_document_number, status').eq('id', sid).maybeSingle(),
+    sb.from('students').select('id, organization_id, user_id, first_names, last_names, student_code, status').eq('id', sid).maybeSingle(),
     sb.from('student_credentials').select('*').eq('student_id', sid).maybeSingle(),
     sb.from('enrollments').select('programs(name), academic_periods(code)').eq('student_id', sid).order('created_at', { ascending: false }).limit(1),
   ]);
@@ -66,7 +66,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
                 : <div className="flex h-32 w-28 items-center justify-center rounded-lg bg-slate-100 text-4xl text-slate-400">👤</div>}
               <div className="min-w-0 text-sm">
                 <p className="text-lg font-bold leading-tight">{s.first_names} {s.last_names}</p>
-                <p className="mt-1 text-slate-600">{s.id_document_type} {s.id_document_number}</p>
                 <p className="mt-2"><span className="label">Código</span> <span className="font-mono font-semibold">{s.student_code}</span></p>
                 {program && <p className="mt-1 text-slate-700">{program}</p>}
                 <p className={`mt-2 font-semibold ${expired ? 'text-red-700' : 'text-emerald-700'}`}>

@@ -24,9 +24,9 @@ def buy(browser, provider, email, doc, button='#approve', slug='sql-desde-cero',
     c = browser.new_context(viewport={'width': 1366, 'height': 900}); p = c.new_page()
     go(p, f'{BASE}/cursos/{slug}/inscripcion' + (f'?codigo={code}' if code else ''))
     if not code:
-        p.fill('input[name=name]', f'Comprador {provider.title()}'); p.fill('input[name=email]', email); p.fill('input[name=doc_number]', doc)
+        p.fill('input[name=name]', f'Comprador {provider.title()}'); p.fill('input[name=email]', email)
     else:
-        p.fill('input[name=name]', 'Postulante Web'); p.fill('input[name=email]', email); p.fill('input[name=doc_number]', doc)
+        p.fill('input[name=name]', 'Postulante Web'); p.fill('input[name=email]', email)
     p.check(f'input[name=provider][value={provider}]'); p.check('input[name=consent]')
     p.click('button:has-text("Ir a pagar")')
     p.wait_for_selector('#provider', timeout=20000)
@@ -102,7 +102,7 @@ def main():
 
         # 4. Postulación → aprobación → pago
         c = new(); p = c.new_page(); go(p, BASE + '/cursos/tecnico-informatica/inscripcion')
-        p.fill('input[name=name]', 'Pablo Postulante'); p.fill('input[name=email]', 'pablo.post@demo.sematec.test'); p.fill('input[name=doc_number]', 'WEB-3001')
+        p.fill('input[name=name]', 'Pablo Postulante'); p.fill('input[name=email]', 'pablo.post@demo.sematec.test')
         p.fill('input[name=education]', 'Enseñanza media completa'); p.fill('textarea[name=motivation]', 'Quiero trabajar en desarrollo de software')
         p.check('input[name=consent]'); p.click('button:has-text("Enviar postulación")')
         p.wait_for_selector('text=Postulación recibida'); code = re.search(r'SA-[A-Z0-9]{8}', p.inner_text('body')).group(0)
@@ -112,8 +112,8 @@ def main():
         shot(p, 'web_09_estado_revision')
         # Intento de pagar sin aprobación (manipulando la URL)
         go(p, f'{BASE}/cursos/tecnico-informatica/inscripcion?codigo={code}')
-        p.fill('input[name=name]', 'Pablo'); p.fill('input[name=email]', 'pablo.post@demo.sematec.test'); p.fill('input[name=doc_number]', 'WEB-3001')
-        p.check('input[name=consent]'); p.click('button:has-text("Ir a pagar")')
+        p.fill('input[name=name]', 'Pablo'); p.fill('input[name=email]', 'pablo.post@demo.sematec.test')
+        p.check('input[name=provider][value=webpay]'); p.check('input[name=consent]'); p.click('button:has-text("Ir a pagar")')
         check('postulación aprobada' in status_msg(p), 'No se puede pagar una postulación no aprobada')
         c.close()
         ca = new(); pa = login(ca, 'director.a@demo.sematec.test', mfa=True)
@@ -147,7 +147,7 @@ def main():
         go(po, BASE + '/app/sitio'); shot(po, 'web_12_admin_marca')
         # nuevo curso desde el panel
         go(po, BASE + '/app/sitio/cursos'); po.click('summary:has-text("Nuevo curso")')
-        po.fill('input[name=title]', 'Excel para la gestión'); po.fill('input[name=slug]', 'excel-gestion'); po.fill('input[name=price]', '49990')
+        po.fill('input[name=title]', 'Excel para la gestión'); po.fill('input[name=slug]', 'excel-gestion'); po.fill('input[name=regular_price]', '49990')
         sel_re(po, 'select[name=program_id]', 'TIN'); sel_re(po, 'select[name=period_id]', '2026-2')
         po.fill('textarea[name=summary]', 'Tablas dinámicas, fórmulas y paneles.'); po.check('input[name=is_published]')
         po.click('button:has-text("Crear curso")'); check('Curso creado' in status_msg(po), 'Curso nuevo con precio creado desde el panel')

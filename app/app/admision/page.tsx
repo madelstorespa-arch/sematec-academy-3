@@ -32,7 +32,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
       <tbody>{data.map((a: any) => (
         <tr key={a.id}><td className="font-mono text-xs">{a.tracking_code}</td><td>{a.applicant_name}<br /><span className="text-xs text-slate-500">{a.applicant_email} · {a.form_data?.phone}</span></td>
           <td>{a.catalog_offerings?.title}</td><td>{fmtDateTime(a.submitted_at)}</td>
-          <td className="max-w-xs text-xs">{a.form_data?.doc_type} {a.form_data?.doc_number}<br />{a.form_data?.education}<br /><i>{a.form_data?.motivation}</i></td>
+          <td className="max-w-xs text-xs">{a.form_data?.education}<br /><i>{a.form_data?.motivation}</i></td>
           <td><StatusBadge status={a.status} />{a.decision_notes && <p className="text-xs text-slate-500">{a.decision_notes}</p>}</td>
           {can(ctx, 'admissions.approve') && <td>{['submitted', 'under_review'].includes(a.status) && (
             <ActionForm action={decide} inline submitLabel="Aplicar" submitClass="btn-secondary btn-sm">

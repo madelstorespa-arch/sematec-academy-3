@@ -22,13 +22,22 @@ export default async function Page({ params, searchParams }: { params: Promise<{
   let body: React.ReactNode = null;
 
   if (tab === 'contenidos') {
-    const [{ data: units }, { data: contents }] = await Promise.all([
+    const [{ data: units }, { data: contents }, { data: books }] = await Promise.all([
       ctx.supabase.from('course_units').select('*').eq('section_id', id).order('position').order('created_at'),
       ctx.supabase.from('course_contents').select('*').eq('section_id', id).order('position').order('created_at'),
+      ctx.supabase.from('library_items').select('id, title, author, file_id, url').or(`section_id.eq.${id},course_id.eq.${s.course_id}`)
+        .or('file_id.not.is.null,url.not.is.null').order('title').limit(30),
     ]);
     const groups = [...(units ?? []), { id: null, title: 'Otros contenidos' }];
     body = (
       <>
+        {!!books?.length && (
+          <div className="card card-pad mb-6">
+            <p className="mb-3 text-sm font-bold">📚 Libros virtuales de esta asignatura</p>
+            <div className="flex flex-wrap gap-2">{books.map((b: any) => (
+              <a key={b.id} className="btn-secondary btn-sm" target="_blank" rel="noopener noreferrer" href={b.file_id ? `/app/biblioteca/libro/${b.file_id}` : b.url}>📘 {b.title}</a>))}
+            </div>
+          </div>)}
         {manager && (
           <div className="mb-6 grid gap-6 lg:grid-cols-2">
             <details className="card"><summary className="cursor-pointer px-5 py-3 text-sm font-bold text-brand-700">+ Nueva unidad</summary>

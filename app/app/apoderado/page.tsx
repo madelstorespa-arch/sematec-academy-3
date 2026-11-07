@@ -3,6 +3,9 @@ import Link from 'next/link';
 import { getContext } from '@/lib/context';
 import { PageHeader, Card, Badge, Empty, Stat } from '@/components/ui';
 import { fmtDate, fmtMoney, fmtNum } from '@/lib/format';
+import { PayInstallments } from '@/components/pay-installments';
+import { availableProviders } from '@/lib/payments';
+import { payInstallments } from '@/app/app/pagar/actions';
 
 export const metadata = { title: 'Mis pupilos' };
 const REL: Record<string, string> = { madre: 'Madre', padre: 'Padre', tutor: 'Tutor/a', apoderado: 'Apoderado/a', otro: 'Otro' };
@@ -14,7 +17,8 @@ export default async function Page() {
     .eq('guardian_id', ctx.user.id).eq('status', 'activo').eq('organization_id', ctx.orgId!);
   const summaries = await Promise.all((links ?? []).map(async (l: any) => {
     const { data } = await ctx.supabase.rpc('guardian_summary', { p_student: l.student_id });
-    return { link: l, s: data as any };
+    const { data: inst } = await ctx.supabase.rpc('guardian_installments', { p_student: l.student_id });
+    return { link: l, s: data as any, inst: (inst ?? []) as any[] };
   }));
 
   return (
@@ -23,7 +27,7 @@ export default async function Page() {
         actions={<Link className="btn-secondary" href="/app/mensajes">✉ Escribir a la institución</Link>} />
       {!summaries.length && <Card><Empty>No tiene estudiantes vinculados.</Empty></Card>}
       <div className="space-y-8">
-        {summaries.map(({ link, s }) => {
+        {summaries.map(({ link, s, inst }) => {
           if (!s) return null;
           const courses = (s.courses ?? []) as any[];
           const attVals = courses.map((c) => c.attendance).filter((v) => v != null) as number[];
@@ -36,6 +40,7 @@ export default async function Page() {
                 <Stat label="Asistencia promedio" value={att != null ? `${fmtNum(att)}%` : '—'} hint={att != null && att < 75 ? '⚠ Bajo el mínimo habitual' : undefined} />
                 <Stat label="Saldo pendiente" value={fmtMoney(s.balance)} hint={s.overdue ? `⚠ ${s.overdue} cuota(s) vencida(s)` : s.next_due ? `Próximo vencimiento ${fmtDate(s.next_due)}` : 'Al día'} />
               </div>
+              {inst.length > 0 && <div className="card card-pad mb-4"><PayInstallments studentId={link.student_id} items={inst} providers={availableProviders(inst[0].currency)} action={payInstallments} /></div>}
               <div className="grid gap-4 lg:grid-cols-2">
                 {courses.length ? courses.map((c, i) => {
                   const graded = (c.grades as any[]).filter((g) => g.grade != null);

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { OwnerActions } from '@/components/owner-actions';
 import { getContext, can, requireOrg } from '@/lib/context';
 import { PageHeader, Card, Badge, Empty } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField, TextArea } from '@/components/forms';
@@ -104,7 +105,8 @@ export default async function Page() {
                   <td>{state(s)}</td>
                   <td className="whitespace-nowrap">{fmtDateTime(s.closes_at)}</td>
                   <td className="text-right font-semibold">{counts.get(s.id) ?? 0}</td>
-                  <td><Link className="link" href={`/app/encuestas/${s.id}`}>Abrir</Link></td>
+                  <td className="space-y-1"><Link className="link" href={`/app/encuestas/${s.id}`}>Abrir</Link>
+                    {ctx.isOwner && <OwnerActions table="surveys" id={s.id} active={s.published} path="/app/encuestas" name={`la encuesta ${s.title}`} />}</td>
                 </tr>))}
               </tbody>
             </table></div>

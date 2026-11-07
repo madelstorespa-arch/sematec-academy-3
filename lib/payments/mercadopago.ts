@@ -6,7 +6,7 @@ const base = () => process.env.MERCADOPAGO_API_URL ?? 'https://api.mercadopago.c
 const auth = () => ({ Authorization: `Bearer ${process.env.MERCADOPAGO_ACCESS_TOKEN}`, 'Content-Type': 'application/json' });
 
 export const mercadopago: PaymentProvider = {
-  id: 'mercadopago', label: 'Mercado Pago', description: 'Tarjetas y medios de pago de Mercado Pago',
+  id: 'mercadopago', label: 'Tarjeta o Mercado Pago', description: 'Crédito, débito o saldo de Mercado Pago, con cuotas',
   currencies: ['CLP', 'ARS', 'MXN', 'COP', 'PEN', 'UYU', 'BRL'],
   enabled: () => !!process.env.MERCADOPAGO_ACCESS_TOKEN,
   async start(order, urls) {

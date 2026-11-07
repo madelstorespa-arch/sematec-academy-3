@@ -2,6 +2,9 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getContext } from '@/lib/context';
 import { PageHeader, Card, Empty, StatusBadge, Badge } from '@/components/ui';
+import { PayInstallments } from '@/components/pay-installments';
+import { availableProviders } from '@/lib/payments';
+import { payInstallments } from '@/app/app/pagar/actions';
 import { WEEKDAYS, fmtDate, fmtDateTime, fmtMoney, fmtNum, fmtSlot } from '@/lib/format';
 
 export const metadata = { title: 'Mi portal' };
@@ -16,7 +19,7 @@ export default async function Page() {
     sb.from('grades').select('grade, assessments(name, weight_pct, section_id)').eq('student_id', sid),
     sb.from('attendance_records').select('status, class_sessions(section_id)').eq('student_id', sid),
     sb.from('account_balances').select('*').eq('student_id', sid),
-    sb.from('installment_balances').select('*').eq('student_id', sid).gt('outstanding', 0).eq('cancelled', false).order('due_on').limit(6),
+    sb.from('installment_balances').select('*').eq('student_id', sid).gt('outstanding', 0).eq('cancelled', false).order('due_on').limit(24),
     sb.from('certificates').select('id, title, serial_number, status, issued_at').eq('student_id', sid).order('issued_at', { ascending: false }),
     sb.from('conference_sessions').select('id, title, scheduled_start, timezone, status').in('status', ['scheduled', 'live']).gte('scheduled_end', new Date().toISOString()).order('scheduled_start').limit(5),
   ]);
@@ -45,7 +48,7 @@ export default async function Page() {
         <div className="space-y-6">
           <Card title="Estado de cuenta">
             {balance?.length ? balance.map((b: any) => <p key={b.account_id} className="text-sm">Saldo: <b>{fmtMoney(b.outstanding, b.currency)}</b>{Number(b.overdue) > 0 && <> · <span className="text-red-600">vencido {fmtMoney(b.overdue, b.currency)}</span></>}</p>) : <p className="text-sm text-slate-500">Sin deuda.</p>}
-            {!!inst?.length && <ul className="mt-3 space-y-1 text-sm">{inst.map((i: any) => <li key={i.installment_id} className="flex justify-between"><span>Cuota {i.number} · {fmtDate(i.due_on)}</span><span className={i.days_overdue > 0 ? 'text-red-600' : ''}>{fmtMoney(i.outstanding, i.currency)}</span></li>)}</ul>}
+            {!!inst?.length && <PayInstallments studentId={sid} items={inst as any[]} providers={availableProviders(inst[0].currency)} action={payInstallments} />}
             <Link className="link mt-3 inline-block text-sm" href={`/app/finanzas/cuenta/${sid}`}>Ver detalle →</Link>
           </Card>
           <Card title="Clases virtuales">

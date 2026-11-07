@@ -1,4 +1,5 @@
 import { getContext, can, requireOrg } from '@/lib/context';
+import { OwnerActions } from '@/components/owner-actions';
 import { PageHeader, Card, Badge, Empty } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField, TextArea } from '@/components/forms';
 import { fmtDate } from '@/lib/format';
@@ -67,6 +68,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
                 <span className="flex flex-wrap gap-2">
                   {!closed && j.apply_url && <a className="btn-primary btn-sm" href={j.apply_url} target="_blank" rel="noopener noreferrer">Postular</a>}
                   {!closed && j.apply_email && <a className="btn-secondary btn-sm" href={`mailto:${j.apply_email}?subject=${encodeURIComponent('Postulación: ' + j.title)}`}>Enviar CV</a>}
+                  {ctx.isOwner && <OwnerActions table="job_postings" id={j.id} path="/app/empleos" name={`la oferta ${j.title}`} />}
                   {manage && <ActionForm action={toggleJob} inline submitLabel={j.published ? 'Retirar' : 'Volver a publicar'} submitClass="btn-secondary btn-sm">
                     <input type="hidden" name="id" value={j.id} /><input type="hidden" name="publish" value={j.published ? '0' : '1'} />
                   </ActionForm>}

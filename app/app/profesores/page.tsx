@@ -1,4 +1,5 @@
 import { getContext, can, requirePerm, requireOrg } from '@/lib/context';
+import { OwnerActions } from '@/components/owner-actions';
 import { PageHeader, Card, StatusBadge, Empty, Badge } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField } from '@/components/forms';
 import { campusOptions, countryOptions } from '@/lib/options';
@@ -31,9 +32,6 @@ export default async function Page() {
                 <Field label="Código" name="teacher_code" required />
                 <Field label="Nombres" name="first_names" required />
                 <Field label="Apellidos" name="last_names" required />
-                <SelectField label="País del documento" name="id_document_country" required options={countries} defaultValue="CL" />
-                <Field label="Tipo de documento" name="id_document_type" required defaultValue="RUN" />
-                <Field label="N° de documento" name="id_document_number" required />
                 <Field label="Correo" name="email" type="email" required />
                 <Field label="Grado académico" name="academic_degree" />
                 <Field label="Especialidad" name="specialty" />
@@ -45,7 +43,7 @@ export default async function Page() {
       )}
       <Card>
         {teachers?.length ? <div className="overflow-x-auto"><table className="table">
-          <thead><tr><th>Código</th><th>Nombre</th><th>Acceso al portal</th><th>Correo</th><th>Especialidad</th><th>Sede</th><th>Estado</th></tr></thead>
+          <thead><tr><th>Código</th><th>Nombre</th><th>Acceso al portal</th><th>Correo</th><th>Especialidad</th><th>Sede</th><th>Estado</th>{ctx.isOwner && <th>Propietario</th>}</tr></thead>
           <tbody>{teachers.map((t: any) => (
             <tr key={t.id}>
               <td className="font-mono text-xs">{t.teacher_code}</td><td>{t.last_names}, {t.first_names}</td>
@@ -66,6 +64,7 @@ export default async function Page() {
                     <option value="active">Activo</option><option value="inactive">Inactivo</option><option value="suspended">Suspendido</option>
                   </select>
                 </ActionForm>) : <StatusBadge status={t.status} />}</td>
+              {ctx.isOwner && <td><OwnerActions table="teachers" id={t.id} active={t.status === 'active'} path="/app/profesores" name={`a ${t.first_names} ${t.last_names}`} /></td>}
             </tr>))}</tbody>
         </table></div> : <Empty>Aún no hay profesores registrados.</Empty>}
       </Card>

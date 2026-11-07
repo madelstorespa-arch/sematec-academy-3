@@ -10,7 +10,7 @@ export const toStripeAmount = (amount: number, cur: string) => (ZERO_DECIMAL.has
 const fromStripeAmount = (amount: number, cur: string) => (ZERO_DECIMAL.has(cur) ? amount : amount / 100);
 
 export const stripe: PaymentProvider = {
-  id: 'stripe', label: 'Stripe', description: 'Tarjetas internacionales Visa, Mastercard, American Express',
+  id: 'stripe', label: 'Tarjeta internacional', description: 'Visa, Mastercard y American Express de cualquier país (Stripe)',
   currencies: ['CLP', 'USD', 'EUR', 'MXN', 'PEN', 'COP', 'ARS', 'BRL', 'UYU'],
   enabled: () => !!process.env.STRIPE_SECRET_KEY,
   async start(order, urls) {

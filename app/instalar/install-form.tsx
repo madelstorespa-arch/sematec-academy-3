@@ -1,6 +1,7 @@
 'use client';
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
+import { PasswordInput } from '@/components/forms';
 
 type R = { ok: boolean; message?: string; error?: string; data?: unknown; demo?: boolean };
 const DEMO = [
@@ -17,7 +18,7 @@ export function InstallForm({ action }: { action: (fd: FormData) => Promise<R> }
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); setR(null);
         start(async () => { try { setR(await action(fd)); } catch { setR({ ok: false, error: 'Se perdió la conexión. Recargue la página: el instalador continúa donde quedó.' }); } }); }}>
         <label className="block"><span className="label">Clave de instalación (SETUP_TOKEN)</span>
-          <input name="token" type="password" required className="input" autoComplete="off" /></label>
+          <PasswordInput name="token" required autoComplete="off" /></label>
         {!demo && (
           <fieldset className="space-y-3 rounded-lg border border-slate-200 p-4">
             <legend className="px-1 text-xs font-bold uppercase text-slate-500">Su academia (instalación real)</legend>
@@ -28,7 +29,7 @@ export function InstallForm({ action }: { action: (fd: FormData) => Promise<R> }
             <label className="block"><span className="label">Correo del administrador</span>
               <input name="admin_email" type="email" required className="input" autoComplete="email" /></label>
             <label className="block"><span className="label">Contraseña del administrador</span>
-              <input name="admin_password" type="password" required minLength={12} className="input" autoComplete="new-password" />
+              <PasswordInput name="admin_password" required minLength={12} autoComplete="new-password" />
               <span className="text-xs text-slate-500">Mínimo 12 caracteres, con mayúsculas, minúsculas y números.</span></label>
           </fieldset>
         )}

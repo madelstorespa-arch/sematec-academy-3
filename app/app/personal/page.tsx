@@ -1,4 +1,5 @@
 import { getContext, can, requireOrg } from '@/lib/context';
+import { OwnerActions } from '@/components/owner-actions';
 import { notFound } from 'next/navigation';
 import { PageHeader, Card, Badge, Empty } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField } from '@/components/forms';
@@ -65,7 +66,7 @@ export default async function Page() {
               </ActionForm></div></details>)}
           <Card title={`Funcionarios (${emps?.length ?? 0})`} className="mb-6">
             {emps?.length ? <div className="overflow-x-auto"><table className="table">
-              <thead><tr><th>Nombre</th><th>Cargo</th><th>Sede</th><th>Hoy</th><th>Contrato</th><th>Cuenta</th></tr></thead>
+              <thead><tr><th>Nombre</th><th>Cargo</th><th>Sede</th><th>Hoy</th><th>Contrato</th><th>Cuenta</th>{ctx.isOwner && <th></th>}</tr></thead>
               <tbody>{emps.map((e: any) => {
                 const a = (att ?? []).find((x: any) => x.employee_id === e.id);
                 const c = (contracts ?? []).find((x: any) => x.employee_id === e.id && x.status === 'active');
@@ -83,8 +84,9 @@ export default async function Page() {
                       <details><summary className="link cursor-pointer text-xs">🔑 Crear cuenta</summary>
                         <ActionForm action={createEmployeeAccount} submitLabel="Crear cuenta" className="mt-2 w-60 space-y-2"><input type="hidden" name="id" value={e.id} />
                           <SelectField label="Rol" name="role" required defaultValue="secretaria" options={STAFF_ROLES} />
-                          <Field label="Contraseña" name="password" type="text" autoComplete="new-password" placeholder="Mín. 10, A-z y 0-9" />
-                        </ActionForm></details>) : '—'}</td></tr>);
+                          <Field label="Contraseña" name="password" type="password" autoComplete="new-password" placeholder="Mín. 10, A-z y 0-9" />
+                        </ActionForm></details>) : '—'}</td>
+                    {ctx.isOwner && <td><OwnerActions table="employees" id={e.id} active={e.status === 'active'} path="/app/personal" name={`a ${e.first_names} ${e.last_names}`} /></td>}</tr>);
               })}</tbody></table></div> : <Empty>No hay funcionarios registrados.</Empty>}
           </Card>
           <Card title="Solicitudes de permiso">

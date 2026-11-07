@@ -52,8 +52,13 @@ export function ActionForm({
               router.refresh();
             }
             onDone?.(r);
-          } catch {
-            if (queue()) return;
+          } catch (err) {
+            // Redirecciones de Next.js (la acción SÍ se completó): dejar que el router navegue
+            const digest = (err as { digest?: string } | null)?.digest ?? '';
+            if (digest.startsWith('NEXT_REDIRECT') || digest.startsWith('NEXT_HTTP_ERROR') || digest === 'NEXT_NOT_FOUND') throw err;
+            // Solo se guarda en el dispositivo si de verdad no hubo conexión (nunca si la operación pudo llegar)
+            const network = !navigator.onLine || err instanceof TypeError;
+            if (network && queue()) return;
             setResult({ ok: false, error: 'No se pudo contactar al servidor: la operación NO fue guardada. Recargue la página (F5) y vuelva a intentarlo; si persiste, revise su conexión.' });
           }
         });
@@ -83,9 +88,27 @@ export function Field({ label, name, type = 'text', required, defaultValue, plac
   return (
     <label className={`block ${className}`}>
       <span className="label">{label}{required && ' *'}</span>
-      <input className="input" name={name} type={type} required={required} defaultValue={defaultValue ?? undefined}
-        placeholder={placeholder} step={step} min={min} max={max} autoComplete={autoComplete} />
+      {type === 'password'
+        ? <PasswordInput name={name} required={required} placeholder={placeholder} autoComplete={autoComplete} />
+        : <input className="input" name={name} type={type} required={required} defaultValue={defaultValue ?? undefined}
+            placeholder={placeholder} step={step} min={min} max={max} autoComplete={autoComplete} />}
     </label>
+  );
+}
+
+/** Campo de contraseña con botón 👁 para mostrarla u ocultarla. */
+export function PasswordInput({ name, required, placeholder, autoComplete, minLength, className = 'input', title }: {
+  name: string; required?: boolean; placeholder?: string; autoComplete?: string; minLength?: number; className?: string; title?: string;
+}) {
+  const [show, setShow] = useState(false);
+  return (
+    <span className="relative block">
+      <input className={`${className} pr-10`} name={name} type={show ? 'text' : 'password'} required={required} placeholder={placeholder}
+        autoComplete={autoComplete} minLength={minLength} title={title} autoCapitalize="none" autoCorrect="off" spellCheck={false} />
+      <button type="button" onClick={() => setShow((v) => !v)} aria-label={show ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+        title={show ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+        className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-500 hover:text-slate-800">{show ? '🙈' : '👁'}</button>
+    </span>
   );
 }
 

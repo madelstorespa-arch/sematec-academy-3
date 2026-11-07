@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getPublicSite, anonClient, mediaUrl } from '@/lib/site';
 import { MODALITY } from '@/components/course-card';
-import { fmtDate, fmtMoney } from '@/lib/format';
+import { fmtDate } from '@/lib/format';
+import { PriceTag } from '@/components/price-tag';
 
 export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -24,7 +25,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
         <div className="mt-8 whitespace-pre-line leading-relaxed text-slate-700">{c.description}</div>
       </article>
       <aside className="h-fit rounded-2xl border border-slate-200 p-6 shadow-sm lg:sticky lg:top-24">
-        <p className="text-3xl font-black">{fmtMoney(c.price, c.currency)}</p>
+        <PriceTag c={c} size="lg" />
         <dl className="mt-5 space-y-2 text-sm">
           <div className="flex justify-between"><dt className="text-slate-500">Modalidad</dt><dd className="font-semibold">{MODALITY[c.modality]}</dd></div>
           {c.duration_text && <div className="flex justify-between"><dt className="text-slate-500">Duración</dt><dd className="font-semibold">{c.duration_text}</dd></div>}

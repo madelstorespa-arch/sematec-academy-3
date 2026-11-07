@@ -45,3 +45,20 @@ export function localToIso(v: string, tz = 'America/Santiago'): string {
   const inUtc = new Date(d.toLocaleString('en-US', { timeZone: 'UTC' }));
   return new Date(d.getTime() + (inUtc.getTime() - inTz.getTime())).toISOString();
 }
+
+/** Libro virtual de la biblioteca (PDF, Word, PowerPoint…): mismas verificaciones, visible a toda la institución. */
+export async function saveLibraryFile(ctx: Ctx, file: File | null): Promise<string | null> {
+  if (!file || file.size === 0) return null;
+  if (file.size > MAX) throw new Error('El archivo supera 4 MB. Para libros más grandes, súbalo a Google Drive o similar y pegue el enlace.');
+  const ext = (file.name.split('.').pop() ?? '').toLowerCase();
+  const t = TYPES[ext];
+  const buf = Buffer.from(await file.arrayBuffer());
+  if (!t || buf.length < 4 || !t.magic(buf)) throw new Error('Tipo de archivo no permitido. Use PDF, Word, PowerPoint o similar.');
+  const name = file.name.replace(/[^\w.\- áéíóúñÁÉÍÓÚÑ()]/g, '_').slice(0, 200);
+  const { data, error } = await ctx.supabase.from('library_files').insert({
+    organization_id: ctx.orgId, filename: name, mime_type: t.mime, size_bytes: buf.length,
+    sha256: crypto.createHash('sha256').update(buf).digest('hex'), bytes: '\\x' + buf.toString('hex'),
+  }).select('id').single();
+  if (error) throw new Error(error.message);
+  return data.id as string;
+}

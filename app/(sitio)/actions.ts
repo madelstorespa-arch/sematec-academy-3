@@ -28,7 +28,7 @@ export async function applyToCourse(fd: FormData): Promise<ActionResult> {
   if (!fd.get('consent')) return { ok: false, error: 'Debe aceptar los términos y la política de privacidad.' };
   const { data, error } = await anonClient().rpc('submit_public_application', {
     p_offering: v(fd, 'offering_id'), p_name: v(fd, 'name'), p_email: v(fd, 'email'), p_phone: v(fd, 'phone'),
-    p_doc_country: v(fd, 'doc_country'), p_doc_type: v(fd, 'doc_type'), p_doc_number: v(fd, 'doc_number'),
+    p_doc_country: 'CL', p_doc_type: null, p_doc_number: null, // el N° de documento no se solicita
     p_form: { motivation: v(fd, 'motivation'), education: v(fd, 'education') }, p_ip: await ip(),
   });
   if (error) return { ok: false, error: explain(error) };
@@ -49,7 +49,7 @@ export async function startCheckout(fd: FormData): Promise<ActionResult> {
   const provider = v(fd, 'provider') as ProviderId;
   const { data, error } = await anonClient().rpc('create_checkout_order', {
     p_offering: v(fd, 'offering_id'), p_provider: provider, p_name: v(fd, 'name'), p_email: v(fd, 'email'), p_phone: v(fd, 'phone'),
-    p_doc_country: v(fd, 'doc_country') || 'CL', p_doc_type: v(fd, 'doc_type') || 'RUN', p_doc_number: v(fd, 'doc_number'),
+    p_doc_country: 'CL', p_doc_type: null, p_doc_number: null,
     p_tracking_code: v(fd, 'tracking_code') || null,
   });
   if (error) return { ok: false, error: explain(error) };

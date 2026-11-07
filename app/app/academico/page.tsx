@@ -4,6 +4,8 @@ import { PageHeader, Card, StatusBadge, Empty, Tabs } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField } from '@/components/forms';
 import { courseOptions, gradeScaleOptions } from '@/lib/options';
 import { fmtDate, label } from '@/lib/format';
+import { OwnerActions } from '@/components/owner-actions';
+import { updateProgram, updateCourse } from './actions';
 import { addPrerequisite, createCourse, createGradeScale, createPeriod, createProgram, setPeriodStatus } from './actions';
 
 export const metadata = { title: 'Oferta académica' };
@@ -15,7 +17,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
   const orgId = requireOrg(ctx);
   const t = (await searchParams).t ?? 'programas';
   const sb = ctx.supabase;
-  const tabs = [['programas', 'Programas y mallas'], ['cursos', 'Asignaturas'], ['periodos', 'Periodos'], ['escalas', 'Escalas de notas']]
+  const tabs = [['programas', 'Carreras y programas'], ['cursos', 'Asignaturas'], ['periodos', 'Periodos'], ['escalas', 'Escalas de notas']]
     .map(([key, l]) => ({ key, label: l, href: `/app/academico?t=${key}` }));
 
   return (
@@ -37,9 +39,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
     return (
       <div className="space-y-6">
         {can(ctx, 'academic.create') && (
-          <Card title="Nuevo programa">
+          <Card title="➕ Nueva carrera o programa">
             {scales.length === 0 ? <Empty>Primero cree una escala de notas.</Empty> : (
-              <ActionForm action={createProgram} submitLabel="Crear programa">
+              <ActionForm action={createProgram} submitLabel="Crear carrera">
                 <Grid cols={3}>
                   <Field label="Código" name="code" required /><Field label="Nombre" name="name" required className="md:col-span-2" />
                   <SelectField label="Nivel" name="level" required options={o([['course', 'Curso'], ['technical', 'Técnico'], ['undergraduate', 'Pregrado'], ['postgraduate', 'Postgrado'], ['diploma', 'Diplomado'], ['continuing', 'Educación continua']])} />
@@ -54,10 +56,20 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
             )}
           </Card>
         )}
-        <Card>{data?.length ? <table className="table"><thead><tr><th>Código</th><th>Programa</th><th>Nivel</th><th>Duración</th><th>Mallas</th><th>Estado</th></tr></thead>
+        <Card title="Carreras y programas">{data?.length ? <div className="overflow-x-auto"><table className="table"><thead><tr><th>Código</th><th>Carrera o programa</th><th>Nivel</th><th>Duración</th><th>Mallas</th><th>Estado</th>{(can(ctx, 'academic.edit') || ctx.isOwner) && <th></th>}</tr></thead>
           <tbody>{data.map((p: any) => <tr key={p.id}><td className="font-mono text-xs">{p.code}</td><td>{p.name}</td><td>{label(p.level)}</td><td>{p.duration_terms}</td>
-            <td><Link className="link" href={`/app/academico/programas/${p.id}`}>{p.curricula?.map((c: any) => c.version).join(', ') || 'Ver'}</Link></td><td><StatusBadge status={p.status} /></td></tr>)}</tbody></table>
-          : <Empty>Sin programas.</Empty>}</Card>
+            <td><Link className="link" href={`/app/academico/programas/${p.id}`}>{p.curricula?.map((c: any) => c.version).join(', ') || 'Ver'}</Link></td><td><StatusBadge status={p.status} /></td>
+            {(can(ctx, 'academic.edit') || ctx.isOwner) && <td className="space-y-1">
+              {can(ctx, 'academic.edit') && <details><summary className="cursor-pointer text-xs font-semibold text-brand-700">✏️ Editar</summary>
+                <div className="mt-2 w-72"><ActionForm action={updateProgram} submitLabel="Guardar" resetOnSuccess={false}>
+                  <input type="hidden" name="id" value={p.id} />
+                  <Field label="Nombre" name="name" required defaultValue={p.name} />
+                  <SelectField label="Modalidad" name="modality" required defaultValue={p.modality} options={o([['in_person', 'Presencial'], ['online', 'En línea'], ['hybrid', 'Híbrida']])} />
+                  <Field label="Duración (periodos)" name="duration_terms" type="number" min={1} max={20} required defaultValue={p.duration_terms} />
+                </ActionForm></div></details>}
+              {ctx.isOwner && <OwnerActions table="programs" id={p.id} active={p.status === 'active'} path="/app/academico" name={`la carrera ${p.name}`} />}
+            </td>}</tr>)}</tbody></table></div>
+          : <Empty>Aún no hay carreras. Cree la primera arriba.</Empty>}</Card>
       </div>
     );
   }
@@ -85,9 +97,19 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
             </Card>
           </div>
         )}
-        <Card>{data?.length ? <table className="table"><thead><tr><th>Código</th><th>Asignatura</th><th>Créditos</th><th>Hrs/sem</th><th>Prerrequisitos</th></tr></thead>
+        <Card>{data?.length ? <div className="overflow-x-auto"><table className="table"><thead><tr><th>Código</th><th>Asignatura</th><th>Créditos</th><th>Hrs/sem</th><th>Prerrequisitos</th><th>Estado</th>{(can(ctx, 'academic.edit') || ctx.isOwner) && <th></th>}</tr></thead>
           <tbody>{data.map((c: any) => <tr key={c.id}><td className="font-mono text-xs">{c.code}</td><td>{c.name}</td><td>{c.credits}</td><td>{c.weekly_hours}</td>
-            <td>{c.course_prerequisites?.map((p: any) => p.prerequisite?.code).join(', ') || '—'}</td></tr>)}</tbody></table> : <Empty>Sin asignaturas.</Empty>}</Card>
+            <td>{c.course_prerequisites?.map((p: any) => p.prerequisite?.code).join(', ') || '—'}</td><td><StatusBadge status={c.status} /></td>
+            {(can(ctx, 'academic.edit') || ctx.isOwner) && <td className="space-y-1">
+              {can(ctx, 'academic.edit') && <details><summary className="cursor-pointer text-xs font-semibold text-brand-700">✏️ Editar</summary>
+                <div className="mt-2 w-64"><ActionForm action={updateCourse} submitLabel="Guardar" resetOnSuccess={false}>
+                  <input type="hidden" name="id" value={c.id} />
+                  <Field label="Nombre" name="name" required defaultValue={c.name} />
+                  <Field label="Créditos" name="credits" type="number" step="0.5" required defaultValue={c.credits} />
+                  <Field label="Horas semanales" name="weekly_hours" type="number" step="0.5" required defaultValue={c.weekly_hours} />
+                </ActionForm></div></details>}
+              {ctx.isOwner && <OwnerActions table="courses" id={c.id} active={c.status === 'active'} path="/app/academico?t=cursos" name={`la asignatura ${c.name}`} />}
+            </td>}</tr>)}</tbody></table></div> : <Empty>Sin asignaturas.</Empty>}</Card>
       </div>
     );
   }
@@ -109,14 +131,15 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
             </ActionForm>
           </Card>
         )}
-        <Card>{data?.length ? <table className="table"><thead><tr><th>Código</th><th>Nombre</th><th>Clases</th><th>Inscripción</th><th>Estado</th></tr></thead>
+        <Card>{data?.length ? <table className="table"><thead><tr><th>Código</th><th>Nombre</th><th>Clases</th><th>Inscripción</th><th>Estado</th>{ctx.isOwner && <th></th>}</tr></thead>
           <tbody>{data.map((p: any) => <tr key={p.id}><td className="font-mono text-xs">{p.code}</td><td>{p.name}</td><td>{fmtDate(p.starts_on)} – {fmtDate(p.ends_on)}</td>
             <td>{fmtDate(p.enrollment_opens_on)} – {fmtDate(p.enrollment_closes_on)}</td>
             <td>{can(ctx, 'academic.edit') ? (
               <ActionForm action={setPeriodStatus} inline submitLabel="✓" submitClass="btn-secondary btn-sm" resetOnSuccess={false}>
                 <input type="hidden" name="id" value={p.id} />
                 <select name="status" defaultValue={p.status} className="input py-1 text-xs">{statusOpts.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
-              </ActionForm>) : <StatusBadge status={p.status} />}</td></tr>)}</tbody></table> : <Empty>Sin periodos.</Empty>}</Card>
+              </ActionForm>) : <StatusBadge status={p.status} />}</td>
+            {ctx.isOwner && <td><OwnerActions table="academic_periods" id={p.id} path="/app/academico?t=periodos" name={`el periodo ${p.code}`} /></td>}</tr>)}</tbody></table> : <Empty>Sin periodos.</Empty>}</Card>
       </div>
     );
   }

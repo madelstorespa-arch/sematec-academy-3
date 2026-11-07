@@ -7,7 +7,8 @@ import { grantRole, revokeRole, setAccountStatus, createRole } from './actions';
 
 export const metadata = { title: 'Usuarios y roles' };
 
-export default async function Page() {
+export default async function Page({ searchParams }: { searchParams: Promise<{ q?: string; rol?: string; estado?: string }> }) {
+  const sp = await searchParams;
   const ctx = await getContext();
   requirePerm(ctx, 'users.view');
   const orgId = requireOrg(ctx);
@@ -22,6 +23,12 @@ export default async function Page() {
   const admin = can(ctx, 'security.admin');
   const roleOpts = (roles ?? []).filter((r: any) => !r.organization_id || r.organization_id === orgId).map((r: any) => ({ value: r.code, label: `${r.name}${r.requires_mfa ? ' (MFA)' : ''}` }));
   const modules = [...new Set((perms ?? []).map((p: any) => p.module))];
+  const q = (sp.q ?? '').trim().toLowerCase();
+  const shown = (members ?? []).filter((m: any) =>
+    (!q || `${m.profiles?.full_name ?? ''} ${m.profiles?.email ?? ''}`.toLowerCase().includes(q))
+    && (!sp.rol || m.roles?.code === sp.rol)
+    && (!sp.estado || (sp.estado === 'suspendida' ? m.profiles?.status !== 'active' : sp.estado === 'revocado' ? m.status !== 'active' : m.status === 'active' && m.profiles?.status === 'active')));
+  const usedRoles = [...new Map((members ?? []).map((m: any) => [m.roles?.code, m.roles?.name])).entries()].filter(([c]) => c);
 
   return (
     <>
@@ -35,7 +42,7 @@ export default async function Page() {
                 <SelectField label="Rol" name="role" required options={roleOpts} />
                 <SelectField label="Sede (vacío = todas)" name="campus_id" options={campuses} placeholder="Todas las sedes" />
                 <Field label="Vigente hasta (opcional)" name="valid_until" type="date" />
-                <Field label="Contraseña (si la cuenta es nueva)" name="password" type="text" autoComplete="new-password" placeholder="Mín. 10, con A-z y 0-9" />
+                <Field label="Contraseña (si la cuenta es nueva)" name="password" type="password" autoComplete="new-password" placeholder="Mín. 10, con A-z y 0-9" />
                 <label className="flex items-center gap-2 self-end pb-2 text-sm"><input type="checkbox" name="invite" /> Invitar por correo en vez de contraseña (requiere configurar SMTP)</label>
               </Grid>
               <p className="text-xs text-slate-500">Si el correo no tiene cuenta, se crea con la contraseña que usted escriba. No puede otorgar roles con permisos que usted no posee.</p>
@@ -43,10 +50,20 @@ export default async function Page() {
           )}
         </Card>
       )}
-      <Card title="Membresías">
-        {members?.length ? <div className="overflow-x-auto"><table className="table">
+      <Card title={`Cuentas y roles (${shown.length}${shown.length !== (members?.length ?? 0) ? ` de ${members?.length}` : ''})`}>
+        <form className="mb-4 flex flex-wrap gap-2">
+          <input className="input max-w-xs" name="q" defaultValue={sp.q} placeholder="Buscar nombre o correo" />
+          <select className="input max-w-[12rem]" name="rol" defaultValue={sp.rol ?? ''}><option value="">Todos los roles</option>
+            {usedRoles.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select>
+          <select className="input max-w-[12rem]" name="estado" defaultValue={sp.estado ?? ''}><option value="">Todos los estados</option>
+            <option value="activa">Activas</option><option value="suspendida">Cuenta suspendida o bloqueada</option><option value="revocado">Rol revocado</option></select>
+          <button className="btn-secondary">Filtrar</button>
+          {(sp.q || sp.rol || sp.estado) && <a className="btn-secondary" href="/app/usuarios">Limpiar</a>}
+        </form>
+        <p className="mb-3 text-xs text-slate-500">🔒 Cada cuenta tiene su propia contraseña. Por seguridad las contraseñas nunca se pueden ver; si alguien la olvida, asigne una nueva desde Estudiantes, Profesores o Personal (botón 🔑 Cambiar).</p>
+        {shown.length ? <div className="overflow-x-auto"><table className="table">
           <thead><tr><th>Usuario</th><th>Rol</th><th>Sede</th><th>Desde</th><th>Estado</th><th>Cuenta</th>{admin && <th>Acciones</th>}</tr></thead>
-          <tbody>{members.map((m: any) => (
+          <tbody>{shown.map((m: any) => (
             <tr key={m.id}><td>{m.profiles?.full_name || '—'}<br /><span className="text-xs text-slate-500">{m.profiles?.email}</span></td>
               <td>{m.roles?.name} {m.roles?.requires_mfa && <Badge color="blue">MFA</Badge>}</td><td>{m.campuses?.name ?? 'Todas'}</td>
               <td>{fmtDate(m.created_at)}{m.valid_until && <><br /><span className="text-xs">hasta {fmtDate(m.valid_until)}</span></>}</td>
@@ -59,7 +76,7 @@ export default async function Page() {
                   <select name="status" defaultValue={m.profiles?.status} className="input py-1 text-xs"><option value="active">Cuenta activa</option><option value="suspended">Suspender</option><option value="locked">Bloquear</option></select>
                   <input name="reason" required placeholder="Motivo" className="input w-28 py-1 text-xs" /></ActionForm>}
               </td>}
-            </tr>))}</tbody></table></div> : <Empty>Sin usuarios.</Empty>}
+            </tr>))}</tbody></table></div> : <Empty>{members?.length ? 'Ningún usuario con ese filtro.' : 'Sin usuarios.'}</Empty>}
       </Card>
       {admin && ctx.aal === 'aal2' && (
         <details className="card mt-6">

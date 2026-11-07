@@ -11,11 +11,12 @@ import { createThread, replyThread } from '@/app/app/aula/actions';
 import { openTicket, replyTicket } from '@/app/app/soporte/actions';
 import { answerSurvey } from '@/app/app/encuestas/actions';
 import { saveAlumniProfile } from '@/app/app/egresados/actions';
+import { createPost } from '@/app/app/oficinas/actions';
 
 type Act = (fd: FormData) => Promise<{ ok: boolean; message?: string; error?: string }>;
 const ACTIONS: Record<OfflineKey, Act> = {
   asistencia: saveAttendance, notas: saveGrades, mensaje: sendMessage, foro_tema: createThread, foro_respuesta: replyThread,
-  soporte: openTicket, soporte_respuesta: replyTicket, encuesta: answerSurvey, egresado: saveAlumniProfile,
+  soporte: openTicket, soporte_respuesta: replyTicket, encuesta: answerSurvey, egresado: saveAlumniProfile, oficina_post: createPost,
 };
 const WARM_EVERY = 6 * 3600 * 1000;
 

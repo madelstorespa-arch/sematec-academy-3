@@ -37,10 +37,6 @@ function PersonFields({ countries }: { countries: { code: string; name: string }
       <In label="Nombre completo" name="name" required />
       <In label="Correo electrónico" name="email" type="email" required />
       <In label="Teléfono" name="phone" placeholder="+56 9 1234 5678" />
-      <label className="block"><span className="label">País del documento *</span>
-        <select className="input" name="doc_country" defaultValue="CL" required>{countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}</select></label>
-      <In label="Tipo de documento" name="doc_type" required defaultValue="RUN" placeholder="RUN, DNI, Pasaporte" />
-      <In label="Número de documento" name="doc_number" required />
     </div>
   );
 }
@@ -119,7 +115,7 @@ export function CheckoutForm({ action, offeringId, providers, countries, trackin
           {providers.map((p, i) => (
             <label key={p.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-300 p-4 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
               <input type="radio" name="provider" value={p.id} checked={provider === p.id} onChange={() => setProvider(p.id)} required className="mt-1" />
-              <span><b>{p.banks ? '🏦 ' : ''}{p.label}</b><br /><span className="text-xs text-slate-600">{p.description}</span></span>
+              <span><b>{p.banks ? '🏦 ' : p.id === 'flow' ? '' : '💳 '}{p.label}</b><br /><span className="text-xs text-slate-600">{p.description}</span></span>
             </label>))}
         </div>
       </fieldset>

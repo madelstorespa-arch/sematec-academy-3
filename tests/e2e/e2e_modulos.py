@@ -14,7 +14,7 @@ with sync_playwright() as pw:
     s.select_option('select[name=audience]', 'students'); s.click('button:has-text("Publicar")')
     check('publicado' in status_msg(s), 'Secretaría publica un anuncio para estudiantes')
     # Biblioteca
-    go(s, BASE + '/app/biblioteca'); s.click('summary:has-text("Agregar material")')
+    go(s, BASE + '/app/biblioteca'); s.click('summary:has-text("Agregar libro")')
     s.fill('input[name=title]', 'Bases de Datos E2E'); s.fill('input[name=author]', 'Elmasri'); s.fill('input[name=copies]', '2')
     s.click('button:has-text("Agregar")'); check('catálogo' in status_msg(s), 'Material agregado a la biblioteca')
     go(s, BASE + '/app/biblioteca'); s.click('summary:has-text("Registrar préstamo")')

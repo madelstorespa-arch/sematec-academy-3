@@ -1,4 +1,5 @@
 import { getContext, can, requireOrg } from '@/lib/context';
+import { OwnerActions } from '@/components/owner-actions';
 import { PageHeader, Card, Badge, Empty } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField } from '@/components/forms';
 import { campusOptions } from '@/lib/options';
@@ -64,13 +65,14 @@ export default async function Page() {
       </Card>
       <Card title="Equipos y recursos">
         {res?.length ? <div className="overflow-x-auto"><table className="table">
-          <thead><tr><th>Código</th><th>Nombre</th><th>Tipo</th><th>Estado</th></tr></thead>
+          <thead><tr><th>Código</th><th>Nombre</th><th>Tipo</th><th>Estado</th>{ctx.isOwner && <th></th>}</tr></thead>
           <tbody>{res.map((r: any) => (
             <tr key={r.id}><td className="font-mono text-xs">{r.code}</td><td>{r.name}</td><td>{r.kind}</td>
               <td>{can(ctx, 'facilities.edit') ? (
                 <ActionForm action={setResourceStatus} inline submitLabel="✓" submitClass="btn-secondary btn-sm" resetOnSuccess={false}><input type="hidden" name="id" value={r.id} />
                   <select name="status" defaultValue={r.status} className="input py-1 text-xs"><option value="disponible">Disponible</option><option value="mantencion">En mantención</option><option value="baja">De baja</option></select>
-                </ActionForm>) : <Badge color={r.status === 'disponible' ? 'green' : 'amber'}>{r.status}</Badge>}</td></tr>))}</tbody>
+                </ActionForm>) : <Badge color={r.status === 'disponible' ? 'green' : 'amber'}>{r.status}</Badge>}</td>
+              {ctx.isOwner && <td><OwnerActions table="resources" id={r.id} path="/app/reservas" name={r.name} /></td>}</tr>))}</tbody>
         </table></div> : <Empty>No hay equipos registrados.</Empty>}
       </Card>
     </>

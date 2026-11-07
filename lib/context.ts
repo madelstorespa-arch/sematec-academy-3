@@ -56,6 +56,8 @@ export const getContext = cache(async () => {
     teacherId,
     isEmployee,
     isGuardian,
+    /** Propietario institucional (o administrador de plataforma): puede suspender y eliminar en todos los módulos. */
+    isOwner: isPlatformAdmin || !!org?.roles?.includes('Propietario institucional'),
     needsMfa: (isPlatformAdmin || !!org?.requires_mfa) && aal?.currentLevel !== 'aal2',
   };
 });

@@ -1,4 +1,5 @@
 import { getContext, can, requirePerm, requireOrg } from '@/lib/context';
+import { OwnerActions } from '@/components/owner-actions';
 import { PageHeader, Card, Badge, Empty, Stat } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField } from '@/components/forms';
 import { campusOptions } from '@/lib/options';
@@ -63,7 +64,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
                   <select name="room_id" defaultValue={i.room_id ?? ''} className="input py-1 text-xs"><option value="">Sin sala</option>{roomOpts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
                   <input name="assigned_to" defaultValue={i.assigned_to ?? ''} placeholder="Responsable" className="input w-28 py-1 text-xs" />
                 </ActionForm>) : <Badge color={ST[i.status][1]}>{ST[i.status][0]}</Badge>}</td>
-              <td><a className="link text-xs" href={`/app/inventario?ver=${i.id}`}>Historial</a></td></tr>))}</tbody>
+              <td className="space-y-1"><a className="link text-xs" href={`/app/inventario?ver=${i.id}`}>Historial</a>
+                {ctx.isOwner && <OwnerActions table="inventory_items" id={i.id} active={i.status !== 'de_baja'} path="/app/inventario" name={i.name} />}</td></tr>))}</tbody>
         </table></div> : <Empty>{q || estado ? 'Sin resultados.' : 'El inventario está vacío.'}</Empty>}
       </Card>
     </>

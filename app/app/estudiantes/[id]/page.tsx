@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getContext, can, requireOrg } from '@/lib/context';
 import { PageHeader, Card, StatusBadge, Empty, Badge } from '@/components/ui';
-import { ActionForm, Field, SelectField } from '@/components/forms';
+import { ActionForm, PasswordInput, Field, SelectField } from '@/components/forms';
 import { PersonFields } from '@/components/person-form';
 import { campusOptions, countryOptions } from '@/lib/options';
 import { fmtDate, fmtMoney, fmtNum, fullName } from '@/lib/format';
@@ -38,7 +38,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 
   return (
     <>
-      <PageHeader title={fullName(s)} subtitle={`${s.student_code} · ${s.id_document_type} ${s.id_document_number}`}
+      <PageHeader title={fullName(s)} subtitle={s.student_code}
         actions={<><StatusBadge status={s.status} />{s.user_id ? <Badge color="green">Con acceso al portal</Badge> : <Badge>Sin acceso al portal</Badge>}</>} />
       <div className="grid gap-6 xl:grid-cols-2">
         <Card title="Matrículas">
@@ -71,7 +71,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
                     <span className="flex flex-wrap items-center gap-2">
                       <ActionForm action={resetGuardianPassword} inline resetOnSuccess submitLabel="🔑 Cambiar" submitClass="btn-secondary btn-sm">
                         <input type="hidden" name="id" value={g.id} />
-                        <input name="password" type="text" required minLength={10} autoComplete="new-password" placeholder="Nueva contraseña" className="input w-36 py-1 text-xs" />
+                        <span className="inline-block w-40"><PasswordInput name="password" required minLength={10} autoComplete="new-password" placeholder="Nueva contraseña" className="input py-1 text-xs" /></span>
                       </ActionForm>
                       <ActionForm action={revokeGuardian} inline submitLabel="Revocar" submitClass="btn-secondary btn-sm" confirm="¿Quitar el acceso de este apoderado?">
                         <input type="hidden" name="id" value={g.id} />
@@ -86,7 +86,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
                   <input type="hidden" name="student_id" value={s.id} />
                   <Field label="Nombre completo" name="full_name" required />
                   <Field label="Correo (será su usuario)" name="email" type="email" required />
-                  <Field label="Contraseña" name="password" type="text" autoComplete="new-password" placeholder="Mín. 10, con mayúsculas, minúsculas y números" />
+                  <Field label="Contraseña" name="password" type="password" autoComplete="new-password" placeholder="Mín. 10, con mayúsculas, minúsculas y números" />
                   <SelectField label="Parentesco" name="relationship" required defaultValue="apoderado" options={REL} />
                 </ActionForm></div>
               </details>)}
@@ -119,7 +119,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
               <ActionForm action={grantPortalAccess} submitLabel="Crear cuenta">
                 <input type="hidden" name="kind" value="student" /><input type="hidden" name="id" value={s.id} />
                 <Field label="Correo de acceso (usuario)" name="email" type="email" required defaultValue={s.email} />
-                <Field label="Contraseña" name="password" type="text" autoComplete="new-password" placeholder="Mín. 10, con mayúsculas, minúsculas y números" />
+                <Field label="Contraseña" name="password" type="password" autoComplete="new-password" placeholder="Mín. 10, con mayúsculas, minúsculas y números" />
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="invite" /> Enviar invitación por correo (requiere SMTP)</label>
               </ActionForm>
               </div>

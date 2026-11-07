@@ -21,7 +21,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (ctx.teacherId) items.push({ href: '/app/docencia', label: 'Mis secciones', icon: '📚' });
   if (can(ctx, 'students.view')) items.push({ href: '/app/estudiantes', label: 'Estudiantes', icon: '👥' });
   if (can(ctx, 'teachers.view')) items.push({ href: '/app/profesores', label: 'Profesores', icon: '🧑‍🏫' });
-  if (can(ctx, 'academic.view')) items.push({ href: '/app/academico', label: 'Oferta académica', icon: '🏛' });
+  if (can(ctx, 'academic.view')) items.push({ href: '/app/academico', label: 'Carreras y asignaturas', icon: '🏛' });
   if (can(ctx, 'sections.view') || can(ctx, 'grades.view')) items.push({ href: '/app/secciones', label: 'Secciones y notas', icon: '📝' });
   if (can(ctx, 'enrollments.view')) items.push({ href: '/app/matriculas', label: 'Matrículas', icon: '🗂' });
   if (can(ctx, 'finance.view')) items.push({ href: '/app/finanzas', label: 'Finanzas', icon: '💳' });
@@ -34,6 +34,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: '/app/biblioteca', label: 'Biblioteca', icon: '📖' },
     { href: '/app/soporte', label: 'Soporte técnico', icon: '🛟' },
   );
+  if (ctx.studentId || can(ctx, 'students.view')) items.push({ href: '/app/punto-estudiantil', label: 'Punto estudiantil', icon: '🎒' });
+  if (ctx.orgId) items.push({ href: '/app/oficinas', label: 'Oficinas y citas', icon: '🏢' });
   if (ctx.orgId) items.push({ href: '/app/encuestas', label: 'Encuestas', icon: '🗳' });
   if (ctx.studentId || can(ctx, 'alumni.view')) items.push({ href: '/app/egresados', label: 'Egresados', icon: '🎓' });
   if (ctx.studentId || can(ctx, 'alumni.view')) items.push({ href: '/app/empleos', label: 'Bolsa de empleo', icon: '💼' });

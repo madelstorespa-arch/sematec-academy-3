@@ -5,7 +5,7 @@
  */
 export type OfflineKey =
   | 'asistencia' | 'notas' | 'mensaje' | 'foro_tema' | 'foro_respuesta'
-  | 'soporte' | 'soporte_respuesta' | 'encuesta' | 'egresado';
+  | 'soporte' | 'soporte_respuesta' | 'encuesta' | 'egresado' | 'oficina_post';
 
 export type OutboxItem = { id: string; key: OfflineKey; label: string; userId: string; at: string; path: string; fields: [string, string][] };
 export type FailedItem = OutboxItem & { error: string };

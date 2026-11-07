@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { getPublicSite, anonClient } from '@/lib/site';
 import { availableProviders } from '@/lib/payments';
 import { ApplicationForm, CheckoutForm } from '@/components/public-forms';
-import { fmtMoney } from '@/lib/format';
+import { PriceTag } from '@/components/price-tag';
 import { applyToCourse, startCheckout } from '../../../actions';
 
 export const metadata = { title: 'Inscripción' };
@@ -25,7 +25,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
       <Link href={`/cursos/${c.slug}`} className="link text-sm">← {c.title}</Link>
       <h1 className="mt-3 text-3xl font-bold">{payStep ? 'Inscripción y pago' : 'Postulación'}</h1>
       <div className="mt-4 flex items-center justify-between rounded-xl bg-slate-50 p-4">
-        <span className="font-semibold">{c.title}</span><span className="text-xl font-black">{fmtMoney(c.price, c.currency)}</span>
+        <span className="font-semibold">{c.title}</span><span className="text-right"><PriceTag c={c} /></span>
       </div>
       <div className="mt-8">
         {payStep ? (
