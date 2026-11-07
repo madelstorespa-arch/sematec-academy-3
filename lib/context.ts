@@ -24,12 +24,15 @@ export const getContext = cache(async () => {
   let perms: string[] = [];
   let studentId: string | null = null;
   let teacherId: string | null = null;
+  let isEmployee = false;
   if (org) {
-    const [p, s, t] = await Promise.all([
+    const [p, s, t, e] = await Promise.all([
       supabase.rpc('my_permissions', { p_org: org.organization_id }),
       supabase.from('students').select('id').eq('organization_id', org.organization_id).eq('user_id', user.id).maybeSingle(),
       supabase.from('teachers').select('id').eq('organization_id', org.organization_id).eq('user_id', user.id).maybeSingle(),
+      supabase.from('employees').select('id').eq('organization_id', org.organization_id).eq('user_id', user.id).maybeSingle(),
     ]);
+    isEmployee = !!e.data;
     perms = (p.data ?? []) as string[];
     studentId = s.data?.id ?? null;
     teacherId = t.data?.id ?? null;
@@ -48,6 +51,7 @@ export const getContext = cache(async () => {
     isPlatformAdmin,
     studentId,
     teacherId,
+    isEmployee,
     needsMfa: (isPlatformAdmin || !!org?.requires_mfa) && aal?.currentLevel !== 'aal2',
   };
 });

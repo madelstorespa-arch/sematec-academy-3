@@ -31,6 +31,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: '/app/biblioteca', label: 'Biblioteca', icon: '📖' },
     { href: '/app/soporte', label: 'Soporte técnico', icon: '🛟' },
   );
+  if (ctx.orgId) items.push({ href: '/app/calendario', label: 'Calendario', icon: '📅' });
+  if (ctx.teacherId || can(ctx, 'facilities.view')) items.push({ href: '/app/reservas', label: 'Salas y recursos', icon: '🏫' });
+  if (can(ctx, 'employees.view') || ctx.isEmployee) items.push({ href: '/app/personal', label: 'Personal y RR. HH.', icon: '🧾' });
+  if (can(ctx, 'inventory.view')) items.push({ href: '/app/inventario', label: 'Inventario', icon: '📦' });
   if (can(ctx, 'reports.view')) items.push({ href: '/app/reportes', label: 'Reportes', icon: '📊' });
   if (can(ctx, 'users.view')) items.push({ href: '/app/usuarios', label: 'Usuarios y roles', icon: '🔐' });
   if (can(ctx, 'organization.admin') || can(ctx, 'settings.admin')) items.push({ href: '/app/configuracion', label: 'Configuración', icon: '⚙' });
