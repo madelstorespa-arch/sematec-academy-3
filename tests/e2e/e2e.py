@@ -79,18 +79,20 @@ def main():
         shot(page, '02_inicio_secretaria')
         go(page, f'{BASE}/app/estudiantes?nuevo=1')
         page.fill('input[name=student_code]', 'EST-E2E1'); page.fill('input[name=first_names]', 'Camila')
-        page.fill('input[name=last_names]', 'Prueba Navegador'); page.fill('input[name=id_document_number]', 'E2E-0001')
-        page.fill('input[name=email]', 'camila.e2e@demo.sematec.test')
+        page.fill('input[name=last_names]', 'Prueba Navegador')
+        check(page.locator('input[name=id_document_number]').count() == 0, 'Formulario sin N° de documento')
+        page.fill('input[name=email]', 'camila.e2e@demo.sematec.test'); page.fill('form:has(input[name=student_code]) input[name=password]', 'CamilaPrueba2026')
         page.select_option('select[name=campus_id]', label='Sede Santiago (STGO)')
         page.click('button:has-text("Registrar estudiante")')
-        check('registrado' in status_msg(page), 'Estudiante registrado desde el formulario')
+        m = status_msg(page); check('registrado con su cuenta' in m, f'Estudiante registrado con su cuenta y contraseña ({m[:60]})')
+        check(sql("select count(*) from students s join profiles p on p.id = s.user_id where s.student_code='EST-E2E1' and p.email='camila.e2e@demo.sematec.test'") == '1', 'La ficha queda vinculada a su cuenta')
         check(sql("select count(*) from students where student_code='EST-E2E1'") == '1', 'El registro existe en PostgreSQL')
         page.reload(); expect(page.locator('text=Prueba Navegador, Camila')).to_be_visible()
         shot(page, '03_estudiantes')
         # validación
         go(page, f'{BASE}/app/estudiantes?nuevo=1')
         page.fill('input[name=student_code]', 'EST-E2E1'); page.fill('input[name=first_names]', 'Dup'); page.fill('input[name=last_names]', 'Licado')
-        page.fill('input[name=id_document_number]', 'E2E-0002'); page.click('button:has-text("Registrar estudiante")')
+        page.fill('input[name=email]', 'dup.e2e@demo.sematec.test'); page.fill('form:has(input[name=student_code]) input[name=password]', 'DupLicado20266'); page.click('button:has-text("Registrar estudiante")')
         check('Ya existe' in status_msg(page), 'Código duplicado rechazado con mensaje claro')
 
         # 3. Otro dispositivo (contexto independiente) ve el mismo dato
@@ -103,7 +105,7 @@ def main():
         # 4. Sin conexión: la operación no se muestra como guardada
         go(page, f'{BASE}/app/estudiantes?nuevo=1')
         page.fill('input[name=student_code]', 'EST-E2E9'); page.fill('input[name=first_names]', 'Sin'); page.fill('input[name=last_names]', 'Conexion')
-        page.fill('input[name=id_document_number]', 'E2E-0009')
+        page.fill('input[name=email]', 'sin.conexion@demo.sematec.test'); page.fill('form:has(input[name=student_code]) input[name=password]', 'SinConexion2026')
         c1.set_offline(True); page.click('button:has-text("Registrar estudiante")')
         msg = status_msg(page); c1.set_offline(False)
         check('NO fue guardada' in msg, 'Sin internet: mensaje claro de que NO se guardó')

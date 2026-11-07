@@ -32,7 +32,8 @@ export default async function Page() {
                 <Field label="Código" name="teacher_code" required />
                 <Field label="Nombres" name="first_names" required />
                 <Field label="Apellidos" name="last_names" required />
-                <Field label="Correo" name="email" type="email" required />
+                <Field label="Correo (será su usuario)" name="email" type="email" required />
+                <Field label="Contraseña de su cuenta" name="password" type="password" required autoComplete="new-password" placeholder="Mín. 10, con mayúsculas, minúsculas y números" />
                 <Field label="Grado académico" name="academic_degree" />
                 <Field label="Especialidad" name="specialty" />
                 <SelectField label="Sede" name="campus_id" options={campuses} />

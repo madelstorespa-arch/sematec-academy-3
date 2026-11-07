@@ -36,9 +36,18 @@ with sync_playwright() as pw:
     go(o, BASE + '/app/estudiantes?nuevo=1')
     check(o.locator('input[name=id_document_number]').count() == 0, 'El formulario ya no pide N° de documento')
     o.fill('input[name=student_code]', 'EST-E2E4'); o.fill('input[name=first_names]', 'Nora'); o.fill('input[name=last_names]', 'Sin Documento')
-    o.fill('input[name=email]', 'nora.e2e@demo.sematec.test')
+    o.fill('input[name=email]', 'nora.e2e@demo.sematec.test'); o.fill('form:has(input[name=student_code]) input[name=password]', 'NoraSinDoc2026')
     o.click('button:has-text("Registrar estudiante")'); m = status_msg(o)
-    check(m.startswith('✓'), f'Estudiante registrado sin documento ({m[:50]})')
+    check(m.startswith('✓'), f'Estudiante registrado sin documento y con su cuenta ({m[:50]})')
+    check(sql("select count(*) from students where student_code = 'EST-E2E4' and user_id is not null") == '1', 'Cuenta creada y vinculada al registrarlo')
+
+    go(o, BASE + '/app/profesores'); o.click('summary:has-text("Registrar profesor")') if o.locator('summary:has-text("Registrar profesor")').count() else None
+    o.fill('input[name=teacher_code]', 'DOC-E2E4'); o.fill('form:has(input[name=teacher_code]) input[name=first_names]', 'Marc')
+    o.fill('form:has(input[name=teacher_code]) input[name=last_names]', 'Vertisma'); o.fill('form:has(input[name=teacher_code]) input[name=email]', 'marc.doc@demo.sematec.test')
+    o.fill('form:has(input[name=teacher_code]) input[name=password]', 'MarcAndre1998')
+    check(o.locator('form:has(input[name=teacher_code]) input[name=id_document_number]').count() == 0, 'Formulario de profesor sin N° de documento')
+    o.click('button:has-text("Registrar profesor")'); m = status_msg(o)
+    check('con su cuenta' in m and sql("select count(*) from teachers where teacher_code = 'DOC-E2E4' and user_id is not null") == '1', f'Profesor registrado con su cuenta ({m[:50]})')
 
     # --- Carrera nueva, editar, suspender ---
     go(o, BASE + '/app/academico')

@@ -32,7 +32,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
           <summary className="cursor-pointer px-5 py-3 text-sm font-bold text-brand-700">+ Registrar estudiante</summary>
           <div className="border-t border-slate-100 p-5">
             <ActionForm action={createStudent} submitLabel="Registrar estudiante">
-              <PersonFields campuses={campuses} countries={countries} codeName="student_code" codeLabel="Código de estudiante" />
+              <PersonFields campuses={campuses} codeName="student_code" codeLabel="Código de estudiante" withAccount />
             </ActionForm>
           </div>
         </details>

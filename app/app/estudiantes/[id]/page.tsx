@@ -101,7 +101,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <Card title="Editar ficha" className="xl:col-span-2">
             <ActionForm action={updateStudent} submitLabel="Guardar cambios" resetOnSuccess={false}>
               <input type="hidden" name="id" value={s.id} />
-              <PersonFields campuses={campuses} countries={countries} d={s} />
+              <PersonFields campuses={campuses} d={s} />
               <SelectField label="Estado" name="status" required defaultValue={s.status} className="max-w-xs"
                 options={[['active', 'Activo'], ['inactive', 'Inactivo'], ['suspended', 'Suspendido'], ['withdrawn', 'Retirado'], ['graduated', 'Egresado']].map(([value, label]) => ({ value, label }))} />
             </ActionForm>

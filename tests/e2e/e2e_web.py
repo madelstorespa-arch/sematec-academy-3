@@ -93,7 +93,7 @@ def main():
         check(sql("select status||'|'||provider_status from checkout_orders where buyer_email='altera@demo.sematec.test'") == 'failed|amount_mismatch',
               'Monto alterado detectado: pedido rechazado')
         check(int(sql("select count(*) from system_events where event_type='payment_amount_mismatch'")) >= 1, 'Alerta crítica registrada por monto alterado')
-        check(sql("select count(*) from students where id_document_number in ('WEB-2001','WEB-2002','WEB-2003')") == '0', 'Pagos no aprobados no crean matrícula'); c.close()
+        check(sql("select count(*) from students where email in ('rechazo@demo.sematec.test','anula@demo.sematec.test','altera@demo.sematec.test')") == '0', 'Pagos no aprobados no crean matrícula'); c.close()
         # webhook falso
         req = urllib.request.Request(f'{BASE}/api/pago/webhook/stripe', data=b'{"type":"checkout.session.completed"}', headers={'Stripe-Signature': 't=1,v1=falso'}, method='POST')
         try: urllib.request.urlopen(req); code = 200

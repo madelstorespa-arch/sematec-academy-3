@@ -2,6 +2,8 @@
 import { revalidatePath } from 'next/cache';
 import { getContext } from '@/lib/context';
 import { fail, guard, ok, reqStr, str, type ActionResult } from '@/lib/actions';
+import { checkPassword } from '@/lib/users';
+import { createAndLinkAccount } from '@/lib/accounts';
 
 export async function createTeacher(fd: FormData): Promise<ActionResult> {
   return guard(async () => {
@@ -11,18 +13,21 @@ export async function createTeacher(fd: FormData): Promise<ActionResult> {
       teacher_code: reqStr(fd, 'teacher_code', 'Código').toUpperCase(),
       first_names: reqStr(fd, 'first_names', 'Nombres'),
       last_names: reqStr(fd, 'last_names', 'Apellidos'),
-      id_document_country: str(fd, 'id_document_country'),
-      id_document_type: str(fd, 'id_document_type'),
-      id_document_number: str(fd, 'id_document_number')?.toUpperCase() ?? null,
       email: reqStr(fd, 'email', 'Correo').toLowerCase(),
       academic_degree: str(fd, 'academic_degree'),
       specialty: str(fd, 'specialty'),
       campus_id: str(fd, 'campus_id'),
     };
-    const { error } = await ctx.supabase.from('teachers').insert(row);
+    const password = checkPassword(str(fd, 'password'));
+    const { data, error } = await ctx.supabase.from('teachers').insert(row).select('id').single();
     if (error) return fail(error);
     revalidatePath('/app/profesores');
-    return ok(`Profesor ${row.first_names} ${row.last_names} registrado.`);
+    try {
+      const created = await createAndLinkAccount('teacher', data.id, row.email, `${row.first_names} ${row.last_names}`, password);
+      return ok(`Profesor ${row.first_names} ${row.last_names} registrado con su cuenta. Usuario: ${row.email}${created ? ' · contraseña: la que usted escribió.' : ' (la cuenta ya existía y conserva su contraseña).'}`);
+    } catch (e) {
+      return ok(`Profesor registrado, pero no se pudo crear la cuenta: ${(e as Error).message}. Créela con «🔑 Crear cuenta».`);
+    }
   });
 }
 

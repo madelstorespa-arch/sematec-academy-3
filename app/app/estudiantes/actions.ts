@@ -5,14 +5,12 @@ import { fail, guard, ok, reqStr, str, type ActionResult } from '@/lib/actions';
 import { ensureAuthUser, tempPassword, checkPassword } from '@/lib/users';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { workspaceEnabled, createWorkspaceUser } from '@/lib/workspace';
+import { createAndLinkAccount } from '@/lib/accounts';
 
 function personFields(fd: FormData) {
   return {
     first_names: reqStr(fd, 'first_names', 'Nombres'),
     last_names: reqStr(fd, 'last_names', 'Apellidos'),
-    id_document_country: str(fd, 'id_document_country'),
-    id_document_type: str(fd, 'id_document_type'),
-    id_document_number: str(fd, 'id_document_number')?.toUpperCase() ?? null,
     email: str(fd, 'email')?.toLowerCase() ?? null,
     phone: str(fd, 'phone'),
     birth_date: str(fd, 'birth_date'),
@@ -23,11 +21,18 @@ function personFields(fd: FormData) {
 export async function createStudent(fd: FormData): Promise<ActionResult> {
   return guard(async () => {
     const ctx = await getContext();
-    const row = { organization_id: ctx.orgId, student_code: reqStr(fd, 'student_code', 'Código').toUpperCase(), ...personFields(fd) };
+    const email = reqStr(fd, 'email', 'Correo (será su usuario)').toLowerCase();
+    const password = checkPassword(str(fd, 'password')); // validar antes de crear la ficha
+    const row = { organization_id: ctx.orgId, student_code: reqStr(fd, 'student_code', 'Código').toUpperCase(), ...personFields(fd), email };
     const { data, error } = await ctx.supabase.from('students').insert(row).select('id').single();
     if (error) return fail(error);
     revalidatePath('/app/estudiantes');
-    return ok(`Estudiante ${row.first_names} ${row.last_names} registrado.`, data);
+    try {
+      const created = await createAndLinkAccount('student', data.id, email, `${row.first_names} ${row.last_names}`, password);
+      return ok(`Estudiante ${row.first_names} ${row.last_names} registrado con su cuenta. Usuario: ${email}${created ? ' · contraseña: la que usted escribió.' : ' (la cuenta ya existía y conserva su contraseña).'}`, data);
+    } catch (e) {
+      return ok(`Estudiante registrado, pero no se pudo crear la cuenta: ${(e as Error).message}. Créela desde su ficha con «🔑 Crear cuenta».`, data);
+    }
   });
 }
 

@@ -9,15 +9,27 @@ const back = () => revalidatePath('/app/personal');
 export async function createEmployee(fd: FormData): Promise<ActionResult> {
   return guard(async () => {
     const ctx = await getContext();
-    const { error } = await ctx.supabase.from('employees').insert({
+    const role = str(fd, 'role');
+    const pw = role ? checkPassword(str(fd, 'password')) : null; // con rol, la cuenta se crea de inmediato
+    if (role && (!can(ctx, 'security.admin') || ctx.aal !== 'aal2')) return fail('Crear cuentas requiere permiso de seguridad y sesión con MFA.');
+    const email = role ? reqStr(fd, 'email', 'Correo (será su usuario)').toLowerCase() : str(fd, 'email')?.toLowerCase() ?? null;
+    const first = reqStr(fd, 'first_names', 'Nombres'), last = reqStr(fd, 'last_names', 'Apellidos');
+    const { data, error } = await ctx.supabase.from('employees').insert({
       organization_id: ctx.orgId, campus_id: str(fd, 'campus_id'), employee_code: reqStr(fd, 'employee_code', 'Código').toUpperCase(),
-      first_names: reqStr(fd, 'first_names', 'Nombres'), last_names: reqStr(fd, 'last_names', 'Apellidos'),
-      id_document_country: str(fd, 'id_document_country'), id_document_type: str(fd, 'id_document_type'),
-      id_document_number: str(fd, 'id_document_number')?.toUpperCase() ?? null, email: str(fd, 'email')?.toLowerCase() ?? null,
-      position: reqStr(fd, 'position', 'Cargo'),
-    });
+      first_names: first, last_names: last, email, position: reqStr(fd, 'position', 'Cargo'),
+    }).select('id').single();
     if (error) return fail(error);
-    back(); return ok('Funcionario registrado.');
+    back();
+    if (!role || !email || !pw) return ok('Funcionario registrado. Para que pueda entrar, créele su cuenta con «Crear cuenta».');
+    try {
+      const user = await ensureAuthUser(email, `${first} ${last}`, 'password', pw);
+      const { error: e1 } = await ctx.supabase.rpc('grant_membership', { p_user: user.id, p_org: ctx.orgId, p_role_code: role, p_campus: null, p_valid_until: null });
+      if (e1) throw new Error(e1.message);
+      await ctx.supabase.from('employees').update({ user_id: user.id }).eq('id', data.id);
+      return ok(`Funcionario registrado con su cuenta. Usuario: ${email}${user.created ? ' · contraseña: la que usted escribió.' : ' (la cuenta ya existía y conserva su contraseña).'}`);
+    } catch (e) {
+      return ok(`Funcionario registrado, pero no se pudo crear la cuenta: ${(e as Error).message}. Créela desde la lista con «Crear cuenta».`);
+    }
   });
 }
 

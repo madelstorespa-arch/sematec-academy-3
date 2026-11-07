@@ -30,7 +30,6 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         <h1 className="mt-10 text-3xl font-bold">{c.title}</h1>
         <p className="mt-8 text-slate-600">Se certifica que</p>
         <p className="mt-2 text-2xl font-semibold">{c.recipient_name}</p>
-        {c.payload?.document && <p className="text-sm text-slate-500">Documento {String(c.payload.document).split(':').slice(1).join(' ')}</p>}
         {body && <p className="mx-auto mt-6 max-w-xl text-slate-700">{body}</p>}
         {c.payload?.program && <p className="mt-4">Programa: <b>{c.payload.program}</b></p>}
         {c.payload?.course && <p className="mt-2">Asignatura: <b>{c.payload.course}</b>{c.payload.final_grade ? ` · Nota final ${c.payload.final_grade}` : ''}</p>}

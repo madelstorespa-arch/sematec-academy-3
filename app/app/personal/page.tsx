@@ -61,8 +61,13 @@ export default async function Page() {
           {can(ctx, 'employees.create') && (
             <details className="card mb-6"><summary className="cursor-pointer px-5 py-3 text-sm font-bold text-brand-700">+ Registrar funcionario</summary>
               <div className="border-t border-slate-100 p-5"><ActionForm action={createEmployee} submitLabel="Registrar">
-                <PersonFields campuses={campuses} countries={countries} codeName="employee_code" codeLabel="Código de funcionario" withBirth={false} />
+                <PersonFields campuses={campuses} codeName="employee_code" codeLabel="Código de funcionario" withBirth={false} />
                 <Field label="Cargo" name="position" required placeholder="Secretaria, auxiliar, contador…" />
+                {can(ctx, 'security.admin') && ctx.aal === 'aal2' && (
+                  <Grid cols={2}>
+                    <SelectField label="Rol de su cuenta" name="role" required options={STAFF_ROLES} />
+                    <Field label="Contraseña de su cuenta" name="password" type="password" required autoComplete="new-password" placeholder="Mín. 10, con mayúsculas, minúsculas y números" />
+                  </Grid>)}
               </ActionForm></div></details>)}
           <Card title={`Funcionarios (${emps?.length ?? 0})`} className="mb-6">
             {emps?.length ? <div className="overflow-x-auto"><table className="table">
