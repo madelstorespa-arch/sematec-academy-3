@@ -24,6 +24,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (can(ctx, 'finance.view')) items.push({ href: '/app/finanzas', label: 'Finanzas', icon: '💳' });
   if (can(ctx, 'certificates.view')) items.push({ href: '/app/certificados', label: 'Certificados', icon: '🏅' });
   if (can(ctx, 'conferences.view') || ctx.teacherId || ctx.studentId) items.push({ href: '/app/conferencias', label: 'Aulas virtuales', icon: '🎥' });
+  if (ctx.orgId) items.push(
+    { href: '/app/anuncios', label: 'Anuncios', icon: '📢' },
+    { href: '/app/mensajes', label: 'Mensajes', icon: '✉' },
+    { href: '/app/biblioteca', label: 'Biblioteca', icon: '📖' },
+    { href: '/app/soporte', label: 'Soporte técnico', icon: '🛟' },
+  );
   if (can(ctx, 'reports.view')) items.push({ href: '/app/reportes', label: 'Reportes', icon: '📊' });
   if (can(ctx, 'users.view')) items.push({ href: '/app/usuarios', label: 'Usuarios y roles', icon: '🔐' });
   if (can(ctx, 'organization.admin') || can(ctx, 'settings.admin')) items.push({ href: '/app/configuracion', label: 'Configuración', icon: '⚙' });

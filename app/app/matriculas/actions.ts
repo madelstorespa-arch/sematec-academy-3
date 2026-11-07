@@ -2,6 +2,7 @@
 import { revalidatePath } from 'next/cache';
 import { getContext, can } from '@/lib/context';
 import { fail, guard, num, ok, reqStr, str, type ActionResult } from '@/lib/actions';
+import { autoStudentAccess } from '@/lib/portal-access';
 
 export async function enroll(fd: FormData): Promise<ActionResult> {
   return guard(async () => {
@@ -25,8 +26,14 @@ export async function enroll(fd: FormData): Promise<ActionResult> {
         extra = e2 ? ` Atención: la matrícula quedó registrada, pero el arancel NO se generó: ${e2.message}` : ' Arancel y cuotas generados.';
       }
     }
+    // Cuenta del portal automática para el estudiante matriculado
+    let access = '';
+    if (can(ctx, 'students.edit')) {
+      try { const r = await autoStudentAccess(ctx, student); if (r) access = ` ${r}`; }
+      catch (e) { access = ` La cuenta del portal no se creó automáticamente: ${(e as Error).message}`; }
+    }
     revalidatePath('/app/matriculas');
-    return ok(`Matrícula registrada.${extra}`);
+    return ok(`Matrícula registrada.${extra}${access}`);
   });
 }
 
