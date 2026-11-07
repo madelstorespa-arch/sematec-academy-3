@@ -28,7 +28,9 @@ export async function installStatus() {
 }
 
 /** Aplica las migraciones pendientes (cada una en su transacción) y, opcionalmente, los datos de demostración. */
-export async function runInstall(withDemo: boolean) {
+export type FirstInstitution = { name: string; adminName: string; email: string; password: string };
+
+export async function runInstall(withDemo: boolean, first?: FirstInstitution) {
   const c = client(); await c.connect();
   const log: string[] = [];
   try {
@@ -82,7 +84,55 @@ export async function runInstall(withDemo: boolean) {
         from auth.users u where u.email like '%@demo.sematec.test'`)).rows[0];
       log.push(`✓ Usuarios demo: ${d.users} en Auth · ${d.pass_ok} con contraseña demo · ${d.ident_ok} con identidad · ${d.active} activos · ${pw.rowCount ?? 0} contraseñas restablecidas`);
     }
+    if (!withDemo && first) log.push(await createFirstInstitution(c, first));
     await c.query("notify pgrst, 'reload schema'");
     return log;
   } finally { await c.end(); }
+}
+
+/**
+ * Instalación real (sin demo): crea la primera institución, su sede principal, la escala
+ * de notas chilena, la configuración del sitio y la cuenta del administrador (propietario y
+ * superadministrador de la plataforma). Solo funciona si aún no existe ninguna institución.
+ */
+async function createFirstInstitution(c: Client, f: FirstInstitution): Promise<string> {
+  const email = f.email.trim().toLowerCase();
+  const name = f.name.trim(); const adminName = f.adminName.trim();
+  if (!name || !adminName) throw new Error('Complete el nombre de la academia y del administrador.');
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('Correo del administrador inválido.');
+  if (f.password.length < 12 || !/[A-Z]/.test(f.password) || !/[a-z]/.test(f.password) || !/[0-9]/.test(f.password))
+    throw new Error('La contraseña debe tener al menos 12 caracteres, con mayúsculas, minúsculas y números.');
+  const n = (await c.query('select count(*)::int as n from public.organizations')).rows[0].n;
+  if (n > 0) return '• Institución: ya existe (no se creó otra)';
+  const slug = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'academia';
+  await c.query('begin');
+  try {
+    const exists = (await c.query('select id from auth.users where lower(email) = $1', [email])).rows[0];
+    let uid: string = exists?.id;
+    if (!uid) {
+      uid = (await c.query(`insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+          raw_app_meta_data, raw_user_meta_data, created_at, updated_at, confirmation_token, recovery_token,
+          email_change_token_new, email_change, email_change_token_current, phone_change, phone_change_token, reauthentication_token)
+        values ('00000000-0000-0000-0000-000000000000', gen_random_uuid(), 'authenticated', 'authenticated', $1,
+          extensions.crypt($2, extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}',
+          jsonb_build_object('full_name', $3::text), now(), now(), '', '', '', '', '', '', '', '')
+        returning id`, [email, f.password, adminName])).rows[0].id;
+      await c.query(`insert into auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+        values (gen_random_uuid(), $1::uuid, $3::text, jsonb_build_object('sub', $3::text, 'email', $2::text, 'email_verified', true), 'email', now(), now(), now())`, [uid, email, String(uid)]);
+    }
+    await c.query('update public.profiles set full_name = $2, is_platform_admin = true, status = $3 where id = $1', [uid, adminName, 'active']);
+    const org = (await c.query(`insert into public.organizations (slug, legal_name, display_name, country_code, base_currency, timezone)
+      values ($1, $2, $2, 'CL', 'CLP', 'America/Santiago') returning id`, [slug, name])).rows[0].id;
+    await c.query(`insert into public.campuses (organization_id, code, name, country_code, city, timezone)
+      values ($1, 'PRINCIPAL', 'Sede principal', 'CL', 'Santiago', 'America/Santiago')`, [org]);
+    await c.query(`insert into public.grade_scales (organization_id, name, min_grade, max_grade, passing_grade, decimals)
+      values ($1, 'Chile 1.0 - 7.0', 1.0, 7.0, 4.0, 1)`, [org]);
+    await c.query(`insert into public.memberships (user_id, organization_id, role_id)
+      select $1, $2, id from public.roles where organization_id is null and code = 'propietario_institucional'`, [uid, org]);
+    await c.query(`insert into public.site_settings (organization_id, site_name, tagline, hero_title, hero_subtitle, contact_email, is_published)
+      values ($1, $2, 'Formación técnica y profesional', $2, 'Conoce nuestros cursos e inscríbete en línea.', $3, false)
+      on conflict (organization_id) do nothing`, [org, name, email]);
+    await c.query('commit');
+  } catch (e) { await c.query('rollback'); throw e; }
+  return `✓ Institución «${name}» y administrador ${email} creados`;
 }
