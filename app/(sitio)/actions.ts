@@ -57,6 +57,7 @@ export async function startCheckout(fd: FormData): Promise<ActionResult> {
   try {
     const start = await startPayment(provider, {
       id: o.order_id, number: o.order_number, amount: Number(o.amount), currency: o.currency, title: o.title, email: v(fd, 'email').toLowerCase(), name: v(fd, 'name'),
+      bank: v(fd, 'bank') || undefined,
     });
     return { ok: true, message: 'Redirigiendo al pago seguro…', data: start.redirect };
   } catch (e) {

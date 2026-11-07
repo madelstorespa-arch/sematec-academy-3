@@ -9,7 +9,8 @@ import crypto from 'node:crypto';
 
 const PORT = 4010, BASE = `http://localhost:${PORT}`;
 const FLOW_SECRET = process.env.FLOW_SECRET_KEY ?? 'flow-secret-test', STRIPE_WHSEC = process.env.STRIPE_WEBHOOK_SECRET ?? 'whsec_mock';
-const db = { webpay: new Map(), mp: new Map(), mpPay: new Map(), flow: new Map(), stripe: new Map() };
+const db = { webpay: new Map(), mp: new Map(), mpPay: new Map(), flow: new Map(), stripe: new Map(), fintoc: new Map() };
+const FINTOC_BANKS = new Set(['cl_banco_estado','cl_banco_bci','cl_banco_bice','cl_banco_de_chile','cl_banco_falabella','cl_banco_itau','cl_banco_ripley','cl_banco_santander','cl_banco_consorcio','cl_banco_scotiabank','cl_mercado_pago','cl_mach','cl_tenpo','cl_banco_security','cl_tapp_caja_los_andes','cl_banco_internacional','cl_banco_coopeuch','cl_copec_pay','cl_prepago_los_heroes','cl_banco_bbva','cl_banco_hsbc']);
 const id = (p) => p + crypto.randomBytes(8).toString('hex');
 const body = (req) => new Promise((r) => { let d = ''; req.on('data', (c) => (d += c)); req.on('end', () => r(d)); });
 const json = (res, code, o) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); };
@@ -22,6 +23,34 @@ async function notify(url, payload, headers = {}) { try { await fetch(url, { met
 
 http.createServer(async (req, res) => {
   const u = new URL(req.url, BASE); const raw = await body(req); const form = new URLSearchParams(raw);
+  // ---------------- Fintoc (Paga con tu banco) ----------------
+  if (u.pathname === '/fintoc/v2/checkout_sessions' && req.method === 'POST') {
+    if (!String(req.headers.authorization ?? '').startsWith('sk_')) return json(res, 401, { error: { message: 'Invalid API key' } });
+    const b = JSON.parse(raw);
+    const bank = b.payment_method_options?.bank_transfer?.sender_account?.institution_id?.value ?? null;
+    if (bank && !FINTOC_BANKS.has(bank)) return json(res, 400, { error: { message: 'invalid institution_id' } });
+    if (b.currency !== 'CLP' || !Number.isInteger(b.amount)) return json(res, 400, { error: { message: 'invalid amount/currency' } });
+    const s = { id: id('cs_'), object: 'checkout_session', mode: 'test', status: 'created', amount: b.amount, currency: 'CLP', metadata: b.metadata ?? {},
+      success_url: b.success_url, cancel_url: b.cancel_url, payment_resource: null, bank, redirect_url: '' };
+    s.redirect_url = `${BASE}/fintoc/pay/${s.id}`; db.fintoc.set(s.id, s);
+    return json(res, 201, s);
+  }
+  if (u.pathname.startsWith('/fintoc/v2/checkout_sessions/') && req.method === 'GET') {
+    if (!String(req.headers.authorization ?? '').startsWith('sk_')) return json(res, 401, { error: { message: 'Invalid API key' } });
+    const s = db.fintoc.get(u.pathname.split('/').pop()); if (!s) return json(res, 404, { error: { message: 'not found' } });
+    const { bank, ...pub } = s; return json(res, 200, pub);
+  }
+  if (u.pathname.startsWith('/fintoc/pay/')) {
+    const s = db.fintoc.get(u.pathname.split('/').pop()); if (!s) return json(res, 404, {});
+    if (req.method === 'POST') {
+      const ok = form.get('r') === 'ok';
+      s.status = 'finished';
+      s.payment_resource = { payment_intent: { id: id('pi_'), object: 'payment_intent', amount: s.amount, currency: 'CLP', status: ok ? 'succeeded' : 'rejected', payment_type: 'bank_transfer' } };
+      await notify('http://localhost:3000/api/pago/webhook/fintoc', JSON.stringify({ id: id('evt_'), type: 'checkout_session.finished', data: { id: s.id, object: 'checkout_session' } }), { 'Content-Type': 'application/json' });
+      res.writeHead(303, { Location: ok ? s.success_url : s.cancel_url }); return res.end();
+    }
+    return html(res, page(`Fintoc · <span id="bank">${s.bank ?? 'elige tu banco'}</span> (prueba)`, s.amount, 'CLP', `/fintoc/pay/${s.id}`));
+  }
   // ---------------- Webpay Plus ----------------
   if (u.pathname === '/rswebpaytransaction/api/webpay/v1.2/transactions' && req.method === 'POST') {
     if (!req.headers['tbk-api-key-id'] || !req.headers['tbk-api-key-secret']) return json(res, 401, { error_message: 'Not Authorized' });

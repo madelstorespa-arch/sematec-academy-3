@@ -6,14 +6,15 @@ import { webpay } from './webpay';
 import { mercadopago } from './mercadopago';
 import { flow } from './flow';
 import { stripe } from './stripe';
-import type { PaymentProvider, ProviderId, StartResult, Verification } from './types';
+import { fintoc } from './fintoc';
+import type { OrderInfo, PaymentProvider, ProviderId, StartResult, Verification } from './types';
 
-export const PROVIDERS: Record<ProviderId, PaymentProvider> = { webpay, mercadopago, flow, stripe };
+export const PROVIDERS: Record<ProviderId, PaymentProvider> = { fintoc, webpay, mercadopago, flow, stripe };
 
 /** Proveedores habilitados (con credenciales cargadas) que aceptan la moneda. */
 export function availableProviders(currency: string) {
   return Object.values(PROVIDERS).filter((p) => p.enabled() && p.currencies.includes(currency))
-    .map((p) => ({ id: p.id, label: p.label, description: p.description }));
+    .map((p) => ({ id: p.id, label: p.label, description: p.description, banks: p.banks }));
 }
 
 const secret = () => process.env.PAYMENT_LINK_SECRET ?? process.env.SUPABASE_SERVICE_ROLE_KEY ?? 'dev';
@@ -21,7 +22,7 @@ const secret = () => process.env.PAYMENT_LINK_SECRET ?? process.env.SUPABASE_SER
 export const resultToken = (orderId: string) => crypto.createHmac('sha256', secret()).update(`order:${orderId}`).digest('base64url').slice(0, 32);
 export const resultUrl = (orderId: string) => `/pago/resultado/${orderId}?t=${resultToken(orderId)}`;
 
-export async function startPayment(provider: ProviderId, order: { id: string; number: number; amount: number; currency: string; title: string; email: string; name: string }): Promise<StartResult> {
+export async function startPayment(provider: ProviderId, order: OrderInfo): Promise<StartResult> {
   const p = PROVIDERS[provider];
   if (!p?.enabled()) throw new Error('Medio de pago no disponible');
   const site = env.siteUrl();

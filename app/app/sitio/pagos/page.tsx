@@ -7,6 +7,7 @@ import { SiteTabs } from '../tabs';
 export const metadata = { title: 'Medios de pago' };
 
 const VARS: Record<string, { vars: string[]; panel: string; webhook?: boolean }> = {
+  fintoc: { vars: ['FINTOC_SECRET_KEY'], panel: 'Fintoc Dashboard → API Keys (sk_test_… para pruebas, sk_live_… para cobros reales) y Webhooks (eventos checkout_session.finished y checkout_session.expired).', webhook: true },
   webpay: { vars: ['WEBPAY_ENABLED=1', 'WEBPAY_ENV=production', 'WEBPAY_COMMERCE_CODE', 'WEBPAY_API_KEY'], panel: 'Transbank Developers → comercio Webpay Plus. En pruebas basta WEBPAY_ENABLED=1 (usa las credenciales públicas de integración).' },
   mercadopago: { vars: ['MERCADOPAGO_ACCESS_TOKEN', 'MERCADOPAGO_WEBHOOK_SECRET'], panel: 'Mercado Pago Developers → Tus integraciones → Credenciales y Webhooks (evento «Pagos»).', webhook: true },
   flow: { vars: ['FLOW_API_KEY', 'FLOW_SECRET_KEY', 'FLOW_ENV=production'], panel: 'Flow → Integraciones → Datos de API. La URL de confirmación se envía en cada pago.' },

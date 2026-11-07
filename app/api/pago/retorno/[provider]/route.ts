@@ -4,6 +4,7 @@ import { webpayCommit } from '@/lib/payments/webpay';
 import { mercadopagoVerify } from '@/lib/payments/mercadopago';
 import { flowVerify } from '@/lib/payments/flow';
 import { stripeVerify } from '@/lib/payments/stripe';
+import { fintocVerify, fintocPending } from '@/lib/payments/fintoc';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { ProviderId } from '@/lib/payments/types';
 
@@ -47,6 +48,15 @@ async function handle(request: NextRequest, provider: ProviderId) {
         const token = params.get('token');
         if (token) return go((await processVerification('flow', await flowVerify(token))).orderId);
         break;
+      }
+      case 'fintoc': {
+        const orderId = params.get('order');
+        if (!orderId || !/^[0-9a-f-]{36}$/i.test(orderId)) break;
+        const { data: o } = await createAdminClient().from('checkout_orders').select('id, provider, provider_reference').eq('id', orderId).maybeSingle();
+        if (!o || o.provider !== 'fintoc' || !o.provider_reference) break;
+        const v = await fintocVerify(o.provider_reference);
+        if (fintocPending(v.status)) return go(o.id); // la confirmación llegará por el webhook
+        return go((await processVerification('fintoc', { ...v, orderId: o.id })).orderId);
       }
       case 'stripe': {
         const sid = params.get('session_id');

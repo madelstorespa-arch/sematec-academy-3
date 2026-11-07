@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { resultToken, PROVIDERS } from '@/lib/payments';
+import { resultToken, PROVIDERS, processVerification } from '@/lib/payments';
+import { fintocVerify, fintocPending } from '@/lib/payments/fintoc';
 import { fmtDateTime, fmtMoney } from '@/lib/format';
 
 export const metadata = { title: 'Resultado del pago', robots: { index: false } };
@@ -12,8 +13,19 @@ export default async function Page({ params, searchParams }: { params: Promise<{
   const { t, cancelado, error } = await searchParams;
   if (!t || t !== resultToken(id)) notFound();
   const admin = createAdminClient();
-  const { data: o } = await admin.from('checkout_orders').select('*, catalog_offerings(title, slug)').eq('id', id).maybeSingle();
+  let { data: o } = await admin.from('checkout_orders').select('*, catalog_offerings(title, slug)').eq('id', id).maybeSingle();
   if (!o) notFound();
+  // Transferencia bancaria aún en curso: se vuelve a consultar a Fintoc (por si el aviso no ha llegado)
+  if (o.status === 'pending' && o.provider === 'fintoc' && o.provider_reference && !cancelado) {
+    try {
+      const v = await fintocVerify(o.provider_reference);
+      if (!fintocPending(v.status)) {
+        await processVerification('fintoc', { ...v, orderId: o.id });
+        ({ data: o } = await admin.from('checkout_orders').select('*, catalog_offerings(title, slug)').eq('id', id).maybeSingle());
+        if (!o) notFound();
+      }
+    } catch (e) { console.error('consulta Fintoc', e); }
+  }
   let newAccount = false;
   if (o.status === 'paid' && o.user_id && !o.access_link_used) {
     const { data } = await admin.auth.admin.getUserById(o.user_id);

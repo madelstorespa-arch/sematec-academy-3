@@ -93,7 +93,7 @@ export function ApplicationForm({ action, offeringId, countries }: { action: Act
 
 /** Formulario de pago: crea el pedido en el servidor y redirige a la página segura del proveedor. */
 export function CheckoutForm({ action, offeringId, providers, countries, trackingCode, children }: {
-  action: Action; offeringId: string; providers: { id: string; label: string; description: string }[];
+  action: Action; offeringId: string; providers: { id: string; label: string; description: string; banks?: { id: string; name: string }[] }[];
   countries: { code: string; name: string }[]; trackingCode?: string; children?: ReactNode;
 }) {
   const go = (r: Result) => {
@@ -104,6 +104,8 @@ export function CheckoutForm({ action, offeringId, providers, countries, trackin
     document.body.appendChild(f); f.submit();
   };
   const { res, pending, submit } = useSubmit(action, go);
+  const [provider, setProvider] = useState(providers[0]?.id ?? '');
+  const banks = providers.find((p) => p.id === provider)?.banks;
   if (!providers.length) return <p className="rounded-lg bg-amber-50 p-4 text-sm text-amber-800">El pago en línea aún no está habilitado. Escríbanos desde Contacto para inscribirse.</p>;
   return (
     <form onSubmit={submit} className="space-y-5">
@@ -116,14 +118,26 @@ export function CheckoutForm({ action, offeringId, providers, countries, trackin
         <div className="grid gap-3 md:grid-cols-2">
           {providers.map((p, i) => (
             <label key={p.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-300 p-4 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
-              <input type="radio" name="provider" value={p.id} defaultChecked={i === 0} required className="mt-1" />
-              <span><b>{p.label}</b><br /><span className="text-xs text-slate-600">{p.description}</span></span>
+              <input type="radio" name="provider" value={p.id} checked={provider === p.id} onChange={() => setProvider(p.id)} required className="mt-1" />
+              <span><b>{p.banks ? '🏦 ' : ''}{p.label}</b><br /><span className="text-xs text-slate-600">{p.description}</span></span>
             </label>))}
         </div>
       </fieldset>
+      {banks && (
+        <fieldset>
+          <legend className="label">Elige tu banco *</legend>
+          <p className="mb-2 text-xs text-slate-500">Te llevaremos directamente a tu banco para autorizar la transferencia con tu clave y tu dispositivo de seguridad.</p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {banks.map((b) => (
+              <label key={b.id} className="flex cursor-pointer items-center justify-center rounded-lg border border-slate-300 px-2 py-3 text-center text-sm font-semibold has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50 has-[:checked]:text-brand-700">
+                <input type="radio" name="bank" value={b.id} required className="sr-only" />{b.name}
+              </label>))}
+          </div>
+        </fieldset>
+      )}
       <Consent />
       <button className="btn-primary w-full py-3 text-base" disabled={pending || res?.ok}>{pending || res?.ok ? 'Conectando con el pago seguro…' : 'Ir a pagar'}</button>
-      <p className="text-center text-xs text-slate-500">🔒 Los datos de su tarjeta se ingresan en la página del medio de pago; SEMATEC ACADEMY nunca los recibe ni almacena.</p>
+      <p className="text-center text-xs text-slate-500">🔒 Su tarjeta o la clave de su banco se ingresan solo en la página del banco o del medio de pago; SEMATEC ACADEMY nunca las recibe ni almacena.</p>
       <Msg r={res?.ok ? null : res} />
     </form>
   );

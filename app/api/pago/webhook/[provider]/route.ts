@@ -3,6 +3,7 @@ import { processVerification } from '@/lib/payments';
 import { mercadopagoSignatureOk, mercadopagoVerify } from '@/lib/payments/mercadopago';
 import { flowVerify } from '@/lib/payments/flow';
 import { stripeSignatureOk, stripeVerify } from '@/lib/payments/stripe';
+import { fintocVerify, fintocPending } from '@/lib/payments/fintoc';
 
 /** Notificaciones servidor-a-servidor de los proveedores (confirman aunque el comprador cierre el navegador). */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ provider: string }> }) {
@@ -25,6 +26,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const token = new URLSearchParams(raw).get('token');
       if (!token) return NextResponse.json({ error: 'sin token' }, { status: 400 });
       await processVerification('flow', await flowVerify(token));
+      return NextResponse.json({ ok: true });
+    }
+    if (provider === 'fintoc') {
+      // No se confía en el contenido del aviso: solo se toma el id de la sesión y se consulta a Fintoc.
+      let event: any = {};
+      try { event = JSON.parse(raw); } catch { return NextResponse.json({ error: 'json inválido' }, { status: 400 }); }
+      const obj = event?.data?.object && typeof event.data.object === 'object' ? event.data.object : event?.data;
+      const sid = obj?.object === 'checkout_session' ? obj.id : obj?.checkout_session ?? obj?.checkout_session_id ?? null;
+      if (typeof sid !== 'string') return NextResponse.json({ ignored: true });
+      const v = await fintocVerify(sid);
+      if (fintocPending(v.status)) return NextResponse.json({ pending: true });
+      await processVerification('fintoc', v);
       return NextResponse.json({ ok: true });
     }
     if (provider === 'stripe') {
