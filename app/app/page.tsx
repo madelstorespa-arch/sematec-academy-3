@@ -54,6 +54,8 @@ export default async function Dashboard() {
         <Card title="Accesos rápidos">
           <div className="flex flex-wrap gap-2">
             {ctx.studentId && <Link className="btn-secondary" href="/app/mi">Mi portal</Link>}
+            {ctx.isGuardian && <Link className="btn-secondary" href="/app/apoderado">👪 Mis pupilos</Link>}
+            {ctx.studentId && <Link className="btn-secondary" href="/app/credencial">🪪 Mi credencial</Link>}
             {ctx.teacherId && <Link className="btn-secondary" href="/app/docencia">Mis secciones</Link>}
             {can(ctx, 'students.create') && <Link className="btn-secondary" href="/app/estudiantes?nuevo=1">Registrar estudiante</Link>}
             {can(ctx, 'enrollments.create') && <Link className="btn-secondary" href="/app/matriculas">Matricular</Link>}

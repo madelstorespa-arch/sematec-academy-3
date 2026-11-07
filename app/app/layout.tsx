@@ -15,6 +15,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const items: NavItem[] = [{ href: '/app', label: 'Inicio', icon: '⌂' }];
   if (ctx.studentId) items.push({ href: '/app/mi', label: 'Mi portal', icon: '🎓' });
+  if (ctx.isGuardian) items.push({ href: '/app/apoderado', label: 'Mis pupilos', icon: '👪' });
+  if (ctx.studentId) items.push({ href: '/app/credencial', label: 'Mi credencial', icon: '🪪' });
   if (ctx.teacherId) items.push({ href: '/app/docencia', label: 'Mis secciones', icon: '📚' });
   if (can(ctx, 'students.view')) items.push({ href: '/app/estudiantes', label: 'Estudiantes', icon: '👥' });
   if (can(ctx, 'teachers.view')) items.push({ href: '/app/profesores', label: 'Profesores', icon: '🧑‍🏫' });
@@ -31,6 +33,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: '/app/biblioteca', label: 'Biblioteca', icon: '📖' },
     { href: '/app/soporte', label: 'Soporte técnico', icon: '🛟' },
   );
+  if (ctx.orgId) items.push({ href: '/app/encuestas', label: 'Encuestas', icon: '🗳' });
+  if (ctx.studentId || can(ctx, 'alumni.view')) items.push({ href: '/app/egresados', label: 'Egresados', icon: '🎓' });
+  if (ctx.studentId || can(ctx, 'alumni.view')) items.push({ href: '/app/empleos', label: 'Bolsa de empleo', icon: '💼' });
   if (ctx.orgId) items.push({ href: '/app/calendario', label: 'Calendario', icon: '📅' });
   if (ctx.teacherId || can(ctx, 'facilities.view')) items.push({ href: '/app/reservas', label: 'Salas y recursos', icon: '🏫' });
   if (can(ctx, 'employees.view') || ctx.isEmployee) items.push({ href: '/app/personal', label: 'Personal y RR. HH.', icon: '🧾' });

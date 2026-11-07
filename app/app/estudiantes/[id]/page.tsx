@@ -9,6 +9,10 @@ import { fmtDate, fmtMoney, fmtNum, fullName } from '@/lib/format';
 import { updateStudent, grantPortalAccess, createInstitutionalAccount } from '../actions';
 import { AccessForm } from '@/components/access-form';
 import { workspaceEnabled, workspaceDomain } from '@/lib/workspace';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { addGuardian, revokeGuardian, resetGuardianPassword } from '@/app/app/apoderado/actions';
+
+const REL = [['madre', 'Madre'], ['padre', 'Padre'], ['tutor', 'Tutor/a'], ['apoderado', 'Apoderado/a'], ['otro', 'Otro']].map(([value, label]) => ({ value, label }));
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -25,6 +29,12 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     sb.from('certificates').select('id, title, serial_number, status, issued_at').eq('student_id', id).order('issued_at', { ascending: false }),
   ]);
   const edit = can(ctx, 'students.edit');
+  const { data: gl } = can(ctx, 'guardians.view')
+    ? await sb.from('guardian_links').select('id, guardian_id, relationship, status').eq('student_id', id).order('created_at')
+    : { data: null };
+  const gIds = (gl ?? []).map((g: any) => g.guardian_id);
+  const { data: gProfiles } = gIds.length ? await createAdminClient().from('profiles').select('id, full_name, email').in('id', gIds) : { data: [] as any[] };
+  const gp = new Map((gProfiles ?? []).map((p: any) => [p.id, p]));
 
   return (
     <>
@@ -51,6 +61,37 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
             {recs.data.map((r: any) => <tr key={r.id}><td>{r.courses?.code} · {r.courses?.name}</td><td>{r.academic_periods?.code}</td><td>{fmtNum(r.final_grade)}</td><td>{r.attendance_pct != null ? `${fmtNum(r.attendance_pct, 0)} %` : '—'}</td><td><StatusBadge status={r.result} /></td></tr>)}
           </tbody></table> : <Empty>Sin asignaturas registradas.</Empty>}
         </Card>
+        {gl && (
+          <Card title="Apoderados" actions={<Link className="link text-sm" href={`/app/credencial?estudiante=${s.id}`}>🪪 Credencial</Link>}>
+            {gl.length ? (
+              <ul className="divide-y divide-slate-100 text-sm">{gl.map((g: any) => (
+                <li key={g.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                  <span><b>{gp.get(g.guardian_id)?.full_name ?? '—'}</b> · {g.relationship} · {gp.get(g.guardian_id)?.email}{g.status !== 'activo' && <Badge color="red">revocado</Badge>}</span>
+                  {g.status === 'activo' && can(ctx, 'guardians.edit') && (
+                    <span className="flex flex-wrap items-center gap-2">
+                      <ActionForm action={resetGuardianPassword} inline resetOnSuccess submitLabel="🔑 Cambiar" submitClass="btn-secondary btn-sm">
+                        <input type="hidden" name="id" value={g.id} />
+                        <input name="password" type="text" required minLength={10} autoComplete="new-password" placeholder="Nueva contraseña" className="input w-36 py-1 text-xs" />
+                      </ActionForm>
+                      <ActionForm action={revokeGuardian} inline submitLabel="Revocar" submitClass="btn-secondary btn-sm" confirm="¿Quitar el acceso de este apoderado?">
+                        <input type="hidden" name="id" value={g.id} />
+                      </ActionForm>
+                    </span>)}
+                </li>))}
+              </ul>) : <Empty>Sin apoderados registrados.</Empty>}
+            {can(ctx, 'guardians.create') && (
+              <details className="mt-3">
+                <summary className="cursor-pointer text-sm font-semibold text-brand-700">+ Agregar apoderado (crea su cuenta)</summary>
+                <div className="mt-3"><ActionForm action={addGuardian} submitLabel="Registrar apoderado">
+                  <input type="hidden" name="student_id" value={s.id} />
+                  <Field label="Nombre completo" name="full_name" required />
+                  <Field label="Correo (será su usuario)" name="email" type="email" required />
+                  <Field label="Contraseña" name="password" type="text" autoComplete="new-password" placeholder="Mín. 10, con mayúsculas, minúsculas y números" />
+                  <SelectField label="Parentesco" name="relationship" required defaultValue="apoderado" options={REL} />
+                </ActionForm></div>
+              </details>)}
+          </Card>
+        )}
         <Card title="Certificados">
           {certs.data?.length ? <ul className="space-y-1 text-sm">{certs.data.map((c: any) => <li key={c.id} className="flex justify-between"><span>N° {c.serial_number} · {c.title}</span><StatusBadge status={c.status} /></li>)}</ul> : <Empty>Sin certificados.</Empty>}
         </Card>
