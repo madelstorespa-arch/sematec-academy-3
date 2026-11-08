@@ -127,11 +127,11 @@ export function SelectField({ label, name, options, required, defaultValue, clas
   );
 }
 
-export function TextArea({ label, name, required, defaultValue, rows = 3 }: { label: string; name: string; required?: boolean; defaultValue?: string | null; rows?: number }) {
+export function TextArea({ label, name, required, defaultValue, rows = 3, placeholder }: { label: string; name: string; required?: boolean; defaultValue?: string | null; rows?: number; placeholder?: string }) {
   return (
     <label className="block">
       <span className="label">{label}{required && ' *'}</span>
-      <textarea className="input" name={name} required={required} defaultValue={defaultValue ?? undefined} rows={rows} />
+      <textarea className="input" name={name} required={required} defaultValue={defaultValue ?? undefined} rows={rows} placeholder={placeholder} />
     </label>
   );
 }
