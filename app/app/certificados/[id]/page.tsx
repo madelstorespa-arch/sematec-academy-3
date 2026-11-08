@@ -8,6 +8,7 @@ import { PrintButton } from '@/components/print-button';
 import { env } from '@/lib/env';
 import { fmtDate } from '@/lib/format';
 import { revokeCertificate, amendCertificate } from '../actions';
+import { CertificateShare } from '@/components/certificate-share';
 
 export default async function Page({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ editado?: string }> }) {
   const { id } = await params;
@@ -24,6 +25,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
     .replaceAll('{{program}}', P.program ?? '').replaceAll('{{course}}', P.course ?? '').replaceAll('{{grade}}', P.final_grade ?? '').replaceAll('{{date}}', '');
   const signers: { name: string; title?: string }[] = P.signers ?? [];
   const orgName = org?.display_name || P.organization;
+  const { data: st } = c.student_id ? await ctx.supabase.from('students').select('email').eq('id', c.student_id).maybeSingle() : { data: null };
   const legal = org?.legal_name && org.legal_name !== orgName ? org.legal_name : null;
   return (
     <div className="space-y-6">
@@ -31,6 +33,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
         <Link className="btn-secondary" href={can(ctx, 'certificates.view') ? '/app/certificados' : '/app/mi'}>Volver</Link>
         <div className="flex items-center gap-3"><StatusBadge status={c.status} /><PrintButton /></div>
       </div>
+      <div className="mx-auto max-w-3xl"><CertificateShare id={c.id} title={c.title} recipient={c.recipient_name} verifyUrl={url} email={st?.email} /></div>
       <article className="mx-auto max-w-3xl overflow-hidden border-8 border-double border-brand-700 bg-white px-5 py-8 text-center shadow-sm sm:p-12 print:border-4 print:p-10 print:shadow-none">
         <p className="text-xs font-bold uppercase tracking-[0.3em] text-brand-600 sm:tracking-[0.4em]">{orgName}</p>
         {legal && <p className="mt-1 text-sm text-slate-600">{legal}</p>}

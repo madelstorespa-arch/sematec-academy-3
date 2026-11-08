@@ -37,5 +37,18 @@ with sync_playwright() as pw:
     new = sql(f"select verification_code from certificates where student_id = '{st1}' and status = 'issued' order by issued_at desc limit 1")
     p = b.new_context().new_page(); go(p, f'{BASE}/verificar/{new}')
     check(p.locator('text=/válido|auténtico|vigente/i').count() >= 1, 'El certificado corregido se verifica como válido')
+    # Descargar y enviar
+    go(o, f'{BASE}/app/certificados/{cid}')
+    check(o.locator('a:has-text("Descargar PDF")').count() == 1 and o.locator('button:has-text("Enviar")').count() == 1
+          and o.locator('a:has-text("WhatsApp")').count() == 1 and o.locator('a:has-text("Correo")').count() == 1, 'Botones Descargar PDF, Enviar, WhatsApp y Correo')
+    with o.expect_download() as dl: o.click('a:has-text("Descargar PDF")')
+    path = dl.value.path(); data = open(path, 'rb').read()
+    check(data[:5] == b'%PDF-' and len(data) > 3000 and dl.value.suggested_filename.endswith('.pdf'), f'Descarga un PDF real ({len(data)} bytes, {dl.value.suggested_filename})')
+    open('/tmp/cert.pdf', 'wb').write(data)
+    ec = b.new_context(); e = login(ec, 'estudiante1.a@demo.sematec.test')
+    newid = sql(f"select id from certificates where verification_code = '{new}'")
+    r = e.request.get(f'{BASE}/app/certificados/{newid}/pdf'); check(r.status == 200 and r.body()[:5] == b'%PDF-', 'El estudiante descarga su propio certificado')
+    e2 = login(b.new_context(), 'estudiante2.a@demo.sematec.test')
+    r = e2.request.get(f'{BASE}/app/certificados/{newid}/pdf'); check(r.status == 404, 'Otro estudiante no puede descargarlo')
     b.close()
 print(f"\n{sum(1 for ok, _ in results if ok)}/{len(results)} pruebas OK")

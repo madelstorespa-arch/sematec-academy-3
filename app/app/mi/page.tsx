@@ -55,7 +55,7 @@ export default async function Page() {
             {confs?.length ? <ul className="space-y-2 text-sm">{confs.map((c: any) => <li key={c.id} className="flex items-center justify-between gap-2"><span>{c.title}<br /><span className="text-xs text-slate-500">{fmtDateTime(c.scheduled_start, c.timezone)}</span></span><Link className="btn-primary btn-sm" href={`/app/conferencias/sala/${c.id}`}>Entrar</Link></li>)}</ul> : <p className="text-sm text-slate-500">Sin clases programadas.</p>}
           </Card>
           <Card title="Mis certificados">
-            {certs?.length ? <ul className="space-y-1 text-sm">{certs.map((c: any) => <li key={c.id} className="flex justify-between gap-2"><Link className="link" href={`/app/certificados/${c.id}`}>{c.title}</Link>{c.status === 'revoked' ? <Badge color="red">Revocado</Badge> : <span className="text-xs text-slate-500">{fmtDate(c.issued_at)}</span>}</li>)}</ul> : <p className="text-sm text-slate-500">Sin certificados.</p>}
+            {certs?.length ? <ul className="space-y-1 text-sm">{certs.map((c: any) => <li key={c.id} className="flex justify-between gap-2"><Link className="link" href={`/app/certificados/${c.id}`}>{c.title}</Link>{c.status === 'revoked' ? <Badge color="red">Revocado</Badge> : <span className="flex items-center gap-2 text-xs text-slate-500">{fmtDate(c.issued_at)}<a className="link" href={`/app/certificados/${c.id}/pdf`} download>⬇ PDF</a></span>}</li>)}</ul> : <p className="text-sm text-slate-500">Sin certificados.</p>}
           </Card>
         </div>
       </div>

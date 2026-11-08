@@ -85,10 +85,11 @@ export default async function Page() {
         </Card>
       )}
       <Card title="Certificados emitidos">
-        {certs?.length ? <div className="overflow-x-auto"><table className="table"><thead><tr><th>N°</th><th>Fecha</th><th>Destinatario</th><th>Título</th><th>Código</th><th>Estado</th></tr></thead>
+        {certs?.length ? <div className="overflow-x-auto"><table className="table"><thead><tr><th>N°</th><th>Fecha</th><th>Destinatario</th><th>Título</th><th>Código</th><th>Estado</th><th></th></tr></thead>
           <tbody>{certs.map((c: any) => (
             <tr key={c.id}><td>{c.serial_number}</td><td>{fmtDate(c.issued_at)}</td><td>{c.recipient_name}</td>
-              <td><Link className="link" href={`/app/certificados/${c.id}`}>{c.title}</Link></td><td className="font-mono text-xs">{c.verification_code}</td><td><StatusBadge status={c.status} /></td></tr>))}</tbody></table></div>
+              <td><Link className="link" href={`/app/certificados/${c.id}`}>{c.title}</Link></td><td className="font-mono text-xs">{c.verification_code}</td><td><StatusBadge status={c.status} /></td>
+              <td><a className="link text-xs" href={`/app/certificados/${c.id}/pdf`} download>⬇ PDF</a></td></tr>))}</tbody></table></div>
           : <Empty>Aún no se emiten certificados.</Empty>}
       </Card>
     </>
