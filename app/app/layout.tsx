@@ -46,7 +46,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (can(ctx, 'reports.view')) items.push({ href: '/app/reportes', label: 'Reportes', icon: '📊' });
   if (can(ctx, 'users.view')) items.push({ href: '/app/usuarios', label: 'Usuarios y roles', icon: '🔐' });
   if (can(ctx, 'organization.admin') || can(ctx, 'settings.admin')) items.push({ href: '/app/configuracion', label: 'Configuración', icon: '⚙' });
-  if (can(ctx, 'audit.view')) items.push({ href: '/app/auditoria', label: 'Auditoría', icon: '🛡' });
+  if (can(ctx, 'security.admin') || can(ctx, 'audit.view') || ctx.isPlatformAdmin) items.push({ href: '/app/ciberseguridad', label: 'Centro de Ciberseguridad', icon: '🛡' });
+  if (can(ctx, 'audit.view')) items.push({ href: '/app/auditoria', label: 'Auditoría', icon: '📜' });
   if (ctx.isPlatformAdmin) items.push({ href: '/app/instituciones', label: 'Instituciones', icon: '🌎' });
   if (can(ctx, 'settings.admin')) items.push({ href: '/app/sitio', label: 'Sitio web y marca', icon: '🌐' });
   if (can(ctx, 'admissions.view')) items.push({ href: '/app/admision', label: 'Admisión web', icon: '📨' });
