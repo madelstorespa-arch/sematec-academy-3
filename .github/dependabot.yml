@@ -1,0 +1,11 @@
+# Revisión automática de dependencias: GitHub propone actualizaciones de seguridad cada semana
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly, day: monday, time: "06:00", timezone: America/Santiago }
+    open-pull-requests-limit: 5
+    groups:
+      seguridad:
+        applies-to: security-updates
+        patterns: ["*"]

@@ -142,7 +142,7 @@ def main():
         po.locator('form:has(input[value=logo]) input[type=file]').set_input_files(png('#7c3aed'))
         po.click('button:has-text("Subir logo")'); check('Logo actualizado' in form_msg(po, 'form:has(input[value=logo])'), 'Logo subido desde el panel')
         po.locator('form:has(input[value=logo]) input[type=file]').set_input_files({'name': 'virus.png', 'mimeType': 'image/png', 'buffer': b'<script>alert(1)</script>'})
-        po.wait_for_timeout(500); po.click('button:has-text("Subir logo")'); po.wait_for_function("document.querySelector('form:has(input[value=logo]) [role=status]')?.innerText.includes('Formato')", timeout=20000)
+        po.wait_for_timeout(500); po.click('button:has-text("Subir logo")'); po.locator('form:has(input[value=logo]) [role=status]:has-text("Formato")').wait_for(timeout=20000)
         check(True, 'Archivo falso con extensión .png rechazado')
         go(po, BASE + '/app/sitio'); shot(po, 'web_12_admin_marca')
         # nuevo curso desde el panel

@@ -4,13 +4,27 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { env } from '@/lib/env';
+import { safeNext } from '@/lib/safe-redirect';
 import type { ActionResult } from '@/lib/actions';
 
+/** IP real del visitante (Vercel la entrega en x-real-ip; x-forwarded-for puede ser falsificado por el cliente). */
+async function clientIp() {
+  const h = await headers();
+  const ip = (h.get('x-real-ip') ?? h.get('x-vercel-forwarded-for') ?? (h.get('x-forwarded-for') ?? '').split(',').pop() ?? '').trim();
+  return /^[0-9a-f:.]{3,45}$/i.test(ip) ? ip : null;
+}
+
 export async function signIn(fd: FormData): Promise<ActionResult> {
-  const email = String(fd.get('email') ?? '').trim().toLowerCase();
-  const password = String(fd.get('password') ?? '');
-  const next = String(fd.get('next') ?? '/app');
+  const email = String(fd.get('email') ?? '').trim().toLowerCase().slice(0, 254);
+  const password = String(fd.get('password') ?? '').slice(0, 200);
+  const next = safeNext(String(fd.get('next') ?? '/app'));
   if (!email || !password) return { ok: false, error: 'Ingrese correo y contraseña.' };
+
+  const ip = await clientIp();
+  try {
+    const { data: blocked } = await createAdminClient().rpc('login_ip_blocked', { p_ip: ip });
+    if (blocked) return { ok: false, error: 'Demasiados intentos fallidos desde esta red. Por seguridad, espere 15 minutos e intente de nuevo.' };
+  } catch { /* si la verificación falla se continúa: el bloqueo por cuenta sigue activo */ }
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -18,8 +32,7 @@ export async function signIn(fd: FormData): Promise<ActionResult> {
     // Registro del intento fallido y bloqueo automático (SEG-010)
     try {
       const h = await headers();
-      const ip = (h.get('x-forwarded-for') ?? '').split(',')[0].trim() || null;
-      await createAdminClient().rpc('record_login_failure', { p_email: email, p_ip: ip, p_user_agent: h.get('user-agent') });
+      await createAdminClient().rpc('record_login_failure', { p_email: email, p_ip: ip, p_user_agent: (h.get('user-agent') ?? '').slice(0, 300) });
     } catch { /* el registro no debe impedir responder */ }
     const code = (error as { code?: string } | null)?.code;
     const status = (error as { status?: number } | null)?.status;
@@ -34,7 +47,7 @@ export async function signIn(fd: FormData): Promise<ActionResult> {
     await supabase.auth.signOut();
     return { ok: false, error: 'La cuenta está bloqueada o suspendida. Contacte a la administración de su institución.' };
   }
-  redirect(next.startsWith('/') && !next.startsWith('//') ? next : '/app');
+  redirect(next);
 }
 
 export async function requestReset(fd: FormData): Promise<ActionResult> {

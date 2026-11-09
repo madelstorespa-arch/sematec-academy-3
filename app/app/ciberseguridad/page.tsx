@@ -11,6 +11,7 @@ const EV: Record<string, string> = {
   login_failed: 'Inicio de sesión fallido', account_locked: 'Cuenta bloqueada', account_unlocked: 'Cuenta desbloqueada',
   sessions_revoked: 'Sesiones cerradas', incident_opened: 'Incidente registrado', password_reset_by_admin: 'Contraseña cambiada por administrador',
   installment_payment_fulfill_failed: 'Pago no registrado', mfa_enrolled: 'MFA activado',
+  owner_bruteforce: 'Ataque a la cuenta del propietario', login_ip_blocked: 'Red bloqueada por fuerza bruta',
 };
 const SEV: Record<string, 'gray' | 'amber' | 'red'> = { info: 'gray', warning: 'amber', critical: 'red' };
 const ISEV: Record<string, ['gray' | 'blue' | 'amber' | 'red', string]> = { baja: ['gray', 'Baja'], media: ['blue', 'Media'], alta: ['amber', 'Alta'], critica: ['red', 'Crítica'] };
