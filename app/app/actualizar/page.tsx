@@ -17,7 +17,8 @@ export default async function ActualizarPage() {
   if (!ctx.isPlatformAdmin) redirect('/app');
   const { data, error } = await ctx.supabase.rpc('installed_migrations');
   const installed = new Set((data ?? []) as string[]);
-  const pending = MIGRATIONS.filter((m) => !installed.has(m.version));
+  // Si la base aún no tiene la función que lista lo instalado (primera vez), se ofrecen todas: el instalador salta las ya aplicadas
+  const pending = error ? MIGRATIONS.slice(-3) : MIGRATIONS.filter((m) => !installed.has(m.version));
   const hasDb = !!process.env.DATABASE_URL;
   const mfa = ctx.aal === 'aal2';
   return (
@@ -31,11 +32,11 @@ export default async function ActualizarPage() {
           <div className="mt-4"><ReloadButton /></div>
         </Card>
         <Card title="Mejoras de la base de datos">
-          {error ? <p className="text-sm text-red-700">{error.message}</p> : pending.length === 0 ? (
+          {pending.length === 0 ? (
             <p className="text-sm" data-testid="al-dia"><Badge color="green">✓ Al día</Badge> Todas las mejoras ({MIGRATIONS.length}) están instaladas.</p>
           ) : (
             <>
-              <p className="mb-2 text-sm"><Badge color="amber">{pending.length} pendiente{pending.length > 1 ? 's' : ''}</Badge> Mejoras por instalar:</p>
+              <p className="mb-2 text-sm">{error ? <Badge color="amber">Mejoras nuevas</Badge> : <Badge color="amber">{pending.length} pendiente{pending.length > 1 ? 's' : ''}</Badge>} {error ? 'Últimas mejoras (las ya instaladas se saltan solas):' : 'Mejoras por instalar:'}</p>
               <ul className="mb-4 list-inside list-disc text-sm" data-testid="pendientes">{pending.map((m) => <li key={m.version}>{nice(m.name)}</li>)}</ul>
               {!hasDb ? (
                 <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
@@ -49,7 +50,7 @@ export default async function ActualizarPage() {
               ) : !mfa ? (
                 <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Por seguridad, cierre sesión y vuelva a entrar con el código de verificación en dos pasos para poder actualizar.</p>
               ) : (
-                <ActionForm action={installUpdates} submitLabel={`⬆ Instalar ${pending.length} mejora${pending.length > 1 ? 's' : ''}`}
+                <ActionForm action={installUpdates} submitLabel={error ? '⬆ Instalar mejoras' : `⬆ Instalar ${pending.length} mejora${pending.length > 1 ? 's' : ''}`}
                   confirm="¿Instalar las mejoras ahora? Toma unos segundos; cada mejora se instala completa o no se instala.">
                   <p className="text-xs text-slate-500">Se recomienda hacerlo fuera del horario de clases.</p>
                 </ActionForm>
