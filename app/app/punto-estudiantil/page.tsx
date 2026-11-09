@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { OwnerActions } from '@/components/owner-actions';
 import { notFound } from 'next/navigation';
 import { getContext, can, requireOrg } from '@/lib/context';
 import { PageHeader, Card, Badge, Empty, Stat } from '@/components/ui';
@@ -66,7 +67,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
                     <p className="font-semibold">N° {r.number} · {r.subject}</p>
                     <p className="text-xs text-slate-500">{KINDS[r.kind]} · {fmtDateTime(r.created_at)}{staff && r.students ? ` · ${r.students.first_names} ${r.students.last_names} (${r.students.student_code})` : ''}</p>
                   </div>
-                  <Badge color={ST[r.status][1]}>{ST[r.status][0]}</Badge>
+                  <span className="flex flex-wrap items-center gap-1"><Badge color={ST[r.status][1]}>{ST[r.status][0]}</Badge>
+                    {ctx.isOwner && <OwnerActions table="student_requests" id={r.id} path="/app/punto-estudiantil" name={`la solicitud N° ${r.number}`} />}</span>
                 </div>
                 {r.details && <p className="mt-2 whitespace-pre-line text-sm text-slate-700">{r.details}</p>}
                 {r.response && <p className="mt-2 rounded-lg bg-brand-50 p-3 text-sm"><b>Respuesta:</b> {r.response}</p>}

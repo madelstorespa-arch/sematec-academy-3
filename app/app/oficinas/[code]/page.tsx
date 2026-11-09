@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { OwnerActions } from '@/components/owner-actions';
 import { notFound } from 'next/navigation';
 import { getContext, requireOrg } from '@/lib/context';
 import { PageHeader, Card, Badge, Empty, Tabs } from '@/components/ui';
@@ -136,7 +137,8 @@ export default async function Page({ params, searchParams }: { params: Promise<{
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <span><b>{fmtDateTime(a.starts_at)}</b> · {a.duration_min} min · {MODE[a.mode]}<span className="block">{a.requester_name} — {a.topic}</span>
                     {a.details && <span className="block text-xs text-slate-500">{a.details}</span>}</span>
-                  <Badge color={AST[a.status][1]}>{AST[a.status][0]}</Badge>
+                  <span className="flex flex-wrap items-center gap-1"><Badge color={AST[a.status][1]}>{AST[a.status][0]}</Badge>
+                    {ctx.isOwner && <OwnerActions table="appointments" id={a.id} path={`/app/oficinas/${code}?t=citas`} name="la cita" />}</span>
                 </div>
                 {['solicitada', 'confirmada'].includes(a.status) && (
                   <ActionForm action={manageAppointment} inline submitLabel="Aplicar" submitClass="btn-secondary btn-sm" resetOnSuccess={false}>
@@ -153,7 +155,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
 
   return (
     <>
-      <PageHeader title={`${o.icon} ${o.name}`} subtitle={o.description ?? ''} actions={<Link className="btn-secondary" href="/app/oficinas">Todas las oficinas</Link>} />
+      <PageHeader title={`${o.icon} ${o.name}`} subtitle={o.description ?? ''} actions={<span className="flex flex-wrap gap-2">{ctx.isOwner && <OwnerActions table="offices" id={o.id} path={`/app/oficinas/${code}`} name={`la oficina ${o.name}`} afterDelete="/app/oficinas" />}<Link className="btn-secondary" href="/app/oficinas">Todas las oficinas</Link></span>} />
       {tabs.length > 0 && <Tabs items={tabs} current={tab} />}
       {body}
     </>

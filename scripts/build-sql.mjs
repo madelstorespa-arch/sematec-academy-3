@@ -12,3 +12,9 @@ const out = `// ARCHIVO GENERADO por scripts/build-sql.mjs — no editar a mano.
 fs.mkdirSync(path.join(root, 'lib/setup'), { recursive: true });
 fs.writeFileSync(path.join(root, 'lib/setup/sql.generated.ts'), out);
 console.log(`Instalador: ${migrations.length} migraciones empaquetadas.`);
+
+// Versión de esta publicación (la misma para el servidor y el navegador): si cambia, la app ofrece «Actualizar ahora»
+const version = (process.env.VERCEL_GIT_COMMIT_SHA ?? '').slice(0, 7) || `local-${Date.now().toString(36)}`;
+fs.writeFileSync(path.join(root, 'lib/version.generated.ts'),
+  `// ARCHIVO GENERADO por scripts/build-sql.mjs — no editar a mano.\nexport const APP_VERSION = ${JSON.stringify(version)};\nexport const APP_BUILT = ${JSON.stringify(new Date().toISOString())};\n`);
+console.log(`Versión: ${version}`);

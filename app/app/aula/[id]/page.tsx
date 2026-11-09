@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { OwnerActions } from '@/components/owner-actions';
 import { getContext } from '@/lib/context';
 import { loadSection } from '@/lib/aula';
 import { PageHeader, Card, Badge, Empty, Tabs } from '@/components/ui';
@@ -60,6 +61,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
             <Card key={u.id ?? 'otros'} title={u.title} className="mb-4"
               actions={manager && u.id ? <ActionForm action={deleteContent} inline submitLabel="Eliminar unidad" submitClass="btn-secondary btn-sm" confirm="¿Eliminar la unidad y sus contenidos?">{hidden}<input type="hidden" name="what" value="unit" /><input type="hidden" name="id" value={u.id} /></ActionForm> : null}>
               {u.description && <p className="mb-3 text-sm text-slate-600">{u.description}</p>}
+              {ctx.isOwner && u.id && <div className="mb-3"><OwnerActions table="course_units" id={u.id} active={u.published} path={`/app/aula/${id}`} name={`la unidad «${u.title}»`} /></div>}
               {items.length ? <ul className="space-y-3">{items.map((c: any) => (
                 <li key={c.id} className="rounded-lg border border-slate-200 p-3">
                   <div className="flex items-start justify-between gap-2">
@@ -67,6 +69,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
                     {manager && <ActionForm action={deleteContent} inline submitLabel="✕" submitClass="btn-secondary btn-sm" confirm="¿Eliminar este contenido?">{hidden}<input type="hidden" name="id" value={c.id} /></ActionForm>}
                   </div>
                   {c.body && <p className="mt-1 whitespace-pre-line text-sm text-slate-600">{c.body}</p>}
+                  {ctx.isOwner && <div className="mt-2"><OwnerActions table="course_contents" id={c.id} active={c.published} path={`/app/aula/${id}`} name={`«${c.title}»`} /></div>}
                 </li>))}</ul> : <p className="text-sm text-slate-500">Sin contenidos aún.</p>}
             </Card>);
         }) : <Card><Empty>El profesor aún no publica contenidos.</Empty></Card>}
@@ -95,6 +98,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
             <Card key={a.id} title={a.title} actions={a.due_at < now ? <Badge color="gray">Cerrada {fmtDateTime(a.due_at)}</Badge> : <Badge color="amber">Entrega {fmtDateTime(a.due_at)}</Badge>}>
               {a.instructions && <p className="whitespace-pre-line text-sm text-slate-700">{a.instructions}</p>}
               <p className="mt-2 text-xs text-slate-500">Puntaje máximo {a.max_score}{a.assessment_id && ' · cuenta para la nota oficial'}</p>
+              {ctx.isOwner && <div className="mt-2"><OwnerActions table="assignments" id={a.id} active={a.published} path={`/app/aula/${id}?t=tareas`} name={`la tarea «${a.title}»`} /></div>}
               {manager && <p className="mt-3"><Link className="btn-secondary btn-sm" href={`${base}/tarea/${a.id}`}>Ver entregas ({n.length}, {n.filter((x: any) => x.score == null).length} por calificar)</Link></p>}
               {student && (sub?.score != null ? (
                 <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm"><b>Calificada: {sub.score} / {a.max_score}</b>{sub.feedback && <p className="mt-1">Comentario: {sub.feedback}</p>}</div>
@@ -135,6 +139,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
           return (
             <Card key={q.id} title={q.title} actions={!q.published ? <Badge>Borrador</Badge> : open ? <Badge color="green">Abierto</Badge> : q.closes_at <= now ? <Badge color="gray">Cerrado</Badge> : <Badge color="blue">Próximo</Badge>}>
               <p className="text-sm text-slate-600">{fmtDateTime(q.opens_at)} → {fmtDateTime(q.closes_at)}{q.time_limit_min && ` · ${q.time_limit_min} min`} · {q.max_attempts} intento(s)</p>
+              {ctx.isOwner && <div className="mt-2"><OwnerActions table="quizzes" id={q.id} active={q.published} path={`/app/aula/${id}?t=examenes`} name={`la prueba «${q.title}»`} /></div>}
               {q.instructions && <p className="mt-2 whitespace-pre-line text-sm">{q.instructions}</p>}
               {manager && <p className="mt-3"><Link className="btn-secondary btn-sm" href={`${base}/examen/${q.id}`}>Preguntas y resultados</Link></p>}
               {student && (
@@ -162,7 +167,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
           <li key={t.id}><Link href={`${base}/foro/${t.id}`} className="block py-3 hover:bg-slate-50">
             <p className="font-semibold">{t.pinned && '📌 '}{t.locked && '🔒 '}{t.title}</p>
             <p className="text-xs text-slate-500">{t.author_name} · {t.forum_posts?.[0]?.count ?? 0} respuestas · último mensaje {fmtDateTime(t.last_post_at)}</p>
-          </Link></li>))}</ul> : <Empty>Aún no hay temas en el foro.</Empty>}</Card>
+          </Link>{ctx.isOwner && <div className="pb-3"><OwnerActions table="forum_threads" id={t.id} path={`/app/aula/${id}?t=foro`} name={`el tema «${t.title}»`} /></div>}</li>))}</ul> : <Empty>Aún no hay temas en el foro.</Empty>}</Card>
       </>);
   }
 

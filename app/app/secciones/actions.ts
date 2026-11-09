@@ -109,6 +109,7 @@ export async function saveAttendance(fd: FormData): Promise<ActionResult> {
     if (!rows.length) return fail('No hay estudiantes para registrar.');
     const { error } = await ctx.supabase.from('attendance_records').upsert(rows, { onConflict: 'class_session_id,student_id' });
     if (error) return fail(error);
+    await ctx.supabase.rpc('teacher_class_mark', { p_session: session, p_action: 'held' }); // la clase queda como dictada
     refresh(str(fd, 'section_id'));
     return ok(`Asistencia guardada (${rows.length} estudiantes).`);
   });
@@ -178,5 +179,51 @@ export async function amendGrade(fd: FormData): Promise<ActionResult> {
     if (error) return fail(error);
     refresh(str(fd, 'section_id'));
     return ok('Nota rectificada; el resultado final fue recalculado y queda en el historial.');
+  });
+}
+
+/** 📱 Abre (o renueva) el código QR de asistencia de una clase. */
+export async function openCheckin(fd: FormData): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getContext();
+    const { data, error } = await ctx.supabase.rpc('open_checkin', { p_session: reqStr(fd, 'class_session_id', 'Clase'), p_minutes: num(fd, 'minutes') ?? 15 });
+    if (error) return fail(error);
+    refresh(str(fd, 'section_id'));
+    return ok(`Código de asistencia: ${(data as { code: string }).code}. Muéstrelo o proyecte el QR.`);
+  });
+}
+
+export async function closeCheckin(fd: FormData): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getContext();
+    const { error } = await ctx.supabase.rpc('close_checkin', { p_session: reqStr(fd, 'class_session_id', 'Clase') });
+    if (error) return fail(error);
+    refresh(str(fd, 'section_id'));
+    return ok('Se cerró el código de asistencia.');
+  });
+}
+
+/** 👨‍🏫 Inicio / término / suspensión de la clase por el profesor. */
+export async function teacherMark(fd: FormData): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getContext();
+    const action = reqStr(fd, 'action', 'acción');
+    if (!['start', 'end', 'cancel', 'held'].includes(action)) return fail('Acción inválida.');
+    const { data, error } = await ctx.supabase.rpc('teacher_class_mark', { p_session: reqStr(fd, 'class_session_id', 'Clase'), p_action: action });
+    if (error) return fail(error);
+    refresh(str(fd, 'section_id'));
+    revalidatePath('/app/docencia');
+    return ok(`${data}.`);
+  });
+}
+
+/** 🎥 Asistencia automática según quién entró al aula virtual. */
+export async function attendanceFromVirtual(fd: FormData): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getContext();
+    const { data, error } = await ctx.supabase.rpc('attendance_from_conference', { p_session: reqStr(fd, 'class_session_id', 'Clase') });
+    if (error) return fail(error);
+    refresh(str(fd, 'section_id'));
+    return ok(`Asistencia tomada desde el aula virtual (${data} estudiantes actualizados).`);
   });
 }

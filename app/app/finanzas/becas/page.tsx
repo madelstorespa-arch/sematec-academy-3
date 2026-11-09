@@ -1,4 +1,5 @@
 import { getContext, can, requirePerm, requireOrg } from '@/lib/context';
+import { OwnerActions } from '@/components/owner-actions';
 import { PageHeader, Card, Empty, StatusBadge } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField } from '@/components/forms';
 import { FinanceTabs } from '../tabs';
@@ -26,8 +27,8 @@ export default async function Page() {
           </ActionForm>
         </Card>
       )}
-      <Card>{data?.length ? <table className="table"><thead><tr><th>Código</th><th>Nombre</th><th>Descuento</th><th>Estado</th></tr></thead>
-        <tbody>{data.map((b: any) => <tr key={b.id}><td className="font-mono text-xs">{b.code}</td><td>{b.name}</td><td>{b.percent_off ? `${b.percent_off} %` : b.amount_off}</td><td><StatusBadge status={b.status} /></td></tr>)}</tbody></table>
+      <Card>{data?.length ? <table className="table"><thead><tr><th>Código</th><th>Nombre</th><th>Descuento</th><th>Estado</th>{ctx.isOwner && <th></th>}</tr></thead>
+        <tbody>{data.map((b: any) => <tr key={b.id}><td className="font-mono text-xs">{b.code}</td><td>{b.name}</td><td>{b.percent_off ? `${b.percent_off} %` : b.amount_off}</td><td><StatusBadge status={b.status} /></td>{ctx.isOwner && <td><OwnerActions table="benefits" id={b.id} active={b.status === 'active'} path="/app/finanzas/becas" name={`el beneficio ${b.name}`} /></td>}</tr>)}</tbody></table>
         : <Empty>Sin beneficios configurados.</Empty>}</Card>
     </>
   );

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { OwnerActions } from '@/components/owner-actions';
 import { getContext, can, requirePerm, requireOrg } from '@/lib/context';
 import { PageHeader, Card, Empty } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField } from '@/components/forms';
@@ -15,7 +16,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
   const [periods, campuses, courses, teachers, scales] = await Promise.all([periodOptions(ctx), campusOptions(ctx), courseOptions(ctx), teacherOptions(ctx), gradeScaleOptions(ctx)]);
   const periodo = (await searchParams).periodo ?? periods[0]?.value;
   const { data: sections } = periodo ? await ctx.supabase.from('sections')
-    .select('id, code, capacity, grades_closed_at, courses(code, name), teachers(first_names, last_names), campuses(name), section_schedules(weekday, time_slot), section_enrollments(count)')
+    .select('id, code, capacity, status, grades_closed_at, courses(code, name), teachers(first_names, last_names), campuses(name), section_schedules(weekday, time_slot), section_enrollments(count)')
     .eq('organization_id', orgId).eq('period_id', periodo).eq('section_enrollments.status', 'enrolled').order('code') : { data: [] as any[] };
 
   return (
@@ -47,7 +48,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
           <button className="btn-secondary">Ver</button>
         </form>
         {sections?.length ? <div className="overflow-x-auto"><table className="table">
-          <thead><tr><th>Asignatura</th><th>Sección</th><th>Profesor</th><th>Sede</th><th>Horario</th><th>Inscritos</th><th>Acta</th></tr></thead>
+          <thead><tr><th>Asignatura</th><th>Sección</th><th>Profesor</th><th>Sede</th><th>Horario</th><th>Inscritos</th><th>Acta</th>{ctx.isOwner && <th></th>}</tr></thead>
           <tbody>{sections.map((s: any) => (
             <tr key={s.id}>
               <td><Link className="link" href={`/app/secciones/${s.id}`}>{s.courses?.code} · {s.courses?.name}</Link></td>
@@ -55,6 +56,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
               <td className="text-xs">{s.section_schedules?.map((h: any) => `${WEEKDAYS[h.weekday].slice(0, 3)} ${fmtSlot(h.time_slot)}`).join(' · ') || '—'}</td>
               <td>{s.section_enrollments?.[0]?.count ?? 0} / {s.capacity}</td>
               <td>{s.grades_closed_at ? 'Cerrada' : 'Abierta'}</td>
+              {ctx.isOwner && <td><OwnerActions table="sections" id={s.id} active={s.status === 'active'} path="/app/secciones" name={`la sección ${s.code}`} /></td>}
             </tr>))}</tbody></table></div> : <Empty>No hay secciones en este periodo.</Empty>}
       </Card>
     </>

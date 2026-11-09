@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { getUndoStatus, redoLast, undoLast, type UndoStatus } from '@/app/app/deshacer-actions';
 
 /** Avisa a la barra ↶ ↷ que se guardó un cambio (lo llama ActionForm). */
@@ -21,6 +21,7 @@ const editable = (el: EventTarget | null) => {
  */
 export function UndoBar() {
   const router = useRouter();
+  const pathname = usePathname();
   const [st, setSt] = useState<UndoStatus>({ undo: null, redo: null });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -47,8 +48,9 @@ export function UndoBar() {
     }
   }, [load, router]);
 
+  useEffect(() => { load(); }, [pathname, load]);
+
   useEffect(() => {
-    load();
     const onChanged = async () => {
       setMsg(null);
       await load();
@@ -75,6 +77,8 @@ export function UndoBar() {
             {msg.ok ? '✓ ' : '✕ '}{msg.text}
           </span>
         )}
+        <button type="button" className="btn-secondary btn-sm" onClick={() => { setMsg(null); router.refresh(); load(); }}
+          title="Volver a cargar los datos de esta página" aria-label="Refrescar">🔄 Refrescar</button>
         <button type="button" className="btn-secondary btn-sm" disabled={busy || !st.undo} onClick={() => run('undo')}
           title={st.undo ? `Deshacer: ${st.undo.label} (Ctrl+Z)` : 'No hay cambios suyos recientes para deshacer'} aria-label="Deshacer">
           ↶ Deshacer

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { OwnerActions } from '@/components/owner-actions';
 import { getContext, can, requireOrg } from '@/lib/context';
 import { PageHeader, Card, Badge, Empty } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField, TextArea } from '@/components/forms';
@@ -41,7 +42,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
       )}
       <Card>
         {tickets?.length ? <div className="overflow-x-auto"><table className="table">
-          <thead><tr><th>N°</th><th>Asunto</th>{staff && <th>Solicitante</th>}<th>Tema</th><th>Urgencia</th><th>Estado</th><th>Actualizado</th></tr></thead>
+          <thead><tr><th>N°</th><th>Asunto</th>{staff && <th>Solicitante</th>}<th>Tema</th><th>Urgencia</th><th>Estado</th><th>Actualizado</th>{ctx.isOwner && <th></th>}</tr></thead>
           <tbody>{tickets.map((t: any) => (
             <tr key={t.id}>
               <td className="font-mono text-xs">#{t.number}</td>
@@ -49,6 +50,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
               {staff && <td>{t.profiles?.full_name}</td>}
               <td>{CATS[t.category]}</td><td>{t.priority}</td>
               <td><Badge color={ST[t.status]?.[1]}>{ST[t.status]?.[0]}</Badge></td><td>{fmtDateTime(t.updated_at)}</td>
+              {ctx.isOwner && <td><OwnerActions table="support_tickets" id={t.id} path="/app/soporte" name={`el ticket #${t.number}`} /></td>}
             </tr>))}</tbody>
         </table></div> : <Empty>No hay solicitudes.</Empty>}
       </Card>

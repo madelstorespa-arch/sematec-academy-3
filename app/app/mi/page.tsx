@@ -29,7 +29,7 @@ export default async function Page() {
   };
   return (
     <>
-      <PageHeader title="Mi portal" subtitle="Asignaturas, notas, asistencia, estado de cuenta y certificados" />
+      <PageHeader title="Mi portal" subtitle="Asignaturas, notas, asistencia, estado de cuenta y certificados" actions={<Link href="/app/asistencia" className="btn-primary">✅ Marcar asistencia</Link>} />
       <div className="grid gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
           {(sections ?? []).length === 0 && <Empty>No tiene asignaturas inscritas.</Empty>}

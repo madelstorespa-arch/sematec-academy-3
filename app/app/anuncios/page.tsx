@@ -1,4 +1,5 @@
 import { getContext, can, requireOrg } from '@/lib/context';
+import { OwnerActions } from '@/components/owner-actions';
 import { PageHeader, Card, Badge, Empty } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField, TextArea } from '@/components/forms';
 import { fmtDateTime } from '@/lib/format';
@@ -49,7 +50,7 @@ export default async function Page() {
                 <h2 className="text-lg font-bold">{a.pinned && '📌 '}{a.title}</h2>
                 <p className="text-xs text-slate-500">{fmtDateTime(a.published_at)} · {a.author_name ?? ''} · <Badge color="blue">{a.audience === 'section' ? `Sección ${a.sections?.code ?? ''}` : AUD[a.audience]}</Badge></p>
               </div>
-              {(admin || ctx.isOwner || a.created_by === ctx.user.id) && (
+              {ctx.isOwner ? <OwnerActions table="announcements" id={a.id} path="/app/anuncios" name={`el anuncio «${a.title}»`} /> : (admin || a.created_by === ctx.user.id) && (
                 <ActionForm action={deleteAnnouncement} inline submitLabel="Eliminar" submitClass="btn-secondary btn-sm" confirm="¿Eliminar este anuncio?">
                   <input type="hidden" name="id" value={a.id} />
                 </ActionForm>)}

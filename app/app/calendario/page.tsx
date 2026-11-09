@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { OwnerActions } from '@/components/owner-actions';
 import { getContext, can, requireOrg } from '@/lib/context';
 import { PageHeader, Card } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField, TextArea } from '@/components/forms';
@@ -93,7 +94,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ m
               <li key={i} className="flex items-start justify-between gap-2">
                 <span><span className={`mr-1 rounded px-1 text-xs ${KIND[e.kind]?.[1]}`}>{KIND[e.kind]?.[0]}</span>
                   {new Date(e.date + 'T12:00:00Z').toLocaleDateString('es-CL', { day: '2-digit', month: 'short', timeZone: 'UTC' })}{e.time && ` ${e.time}`} · {e.href ? <Link className="link" href={e.href}>{e.title}</Link> : e.title}</span>
-                {e.id && can(ctx, 'calendar.edit') && <ActionForm action={deleteEvent} inline submitLabel="✕" submitClass="btn-secondary btn-sm" confirm="¿Eliminar el evento?"><input type="hidden" name="id" value={e.id} /></ActionForm>}
+                {e.id && ctx.isOwner && <OwnerActions table="calendar_events" id={e.id} path="/app/calendario" name={`el evento «${e.title}»`} />}
+                {e.id && !ctx.isOwner && can(ctx, 'calendar.edit') && <ActionForm action={deleteEvent} inline submitLabel="✕" submitClass="btn-secondary btn-sm" confirm="¿Eliminar el evento?"><input type="hidden" name="id" value={e.id} /></ActionForm>}
               </li>))}</ul> : <p className="text-sm text-slate-500">No hay eventos próximos este mes.</p>}
           </Card>
         </div>

@@ -7,6 +7,7 @@ import { switchOrg } from './actions';
 import { MobileMenu } from '@/components/mobile-menu';
 import { OfflineBar, LogoutButton } from '@/components/offline-bar';
 import { UndoBar } from '@/components/undo-bar';
+import { VersionWatcher } from '@/components/version-watcher';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,6 +42,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (ctx.studentId || can(ctx, 'alumni.view')) items.push({ href: '/app/egresados', label: 'Egresados', icon: '🎓' });
   if (ctx.studentId || can(ctx, 'alumni.view')) items.push({ href: '/app/empleos', label: 'Bolsa de empleo', icon: '💼' });
   if (ctx.orgId) items.push({ href: '/app/calendario', label: 'Calendario', icon: '📅' });
+  if (ctx.orgId && (ctx.studentId || ctx.teacherId || ctx.isOwner || can(ctx, 'attendance.view') || can(ctx, 'reports.view'))) items.push({ href: '/app/asistencia', label: 'Asistencia', icon: '✅' });
   if (ctx.teacherId || can(ctx, 'facilities.view')) items.push({ href: '/app/reservas', label: 'Salas y recursos', icon: '🏫' });
   if (can(ctx, 'employees.view') || ctx.isEmployee) items.push({ href: '/app/personal', label: 'Personal y RR. HH.', icon: '🧾' });
   if (can(ctx, 'inventory.view')) items.push({ href: '/app/inventario', label: 'Inventario', icon: '📦' });
@@ -50,6 +52,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (can(ctx, 'security.admin') || can(ctx, 'audit.view') || ctx.isPlatformAdmin) items.push({ href: '/app/ciberseguridad', label: 'Centro de Ciberseguridad', icon: '🛡' });
   if (can(ctx, 'audit.view')) items.push({ href: '/app/auditoria', label: 'Auditoría', icon: '📜' });
   if (ctx.isOwner && ctx.orgId) items.push({ href: '/app/papelera', label: 'Papelera', icon: '🗑' });
+  if (ctx.isPlatformAdmin) items.push({ href: '/app/actualizar', label: 'Actualizar sistema', icon: '⬆' });
   if (ctx.isPlatformAdmin) items.push({ href: '/app/instituciones', label: 'Instituciones', icon: '🌎' });
   if (can(ctx, 'settings.admin')) items.push({ href: '/app/sitio', label: 'Sitio web y marca', icon: '🌐' });
   if (can(ctx, 'admissions.view')) items.push({ href: '/app/admision', label: 'Admisión web', icon: '📨' });
@@ -90,6 +93,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </aside>
       <main className="min-w-0 flex-1 px-4 py-6 lg:ml-64 lg:px-10 lg:py-8">
         <OfflineBar userId={ctx.user.id} warmUrls={items.map((i) => i.href)} />
+        <VersionWatcher />
         {ctx.orgId && <UndoBar />}
         {!ctx.org && !ctx.isPlatformAdmin ? (
           <div className="card card-pad max-w-xl">

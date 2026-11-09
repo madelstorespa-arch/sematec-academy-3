@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { OwnerActions } from '@/components/owner-actions';
 import { notFound } from 'next/navigation';
 import { getContext, can, requireOrg } from '@/lib/context';
 import { PageHeader, Card, Empty, StatusBadge } from '@/components/ui';
@@ -16,7 +17,7 @@ export default async function Page() {
   const orgId = requireOrg(ctx);
   const sb = ctx.supabase;
   const [{ data: rooms }, { data: sessions }, campuses, { data: org }] = await Promise.all([
-    sb.from('conference_rooms').select('id, name, room_type, max_participants, section_id, sections(code, courses(code, name))').eq('organization_id', orgId).eq('status', 'active').order('name'),
+    sb.from('conference_rooms').select('id, name, room_type, max_participants, status, section_id, sections(code, courses(code, name))').eq('organization_id', orgId).in('status', ctx.isOwner ? ['active', 'inactive'] : ['active']).order('name'),
     sb.from('conference_sessions').select('id, title, session_type, scheduled_start, scheduled_end, timezone, status, conference_rooms(name)')
       .eq('organization_id', orgId).gte('scheduled_end', new Date(Date.now() - 30 * 864e5).toISOString()).order('scheduled_start', { ascending: false }).limit(100),
     campusOptions(ctx),
@@ -67,14 +68,16 @@ export default async function Page() {
             return (
               <tr key={s.id}><td><Link className="link" href={`/app/conferencias/${s.id}`}>{s.title}</Link></td><td>{s.conference_rooms?.name}</td><td>{label(s.session_type)}</td>
                 <td>{fmtDateTime(s.scheduled_start, s.timezone)}</td><td><StatusBadge status={s.status} /></td>
-                <td className="text-right">{open && <Link className="btn-primary btn-sm" href={`/app/conferencias/sala/${s.id}`}>Entrar</Link>}</td></tr>);
+                <td className="text-right">{open && <Link className="btn-primary btn-sm" href={`/app/conferencias/sala/${s.id}`}>Entrar</Link>}
+                  {ctx.isOwner && <div className="mt-1"><OwnerActions table="conference_sessions" id={s.id} path="/app/conferencias" name={`la sesión «${s.title}»`} /></div>}</td></tr>);
           })}</tbody></table></div> : <Empty>No hay sesiones visibles.</Empty>}
       </Card>
       {!!rooms?.length && (
         <Card title="Salas" className="mt-6">
           <ul className="grid gap-2 text-sm md:grid-cols-2">{rooms.map((r: any) => (
             <li key={r.id} className="rounded-lg border border-slate-200 p-3"><b>{r.name}</b> · {label(r.room_type)} · capacidad {r.max_participants}
-              {r.sections && <span className="block text-xs text-slate-500">Aula de {r.sections.courses?.code} sección {r.sections.code}</span>}</li>))}</ul>
+              {r.sections && <span className="block text-xs text-slate-500">Aula de {r.sections.courses?.code} sección {r.sections.code}</span>}
+              {ctx.isOwner && <div className="mt-2"><OwnerActions table="conference_rooms" id={r.id} active={r.status === 'active'} path="/app/conferencias" name={`la sala «${r.name}»`} /></div>}</li>))}</ul>
         </Card>
       )}
     </>

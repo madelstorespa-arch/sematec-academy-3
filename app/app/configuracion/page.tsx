@@ -1,4 +1,5 @@
 import { getContext, can, requirePerm, requireOrg } from '@/lib/context';
+import { OwnerActions } from '@/components/owner-actions';
 import { PageHeader, Card, Empty } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField } from '@/components/forms';
 import { campusOptions, countryOptions } from '@/lib/options';
@@ -55,7 +56,8 @@ export default async function Page() {
         )}
         {orgAdmin && (
           <Card title="Sedes">
-            {campuses?.length ? <ul className="mb-4 divide-y divide-slate-100 text-sm">{campuses.map((c: any) => <li key={c.id} className="py-2"><b>{c.code}</b> · {c.name} · {c.city ?? ''} ({c.timezone})</li>)}</ul> : <Empty>Sin sedes.</Empty>}
+            {campuses?.length ? <ul className="mb-4 divide-y divide-slate-100 text-sm">{campuses.map((c: any) => <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 py-2"><span><b>{c.code}</b> · {c.name} · {c.city ?? ''} ({c.timezone})</span>
+              {ctx.isOwner && <OwnerActions table="campuses" id={c.id} active={c.status === 'active'} path="/app/configuracion" name={`la sede ${c.name}`} />}</li>)}</ul> : <Empty>Sin sedes.</Empty>}
             <ActionForm action={createCampus} submitLabel="Crear sede">
               <Grid cols={3}>
                 <Field label="Código" name="code" required /><Field label="Nombre" name="name" required className="md:col-span-2" />
@@ -68,7 +70,8 @@ export default async function Page() {
         )}
         {orgAdmin && (
           <Card title="Salas y laboratorios">
-            {rooms?.length ? <ul className="mb-4 divide-y divide-slate-100 text-sm">{rooms.map((r: any) => <li key={r.id} className="py-2"><b>{r.code}</b> · {r.name} · {r.campuses?.name} · capacidad {r.capacity}</li>)}</ul> : <Empty>Sin salas.</Empty>}
+            {rooms?.length ? <ul className="mb-4 divide-y divide-slate-100 text-sm">{rooms.map((r: any) => <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2"><span><b>{r.code}</b> · {r.name} · {r.campuses?.name} · capacidad {r.capacity}</span>
+              {ctx.isOwner && <OwnerActions table="rooms" id={r.id} active={r.status === 'active'} path="/app/configuracion" name={`la sala ${r.name}`} />}</li>)}</ul> : <Empty>Sin salas.</Empty>}
             {campusOpts.length > 0 && (
               <ActionForm action={createRoom} submitLabel="Crear sala">
                 <Grid cols={3}>

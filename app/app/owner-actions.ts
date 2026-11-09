@@ -1,5 +1,7 @@
 'use server';
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
+import { safeNext } from '@/lib/safe-redirect';
 import { getContext } from '@/lib/context';
 import { fail, guard, ok, reqStr, type ActionResult } from '@/lib/actions';
 
@@ -13,6 +15,8 @@ export async function ownerManage(fd: FormData): Promise<ActionResult> {
     const path = String(fd.get('path') ?? '');
     if (path.startsWith('/app')) revalidatePath(path);
     revalidatePath('/app', 'layout');
+    const after = fd.get('after');
+    if (op === 'delete' && after) redirect(safeNext(String(after)));
     return ok(`Registro ${data}.`);
   });
 }

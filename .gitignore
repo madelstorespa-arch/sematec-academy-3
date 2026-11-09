@@ -5,3 +5,4 @@ node_modules
 *.log
 lib/setup/sql.generated.ts
 public/mediapipe
+lib/version.generated.ts

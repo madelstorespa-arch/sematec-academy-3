@@ -21,8 +21,9 @@ export function serverConfigChecks(): Check[] {
   add(!has('NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY') && !has('NEXT_PUBLIC_SERVICE_ROLE_KEY'), 'critical', 'Ninguna clave secreta en el navegador',
     'No hay claves secretas con prefijo NEXT_PUBLIC_.', '¡Hay una clave secreta con prefijo NEXT_PUBLIC_ (visible para cualquiera)! Bórrela y rote la clave en Supabase.');
   add(!site || site.startsWith('https://'), 'warning', 'HTTPS obligatorio', 'El sitio usa HTTPS (HSTS activo).', 'NEXT_PUBLIC_SITE_URL no usa https://.');
-  add(!has('DATABASE_URL') || has('SETUP_TOKEN'), 'warning', 'Conexión directa a la base solo durante la instalación',
-    'DATABASE_URL no queda expuesta fuera de la instalación.', 'DATABASE_URL está definida aunque no se esté instalando. Es opcional borrarla (se vuelve a crear para la próxima instalación).');
+  add(true, 'warning', 'Conexión directa a la base',
+    has('DATABASE_URL') ? 'DATABASE_URL vive solo en el servidor y la usa «Actualizar sistema» (solo superadministrador con MFA).'
+      : 'DATABASE_URL no está definida: «Actualizar sistema» pedirá crearla para instalar mejoras.', '');
   add(has('LIVEKIT_API_SECRET') === has('LIVEKIT_API_KEY'), 'warning', 'Videoconferencias', 'Claves de LiveKit completas o no usadas.', 'Falta la clave o el secreto de LiveKit.');
   add(!has('MERCADOPAGO_ACCESS_TOKEN') || has('MERCADOPAGO_WEBHOOK_SECRET'), 'warning', 'Firma de avisos de Mercado Pago',
     'Los avisos de pago se validan con firma.', 'Configure MERCADOPAGO_WEBHOOK_SECRET para validar los avisos de pago.');

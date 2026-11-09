@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { OwnerActions } from '@/components/owner-actions';
 import { getContext, can, requirePerm, requireOrg } from '@/lib/context';
 import { PageHeader, Card, Empty, StatusBadge } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField, TextArea } from '@/components/forms';
@@ -78,7 +79,8 @@ export default async function Page() {
                 <input type="hidden" name="id" value={t.id} />
                 <Field label="Nombre de la plantilla" name="name" required defaultValue={t.name} />
                 <TemplateFields t={t} />
-              </ActionForm></div>
+              </ActionForm>
+              {ctx.isOwner && <div className="mt-3 border-t border-slate-100 pt-3"><OwnerActions table="certificate_templates" id={t.id} active={t.status === 'active'} path="/app/certificados" name={`la plantilla «${t.name}»`} /></div>}</div>
             </details>))}
           </div>
           <p className="mt-3 text-xs text-slate-500">Los cambios se aplican a los certificados que emita desde ahora. Los ya emitidos no cambian (su texto está protegido por la huella SHA-256); si necesita otro texto, revóquelo y emítalo de nuevo.</p>

@@ -60,7 +60,8 @@ export default async function Page() {
           <tbody>{list.map((r: any) => (
             <tr key={r.id}><td className="whitespace-nowrap">{fmt(String(r.during))}</td>
               <td>{r.rooms ? `🏫 ${r.rooms.code} · ${r.rooms.name}` : `🔧 ${r.resources?.code} · ${r.resources?.name}`}</td><td>{r.purpose}</td><td>{r.reserved_name}</td>
-              <td>{(r.reserved_by === ctx.user.id || can(ctx, 'facilities.edit')) && <ActionForm action={cancelReservation} inline submitLabel="Cancelar" submitClass="btn-secondary btn-sm" confirm="¿Cancelar la reserva?"><input type="hidden" name="id" value={r.id} /></ActionForm>}</td></tr>))}</tbody>
+              <td>{(r.reserved_by === ctx.user.id || can(ctx, 'facilities.edit')) && <ActionForm action={cancelReservation} inline submitLabel="Cancelar" submitClass="btn-secondary btn-sm" confirm="¿Cancelar la reserva?"><input type="hidden" name="id" value={r.id} /></ActionForm>}
+                {ctx.isOwner && <OwnerActions table="reservations" id={r.id} path="/app/reservas" name="la reserva" />}</td></tr>))}</tbody>
         </table></div> : <Empty>No hay reservas próximas.</Empty>}
       </Card>
       <Card title="Equipos y recursos">
@@ -72,7 +73,7 @@ export default async function Page() {
                 <ActionForm action={setResourceStatus} inline submitLabel="✓" submitClass="btn-secondary btn-sm" resetOnSuccess={false}><input type="hidden" name="id" value={r.id} />
                   <select name="status" defaultValue={r.status} className="input py-1 text-xs"><option value="disponible">Disponible</option><option value="mantencion">En mantención</option><option value="baja">De baja</option></select>
                 </ActionForm>) : <Badge color={r.status === 'disponible' ? 'green' : 'amber'}>{r.status}</Badge>}</td>
-              {ctx.isOwner && <td><OwnerActions table="resources" id={r.id} path="/app/reservas" name={r.name} /></td>}</tr>))}</tbody>
+              {ctx.isOwner && <td><OwnerActions table="resources" id={r.id} active={r.status !== 'mantencion'} path="/app/reservas" name={r.name} /></td>}</tr>))}</tbody>
         </table></div> : <Empty>No hay equipos registrados.</Empty>}
       </Card>
     </>

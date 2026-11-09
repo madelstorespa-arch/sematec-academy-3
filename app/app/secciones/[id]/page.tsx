@@ -1,4 +1,7 @@
 import { notFound } from 'next/navigation';
+import QRCode from 'qrcode';
+import { OwnerActions } from '@/components/owner-actions';
+import { env } from '@/lib/env';
 import Link from 'next/link';
 import { getContext, can } from '@/lib/context';
 import { PageHeader, Card, Empty, StatusBadge, Tabs, Badge } from '@/components/ui';
@@ -8,7 +11,12 @@ import { WEEKDAYS, fmtDateTime, fmtNum, fullName, label, tzOffset, fmtSlot } fro
 import {
   addSchedule, removeSchedule, registerStudent, dropStudent, createClassSession, saveAttendance,
   createAssessment, togglePublish, saveGrades, closeActa, amendGrade, updateSection,
+  openCheckin, closeCheckin, teacherMark, attendanceFromVirtual,
 } from '../actions';
+
+const TSTATUS: Record<string, [string, 'gray' | 'green' | 'red' | 'amber']> = {
+  pending: ['Por dictar', 'gray'], held: ['Dictada', 'green'], cancelled: ['Suspendida', 'red'], rescheduled: ['Reprogramada', 'amber'],
+};
 
 export default async function Page({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ t?: string; clase?: string }> }) {
   const { id } = await params;
@@ -78,7 +86,8 @@ export default async function Page({ params, searchParams }: { params: Promise<{
             {sched?.length ? <ul className="mb-4 divide-y divide-slate-100 text-sm">{sched.map((h: any) => (
               <li key={h.id} className="flex items-center justify-between py-2">
                 <span>{WEEKDAYS[h.weekday]} {fmtSlot(h.time_slot)} · {h.rooms ? `${h.rooms.code} ${h.rooms.name}` : 'Sin sala'}</span>
-                {can(ctx, 'sections.edit') && <ActionForm action={removeSchedule} inline submitLabel="Quitar" submitClass="btn-secondary btn-sm"><input type="hidden" name="id" value={h.id} /><input type="hidden" name="section_id" value={id} /></ActionForm>}
+                {ctx.isOwner && <OwnerActions table="section_schedules" id={h.id} path={`/app/secciones/${id}`} name="este horario" />}
+                {!ctx.isOwner && can(ctx, 'sections.edit') && <ActionForm action={removeSchedule} inline submitLabel="Quitar" submitClass="btn-secondary btn-sm"><input type="hidden" name="id" value={h.id} /><input type="hidden" name="section_id" value={id} /></ActionForm>}
               </li>))}</ul> : <Empty>Sin horario asignado.</Empty>}
             {can(ctx, 'sections.create') && (
               <ActionForm action={addSchedule} inline submitLabel="Agregar bloque">
@@ -107,12 +116,18 @@ export default async function Page({ params, searchParams }: { params: Promise<{
   }
 
   async function Asistencia() {
-    const { data: sessions } = await sb.from('class_sessions').select('id, starts_at, ends_at, topic, content_covered, attendance_records(student_id, status)')
+    const { data: sessions } = await sb.from('class_sessions').select('id, starts_at, ends_at, topic, content_covered, teacher_status, teacher_checkin_at, teacher_checkout_at, checkin_code, checkin_expires_at, conference_session_id, conference_sessions!conference_sessions_organization_id_class_session_id_fkey(id), attendance_records(student_id, status, source)')
       .eq('section_id', id).order('starts_at', { ascending: false });
     const canWrite = (isTeacher || can(ctx, 'attendance.create')) && !closed;
     const current = sessions?.find((x: any) => x.id === clase) ?? sessions?.[0];
     const statusOf = (stu: string) => current?.attendance_records?.find((a: any) => a.student_id === stu)?.status ?? 'present';
     const total = (sessions ?? []).length;
+    const codeOpen = current?.checkin_code && new Date(current.checkin_expires_at).getTime() > Date.now();
+    const checkinUrl = codeOpen ? `${env.siteUrl()}/app/asistencia/marcar?c=${current.checkin_code}` : '';
+    const qr = codeOpen ? await QRCode.toDataURL(checkinUrl, { margin: 1, width: 260 }) : null;
+    const hasVirtual = !!current && (!!current.conference_session_id || !!current.conference_sessions?.length);
+    const hid = current ? <><input type="hidden" name="class_session_id" value={current.id} /><input type="hidden" name="section_id" value={id} /></> : null;
+    const time = (iso?: string | null) => iso ? new Date(iso).toLocaleTimeString('es-CL', { timeZone: tz, hour: '2-digit', minute: '2-digit' }) : '';
     const pct = (stu: string) => {
       let att = 0, den = 0;
       for (const ses of sessions ?? []) {
@@ -139,17 +154,49 @@ export default async function Page({ params, searchParams }: { params: Promise<{
           <Card title={`Clases registradas (${total})`}>
             {sessions?.length ? <ul className="divide-y divide-slate-100 text-sm">{sessions.map((x: any) => (
               <li key={x.id} className="py-2"><Link className={x.id === current?.id ? 'font-bold text-brand-700' : 'link'} href={`/app/secciones/${id}?t=asistencia&clase=${x.id}`}>{fmtDateTime(x.starts_at, tz)}</Link>
-                <p className="text-xs text-slate-500">{x.topic ?? 'Sin tema'} · {x.attendance_records?.length ?? 0} registros</p></li>))}</ul>
+                <p className="flex flex-wrap items-center gap-1 text-xs text-slate-500">{x.topic ?? 'Sin tema'} · {x.attendance_records?.length ?? 0} registros
+                  <Badge color={TSTATUS[x.teacher_status]?.[1]}>{TSTATUS[x.teacher_status]?.[0]}</Badge></p>
+                {ctx.isOwner && <div className="mt-1"><OwnerActions table="class_sessions" id={x.id} path={`/app/secciones/${id}?t=asistencia`} name="esta clase" /></div>}</li>))}</ul>
               : <Empty>Aún no hay clases registradas.</Empty>}
           </Card>
         </div>
         <Card title={current ? `Asistencia: ${fmtDateTime(current.starts_at, tz)} — ${current.topic ?? ''}` : 'Asistencia'} className="xl:col-span-2">
+          {current && canWrite && (
+            <div className="mb-5 space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4" data-testid="herramientas-clase">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <b>Clase:</b> <Badge color={TSTATUS[current.teacher_status]?.[1]}>{TSTATUS[current.teacher_status]?.[0]}</Badge>
+                {current.teacher_checkin_at && <span className="text-xs text-slate-600">Inicio {time(current.teacher_checkin_at)}{current.teacher_checkout_at && ` · Término ${time(current.teacher_checkout_at)}`}</span>}
+                <span className="ml-auto flex flex-wrap gap-1">
+                  {!current.teacher_checkin_at && <ActionForm action={teacherMark} inline submitLabel="▶ Iniciar clase" submitClass="btn-primary btn-sm">{hid}<input type="hidden" name="action" value="start" /></ActionForm>}
+                  {current.teacher_checkin_at && !current.teacher_checkout_at && <ActionForm action={teacherMark} inline submitLabel="■ Terminar clase" submitClass="btn-secondary btn-sm">{hid}<input type="hidden" name="action" value="end" /></ActionForm>}
+                  {current.teacher_status !== 'cancelled' && <ActionForm action={teacherMark} inline submitLabel="✕ Suspender clase" submitClass="btn-secondary btn-sm" confirm="¿Marcar esta clase como suspendida? No contará para la asistencia.">{hid}<input type="hidden" name="action" value="cancel" /></ActionForm>}
+                </span>
+              </div>
+              {codeOpen ? (
+                <div className="flex flex-wrap items-center gap-4" data-testid="qr-asistencia">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={qr!} alt="QR de asistencia" className="h-40 w-40 rounded-lg border border-slate-200 bg-white p-1" />
+                  <div className="text-sm">
+                    <p>Los estudiantes escanean el QR o escriben el código en <b>Mi portal → Marcar asistencia</b>:</p>
+                    <p className="my-2 font-mono text-3xl font-black tracking-[0.3em] text-brand-700" data-testid="codigo-asistencia">{current.checkin_code}</p>
+                    <p className="text-xs text-slate-500">Válido hasta las {time(current.checkin_expires_at)}. Después de 15 min de iniciada la clase se registra como atraso.</p>
+                    <ActionForm action={closeCheckin} inline submitLabel="Cerrar código" submitClass="btn-secondary btn-sm mt-2">{hid}</ActionForm>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  <ActionForm action={openCheckin} inline submitLabel="📱 Asistencia con QR (15 min)" submitClass="btn-secondary btn-sm">{hid}<input type="hidden" name="minutes" value="15" /></ActionForm>
+                  {hasVirtual && <ActionForm action={attendanceFromVirtual} inline submitLabel="🎥 Tomar asistencia desde el aula virtual" submitClass="btn-secondary btn-sm">{hid}</ActionForm>}
+                </div>
+              )}
+            </div>
+          )}
           {!current ? <Empty>Registre una clase para tomar asistencia.</Empty> : !students.length ? <Empty>Sin estudiantes inscritos.</Empty> : (
             <ActionForm action={saveAttendance} offline={{ key: 'asistencia', label: `Asistencia ${fmtDateTime(current.starts_at, tz)}` }} submitLabel="Guardar asistencia" resetOnSuccess={false} hideSubmit={!canWrite}>
               <input type="hidden" name="class_session_id" value={current.id} /><input type="hidden" name="section_id" value={id} />
               <table className="table"><thead><tr><th>Estudiante</th><th>Estado</th><th>% acumulado</th></tr></thead>
                 <tbody>{students.map((x: any) => (
-                  <tr key={x.id}><td>{x.last_names}, {x.first_names}</td>
+                  <tr key={x.id}><td>{x.last_names}, {x.first_names}{(() => { const src = current.attendance_records?.find((a: any) => a.student_id === x.id)?.source; return src === 'qr' ? <span className="ml-1 text-xs" title="Marcó con QR">📱</span> : src === 'virtual' ? <span className="ml-1 text-xs" title="Aula virtual">🎥</span> : null; })()}</td>
                     <td><div className="flex flex-wrap gap-3 text-xs">{['present', 'late', 'absent', 'excused'].map((st) => (
                       <label key={st} className="flex items-center gap-1"><input type="radio" name={`att_${x.id}`} value={st} defaultChecked={statusOf(x.id) === st} disabled={!canWrite} />{label(st)}</label>))}</div></td>
                     <td className={(pct(x.id) ?? 100) < Number(s.min_attendance_pct) ? 'font-semibold text-red-600' : ''}>{pct(x.id) ?? '—'}{pct(x.id) != null && ' %'}</td></tr>))}</tbody></table>
@@ -213,7 +260,8 @@ export default async function Page({ params, searchParams }: { params: Promise<{
           {canGrade && !!assessments?.length && (
             <Card title="Visibilidad">
               <ul className="space-y-2 text-sm">{assessments.map((a: any) => (
-                <li key={a.id} className="flex items-center justify-between"><span>{a.name}</span>
+                <li key={a.id} className="flex flex-wrap items-center justify-between gap-1"><span>{a.name}</span>
+                  {ctx.isOwner && <OwnerActions table="assessments" id={a.id} active={a.published} path={`/app/secciones/${id}?t=notas`} name={`la evaluación ${a.name}`} />}
                   <ActionForm action={togglePublish} inline submitLabel={a.published ? 'Ocultar' : 'Publicar'} submitClass="btn-secondary btn-sm">
                     <input type="hidden" name="id" value={a.id} /><input type="hidden" name="section_id" value={id} /><input type="hidden" name="published" value={String(!a.published)} />
                   </ActionForm></li>))}</ul>

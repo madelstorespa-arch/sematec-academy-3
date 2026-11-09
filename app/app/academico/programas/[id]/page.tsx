@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { OwnerActions } from '@/components/owner-actions';
 import { getContext, can, requirePerm } from '@/lib/context';
 import { PageHeader, Card, Empty } from '@/components/ui';
 import { ActionForm, Field, SelectField } from '@/components/forms';
@@ -10,7 +11,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const { id } = await params;
   const ctx = await getContext();
   requirePerm(ctx, 'academic.view');
-  const { data: p } = await ctx.supabase.from('programs').select('*, curricula(id, version, valid_from, min_attendance_pct, curriculum_courses(term_number, is_mandatory, courses(id, code, name, credits)))').eq('id', id).maybeSingle();
+  const { data: p } = await ctx.supabase.from('programs').select('*, curricula(id, version, valid_from, min_attendance_pct, status, curriculum_courses(term_number, is_mandatory, courses(id, code, name, credits)))').eq('id', id).maybeSingle();
   if (!p) notFound();
   const courses = await courseOptions(ctx);
   return (
@@ -20,7 +21,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         const byTerm = [...c.curriculum_courses].sort((a: any, b: any) => a.term_number - b.term_number);
         const credits = byTerm.reduce((a: number, r: any) => a + Number(r.courses.credits), 0);
         return (
-          <Card key={c.id} title={`Malla ${c.version} · ${credits} créditos · asistencia mínima ${c.min_attendance_pct} %`} className="mb-6">
+          <Card key={c.id} title={`Malla ${c.version} · ${credits} créditos · asistencia mínima ${c.min_attendance_pct} %`} className="mb-6"
+            actions={ctx.isOwner ? <OwnerActions table="curricula" id={c.id} active={c.status !== 'inactive'} path={`/app/academico/programas/${p.id}`} name={`la malla ${c.version}`} /> : undefined}>
             {byTerm.length ? <table className="table mb-4"><thead><tr><th>Periodo</th><th>Asignatura</th><th>Créditos</th><th>Tipo</th><th></th></tr></thead>
               <tbody>{byTerm.map((r: any) => <tr key={r.courses.id}><td>{r.term_number}</td><td>{r.courses.code} · {r.courses.name}</td><td>{r.courses.credits}</td><td>{r.is_mandatory ? 'Obligatoria' : 'Electiva'}</td>
                 <td className="text-right">{can(ctx, 'academic.admin') && (

@@ -78,7 +78,8 @@ export default async function Page() {
                 return (
                   <tr key={e.id}><td>{e.last_names}, {e.first_names}<span className="block text-xs text-slate-500">{e.email ?? ''}</span></td><td>{e.position}</td><td>{e.campuses?.name ?? '—'}</td>
                     <td>{a ? <span className="text-xs">{hm(a.check_in)}–{hm(a.check_out)}</span> : <Badge>Sin marca</Badge>}</td>
-                    <td>{c ? <span className="text-xs">{CT[c.contract_type]} desde {fmtDate(c.starts_on)}{c.ends_on && ` hasta ${fmtDate(c.ends_on)}`}</span> : can(ctx, 'employees.edit') ? (
+                    <td>{c ? <span className="text-xs">{CT[c.contract_type]} desde {fmtDate(c.starts_on)}{c.ends_on && ` hasta ${fmtDate(c.ends_on)}`}
+                      {ctx.isOwner && <span className="mt-1 block"><OwnerActions table="employment_contracts" id={c.id} active path="/app/personal" name="el contrato" /></span>}</span> : can(ctx, 'employees.edit') ? (
                       <details><summary className="link cursor-pointer text-xs">+ Contrato</summary>
                         <ActionForm action={addContract} submitLabel="Guardar" className="mt-2 w-64 space-y-2"><input type="hidden" name="employee_id" value={e.id} />
                           <SelectField label="Tipo" name="contract_type" required options={Object.entries(CT).map(([value, label]) => ({ value, label }))} />
@@ -102,7 +103,8 @@ export default async function Page() {
                   <td>{l.status === 'pendiente' && can(ctx, 'employees.edit') ? <div className="flex gap-1">
                     <ActionForm action={decideLeave} inline submitLabel="Aprobar" submitClass="btn-primary btn-sm"><input type="hidden" name="id" value={l.id} /><input type="hidden" name="approve" value="1" /></ActionForm>
                     <ActionForm action={decideLeave} inline submitLabel="Rechazar" submitClass="btn-secondary btn-sm"><input type="hidden" name="id" value={l.id} /><input type="hidden" name="approve" value="0" /></ActionForm>
-                  </div> : <Badge color={l.status === 'aprobado' ? 'green' : l.status === 'rechazado' ? 'red' : 'amber'}>{l.status}</Badge>}</td></tr>))}</tbody>
+                  </div> : <Badge color={l.status === 'aprobado' ? 'green' : l.status === 'rechazado' ? 'red' : 'amber'}>{l.status}</Badge>}
+                  {ctx.isOwner && <div className="mt-1"><OwnerActions table="leave_requests" id={l.id} path="/app/personal" name="la solicitud" /></div>}</td></tr>))}</tbody>
             </table></div> : <Empty>No hay solicitudes.</Empty>}
           </Card>
         </>)}
