@@ -6,6 +6,7 @@ import { Nav, type NavItem } from '@/components/nav';
 import { switchOrg } from './actions';
 import { MobileMenu } from '@/components/mobile-menu';
 import { OfflineBar, LogoutButton } from '@/components/offline-bar';
+import { UndoBar } from '@/components/undo-bar';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +49,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (can(ctx, 'organization.admin') || can(ctx, 'settings.admin')) items.push({ href: '/app/configuracion', label: 'Configuración', icon: '⚙' });
   if (can(ctx, 'security.admin') || can(ctx, 'audit.view') || ctx.isPlatformAdmin) items.push({ href: '/app/ciberseguridad', label: 'Centro de Ciberseguridad', icon: '🛡' });
   if (can(ctx, 'audit.view')) items.push({ href: '/app/auditoria', label: 'Auditoría', icon: '📜' });
+  if (ctx.isOwner && ctx.orgId) items.push({ href: '/app/papelera', label: 'Papelera', icon: '🗑' });
   if (ctx.isPlatformAdmin) items.push({ href: '/app/instituciones', label: 'Instituciones', icon: '🌎' });
   if (can(ctx, 'settings.admin')) items.push({ href: '/app/sitio', label: 'Sitio web y marca', icon: '🌐' });
   if (can(ctx, 'admissions.view')) items.push({ href: '/app/admision', label: 'Admisión web', icon: '📨' });
@@ -88,6 +90,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </aside>
       <main className="min-w-0 flex-1 px-4 py-6 lg:ml-64 lg:px-10 lg:py-8">
         <OfflineBar userId={ctx.user.id} warmUrls={items.map((i) => i.href)} />
+        {ctx.orgId && <UndoBar />}
         {!ctx.org && !ctx.isPlatformAdmin ? (
           <div className="card card-pad max-w-xl">
             <h1 className="text-xl font-bold">Cuenta sin institución asignada</h1>

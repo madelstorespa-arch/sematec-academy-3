@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { ActionForm } from '@/components/forms';
 import { ownerManage } from '@/app/app/owner-actions';
 
@@ -15,7 +16,8 @@ export function OwnerActions({ table, id, active, path, name = 'este registro' }
       {active !== undefined && (active
         ? <ActionForm action={ownerManage} inline submitLabel="⏸ Suspender" submitClass="btn-secondary btn-sm" confirm={`¿Suspender ${name}? Podrá reactivarlo después.`}>{hidden('suspend')}</ActionForm>
         : <ActionForm action={ownerManage} inline submitLabel="▶ Activar" submitClass="btn-secondary btn-sm">{hidden('activate')}</ActionForm>)}
-      <ActionForm action={ownerManage} inline submitLabel="🗑 Eliminar" submitClass="btn-secondary btn-sm text-red-700" confirm={`¿Eliminar ${name} definitivamente? Esta acción no se puede deshacer.`}>{hidden('delete')}</ActionForm>
+      <ActionForm action={ownerManage} inline submitLabel="🗑 Eliminar" submitClass="btn-secondary btn-sm text-red-700" confirm={`¿Eliminar ${name}? Quedará en la Papelera por 30 días y podrá restaurarlo.`}>{hidden('delete')}</ActionForm>
+      <Link href={`/app/historial/${table}/${id}`} className="btn-secondary btn-sm" title="Historial de versiones">🕘 Historial</Link>
     </span>
   );
 }

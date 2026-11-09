@@ -50,6 +50,7 @@ export function ActionForm({
             if (r.ok) {
               if (resetOnSuccess) ref.current?.reset();
               router.refresh();
+              window.dispatchEvent(new CustomEvent('sematec:changed')); // barra ↶ Deshacer
             }
             onDone?.(r);
           } catch (err) {
