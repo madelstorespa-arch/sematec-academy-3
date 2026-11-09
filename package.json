@@ -10,12 +10,13 @@
     "test:db": "bash tests/run_local.sh",
     "test:e2e": "node tests/e2e/run.mjs",
     "demo:usuarios": "node scripts/crear-usuarios-demo.mjs",
-    "prebuild": "node scripts/build-sql.mjs",
+    "prebuild": "node scripts/build-sql.mjs && node scripts/copy-mediapipe.mjs",
     "predev": "node scripts/build-sql.mjs"
   },
   "dependencies": {
     "@livekit/components-react": "2.9.25",
     "@livekit/components-styles": "^1.1.6",
+    "@livekit/track-processors": "^0.8.2",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.119.0",
     "livekit-client": "2.23.0",

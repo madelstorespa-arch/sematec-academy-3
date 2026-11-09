@@ -85,3 +85,33 @@ export async function issueAttendanceCertificates(fd: FormData): Promise<ActionR
     return errors.length ? fail(`${n} emitidos; ${errors.length} con error: ${errors[0]}`) : ok(`${n} certificados de asistencia emitidos.`);
   });
 }
+
+export async function setSessionOptions(fd: FormData): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getContext();
+    const { error } = await ctx.supabase.rpc('set_conference_options', {
+      p_session: reqStr(fd, 'session_id', 'Sesión'), p_students_share: fd.get('students_can_share') === 'on',
+      p_chat: fd.get('chat_enabled') === 'on', p_recording: fd.get('recording_enabled') === 'on',
+    });
+    if (error) return fail(error);
+    refresh();
+    return ok('Opciones guardadas. Los participantes que entren desde ahora las tendrán (los que ya están dentro, al volver a entrar).');
+  });
+}
+
+export async function deleteRecording(fd: FormData): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getContext();
+    const id = reqStr(fd, 'id', 'id');
+    const { data: r } = await ctx.supabase.from('conference_recordings').select('session_id, storage_bucket, storage_path').eq('id', id).maybeSingle();
+    if (!r) return fail('Grabación no encontrada.');
+    const { data: isMod } = await ctx.supabase.rpc('conference_is_moderator', { p_session: r.session_id });
+    if (!isMod) return fail('Solo el anfitrión puede eliminar grabaciones.');
+    const admin = (await import('@/lib/supabase/admin')).createAdminClient();
+    await admin.storage.from(r.storage_bucket).remove([r.storage_path]);
+    const { error } = await admin.from('conference_recordings').update({ status: 'deleted' }).eq('id', id);
+    if (error) return fail(error);
+    refresh();
+    return ok('Grabación eliminada.');
+  });
+}

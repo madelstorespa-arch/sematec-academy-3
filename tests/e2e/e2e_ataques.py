@@ -31,7 +31,7 @@ with sync_playwright() as pw:
     # 1. Cabeceras de seguridad
     r = b.new_context().request.get(BASE + '/login'); h = r.headers
     csp = h.get('content-security-policy', '')
-    check("frame-ancestors 'none'" in csp and 'unsafe-eval' not in csp and "object-src 'none'" in csp, 'CSP activa: sin eval, sin incrustar la página, sin plugins')
+    check("frame-ancestors 'none'" in csp and "'unsafe-eval'" not in csp and "object-src 'none'" in csp, 'CSP activa: sin eval, sin incrustar la página, sin plugins')
     check(h.get('x-frame-options') == 'DENY' and h.get('x-content-type-options') == 'nosniff' and 'max-age' in h.get('strict-transport-security', ''), 'Anti-clickjacking, nosniff y HSTS')
     check('x-powered-by' not in h, 'No revela la tecnología del servidor')
 

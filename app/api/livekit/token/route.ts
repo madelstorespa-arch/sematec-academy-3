@@ -36,10 +36,16 @@ export async function POST(request: NextRequest) {
   const ttl = Math.max(60, Math.floor((new Date(auth.expires_at!).getTime() - Date.now()) / 1000));
   const at = new AccessToken(key, secret, { identity: user.id, name: profile?.full_name || user.email || 'Participante', ttl, metadata: JSON.stringify({ role: auth.role }) });
   const g = auth.grants;
+  // Opción de la sesión: los estudiantes también pueden compartir pantalla
+  const { data: opts } = await supabase.from('conference_sessions').select('students_can_share').eq('id', session).maybeSingle();
+  const sources: string[] = [...(g.canPublishSources ?? [])];
+  if (opts?.students_can_share && g.canPublish && !sources.includes('screen_share')) sources.push('screen_share', 'screen_share_audio');
   at.addGrant({
     room: g.room, roomJoin: true, roomAdmin: !!g.roomAdmin, roomRecord: !!g.roomRecord,
     canSubscribe: !!g.canSubscribe, canPublish: !!g.canPublish, canPublishData: !!g.canPublishData,
-    canPublishSources: (g.canPublishSources ?? []).map((s: string) => SOURCES[s]).filter((s: TrackSource | undefined) => s !== undefined),
+    canUpdateOwnMetadata: true, // levantar la mano (atributo propio)
+    canPublishSources: sources.map((s: string) => SOURCES[s]).filter((s: TrackSource | undefined) => s !== undefined),
   });
-  return NextResponse.json({ token: await at.toJwt(), url, role: auth.role }, { headers: { 'Cache-Control': 'no-store' } });
+  const moderator = ['organizer', 'moderator', 'teacher'].includes(auth.role ?? '') || !!g.roomAdmin;
+  return NextResponse.json({ token: await at.toJwt(), url, role: auth.role, moderator }, { headers: { 'Cache-Control': 'no-store' } });
 }

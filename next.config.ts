@@ -12,12 +12,13 @@ const payForms = list('https://*.transbank.cl', 'https://*.flow.cl', 'https://*.
 const csp = [
   "default-src 'self'",
   // Next.js necesita scripts en línea propios; se prohíbe eval y cualquier script de otro sitio
-  "script-src 'self' 'unsafe-inline'",
+  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'", // WebAssembly local para fondos virtuales
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
-  `connect-src ${list("'self'", supabase, wsOrigin(process.env.NEXT_PUBLIC_SUPABASE_URL), livekit, wsOrigin(livekit), 'https://*.livekit.cloud', 'wss://*.livekit.cloud')}`,
-  "media-src 'self' blob:",
+  `connect-src ${list("'self'", supabase, wsOrigin(process.env.NEXT_PUBLIC_SUPABASE_URL), livekit, wsOrigin(livekit), 'https://*.livekit.cloud', 'wss://*.livekit.cloud',
+    'https://storage.googleapis.com' /* modelo de segmentación de fondos (datos, no código) */)}`,
+  `media-src ${list("'self'", 'blob:', supabase)}`,
   "worker-src 'self' blob:",
   "manifest-src 'self'",
   "frame-src 'self'",
