@@ -1,14 +1,15 @@
 'use server';
 import { revalidatePath } from 'next/cache';
 import { getContext, can } from '@/lib/context';
-import { fail, guard, ok, reqStr, str, type ActionResult } from '@/lib/actions';
+import { docFields, fail, guard, ok, reqStr, str, type ActionResult } from '@/lib/actions';
 import { ensureAuthUser, tempPassword, checkPassword } from '@/lib/users';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { workspaceEnabled, createWorkspaceUser } from '@/lib/workspace';
 import { createAndLinkAccount } from '@/lib/accounts';
 
-function personFields(fd: FormData) {
+function personFields(fd: FormData, docRequired = false) {
   return {
+    ...docFields(fd, docRequired),
     first_names: reqStr(fd, 'first_names', 'Nombres'),
     last_names: reqStr(fd, 'last_names', 'Apellidos'),
     email: str(fd, 'email')?.toLowerCase() ?? null,
@@ -23,7 +24,7 @@ export async function createStudent(fd: FormData): Promise<ActionResult> {
     const ctx = await getContext();
     const email = reqStr(fd, 'email', 'Correo (será su usuario)').toLowerCase();
     const password = checkPassword(str(fd, 'password')); // validar antes de crear la ficha
-    const row = { organization_id: ctx.orgId, student_code: reqStr(fd, 'student_code', 'Código').toUpperCase(), ...personFields(fd), email };
+    const row = { organization_id: ctx.orgId, student_code: reqStr(fd, 'student_code', 'Código').toUpperCase(), ...personFields(fd, true), email };
     const { data, error } = await ctx.supabase.from('students').insert(row).select('id').single();
     if (error) return fail(error);
     revalidatePath('/app/estudiantes');

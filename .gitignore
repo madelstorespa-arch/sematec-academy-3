@@ -6,3 +6,4 @@ node_modules
 lib/setup/sql.generated.ts
 public/mediapipe
 lib/version.generated.ts
+public/ffmpeg

@@ -18,7 +18,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const mine = parts?.find((p: any) => p.user_id === ctx.user.id);
   const moderator = ['organizer', 'moderator', 'teacher'].includes(mine?.role) || can(ctx, 'conferences.edit');
   const active = s.status === 'scheduled' || s.status === 'live';
-  const { data: recs } = await sb.from('conference_recordings').select('id, filename, size_bytes, duration_sec, created_at').eq('session_id', id).order('created_at', { ascending: false });
+  const { data: recs } = await sb.from('conference_recordings').select('id, filename, size_bytes, duration_sec, created_at, group_id, part_no').eq('session_id', id).order('created_at', { ascending: false });
+  const { data: canManage } = await sb.rpc('can_manage_recordings', { p_session: id });
   return (
     <>
       <PageHeader title={s.title} subtitle={`${s.conference_rooms?.name} · ${label(s.session_type)} · ${fmtDateTime(s.scheduled_start, s.timezone)} – ${fmtDateTime(s.scheduled_end, s.timezone)} (${s.timezone})`}
@@ -41,14 +42,17 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         <div className="space-y-6">
           <Card title={`🎬 Grabaciones (${recs?.length ?? 0})`}>
             {recs?.length ? <ul className="space-y-3">{recs.map((r: any) => (
-              <li key={r.id} className="text-sm">
+              <li key={r.id} className="text-sm" data-testid="grabacion">
                 <b>{r.filename}</b>
-                <span className="block text-xs text-slate-500">{fmtDateTime(r.created_at, s.timezone)} · {(Number(r.size_bytes) / 1048576).toFixed(1)} MB{r.duration_sec ? ` · ${Math.round(r.duration_sec / 60)} min` : ''}</span>
+                <span className="block text-xs text-slate-500">{fmtDateTime(r.created_at, s.timezone)} · {(Number(r.size_bytes) / 1048576).toFixed(1)} MB{r.duration_sec ? ` · ${Math.max(1, Math.round(r.duration_sec / 60))} min` : ''}{r.part_no ? ` · parte ${r.part_no}` : ''}</span>
                 <span className="mt-1 flex flex-wrap gap-2">
-                  <a className="btn-secondary btn-sm" href={`/app/conferencias/grabacion/${r.id}`} target="_blank" rel="noopener noreferrer">▶ Ver</a>
-                  <a className="btn-secondary btn-sm" href={`/app/conferencias/grabacion/${r.id}?descargar=1`}>⬇ Descargar</a>
-                  <RecordingShare id={r.id} title={s.title} />
-                  {moderator && <ActionForm action={deleteRecording} inline submitLabel="🗑" submitClass="btn-secondary btn-sm" confirm="¿Eliminar la grabación definitivamente?"><input type="hidden" name="id" value={r.id} /></ActionForm>}
+                  <a className="btn-secondary btn-sm" href={`/app/conferencias/grabacion/${r.id}/ver`}>▶ Ver</a>
+                  {canManage && <>
+                    <a className="btn-secondary btn-sm" href={`/app/conferencias/grabacion/${r.id}?descargar=1`}>⬇ Descargar</a>
+                    <RecordingShare id={r.id} title={s.title} />
+                    <a className="btn-secondary btn-sm" href={`/app/conferencias/grabacion/${r.id}/editar`}>✂ {r.group_id ? 'Unir / cortar' : 'Cortar'}</a>
+                    <ActionForm action={deleteRecording} inline submitLabel="🗑" submitClass="btn-secondary btn-sm" confirm="¿Eliminar la grabación definitivamente?"><input type="hidden" name="id" value={r.id} /></ActionForm>
+                  </>}
                 </span>
               </li>))}</ul>
               : <Empty>{s.recording_enabled ? 'Sin grabaciones. El anfitrión graba con «⏺ Grabar» dentro de la sala.' : 'La grabación no está habilitada en esta sesión.'}</Empty>}

@@ -3,6 +3,7 @@ import { getContext, can, requirePerm, requireOrg } from '@/lib/context';
 import { PageHeader, Card, StatusBadge, Empty } from '@/components/ui';
 import { ActionForm } from '@/components/forms';
 import { PersonFields } from '@/components/person-form';
+import { docLabel } from '@/lib/identity';
 import { campusOptions, countryOptions } from '@/lib/options';
 import { createStudent } from './actions';
 import { AccessForm } from '@/components/access-form';
@@ -15,9 +16,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
   requirePerm(ctx, 'students.view');
   const orgId = requireOrg(ctx);
   const { q, nuevo, acceso, estado } = await searchParams;
-  let query = ctx.supabase.from('students').select('id, student_code, first_names, last_names, email, status, user_id, campuses(name)')
+  let query = ctx.supabase.from('students').select('id, student_code, first_names, last_names, email, status, user_id, id_document_type, id_document_number, campuses(name)')
     .eq('organization_id', orgId).order('last_names').limit(300);
-  if (q) { const t = q.replace(/[%,()]/g, ''); query = query.or(`last_names.ilike.%${t}%,first_names.ilike.%${t}%,student_code.ilike.%${t}%,email.ilike.%${t}%`); }
+  if (q) { const t = q.replace(/[%,()]/g, ''); query = query.or(`last_names.ilike.%${t}%,first_names.ilike.%${t}%,student_code.ilike.%${t}%,email.ilike.%${t}%,id_document_number.ilike.%${t}%`); }
   if (acceso === 'con') query = query.not('user_id', 'is', null);
   if (acceso === 'sin') query = query.is('user_id', null);
   if (estado) query = query.eq('status', estado);
@@ -32,7 +33,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
           <summary className="cursor-pointer px-5 py-3 text-sm font-bold text-brand-700">+ Registrar estudiante</summary>
           <div className="border-t border-slate-100 p-5">
             <ActionForm action={createStudent} submitLabel="Registrar estudiante">
-              <PersonFields campuses={campuses} codeName="student_code" codeLabel="Código de estudiante" withAccount />
+              <PersonFields campuses={campuses} codeName="student_code" codeLabel="Código de estudiante" withAccount docRequired />
             </ActionForm>
           </div>
         </details>
@@ -51,7 +52,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
             <tbody>{students.map((s: any) => (
               <tr key={s.id}>
                 <td className="font-mono text-xs">{s.student_code}</td>
-                <td><Link className="link" href={`/app/estudiantes/${s.id}`}>{s.last_names}, {s.first_names}</Link></td>
+                <td><Link className="link" href={`/app/estudiantes/${s.id}`}>{s.last_names}, {s.first_names}</Link>{s.id_document_number && <span className="block text-xs text-slate-500">{docLabel(s.id_document_type).split(' ')[0]} {s.id_document_number}</span>}</td>
                 <td>{!edit ? (s.user_id ? 'Con cuenta' : 'Sin cuenta') : (s.user_id || s.email) ? <AccessForm kind="student" id={s.id} email={s.email} hasAccount={!!s.user_id} />
                   : <Link className="link text-xs" href={`/app/estudiantes/${s.id}`}>Agregar correo</Link>}</td>
                 <td>{s.campuses?.name ?? '—'}</td><td>{s.email ?? '—'}</td>

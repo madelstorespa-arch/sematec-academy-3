@@ -29,8 +29,8 @@ export async function teacherOptions(ctx: Ctx): Promise<Opt[]> {
   return map(data, (r) => `${r.last_names}, ${r.first_names}`);
 }
 export async function studentOptions(ctx: Ctx): Promise<Opt[]> {
-  const { data } = await ctx.supabase.from('students').select('id, student_code, first_names, last_names').eq('organization_id', ctx.orgId!).eq('status', 'active').order('last_names').limit(2000);
-  return map(data, (r) => `${r.last_names}, ${r.first_names} (${r.student_code})`);
+  const { data } = await ctx.supabase.from('students').select('id, student_code, first_names, last_names, id_document_number').eq('organization_id', ctx.orgId!).eq('status', 'active').order('last_names').limit(2000);
+  return map(data, (r) => `${r.last_names}, ${r.first_names} (${r.student_code}${r.id_document_number ? ` · ${r.id_document_number}` : ''})`);
 }
 export async function gradeScaleOptions(ctx: Ctx): Promise<Opt[]> {
   const { data } = await ctx.supabase.from('grade_scales').select('id, name').eq('organization_id', ctx.orgId!).order('name');

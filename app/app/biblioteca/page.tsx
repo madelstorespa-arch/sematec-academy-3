@@ -22,24 +22,28 @@ function Book({ b }: { b: any }) {
   );
 }
 
-export default async function Page({ searchParams }: { searchParams: Promise<{ q?: string; virtual?: string }> }) {
+export default async function Page({ searchParams }: { searchParams: Promise<{ q?: string; virtual?: string; carrera?: string; asignatura?: string; seccion?: string }> }) {
   const ctx = await getContext();
   const orgId = requireOrg(ctx);
-  const { q, virtual } = await searchParams;
+  const { q, virtual, carrera, asignatura, seccion } = await searchParams;
+  const uuid = (x?: string) => (x && /^[0-9a-f-]{36}$/i.test(x) ? x : null);
   const staff = can(ctx, 'library.edit');
   const clean = (q ?? '').replace(/[%,()]/g, '');
   let items = ctx.supabase.from('library_items').select('*, courses(name), programs(name), sections(code, courses(name))').eq('organization_id', orgId).order('title').limit(300);
   if (clean) items = items.or(`title.ilike.%${clean}%,author.ilike.%${clean}%,isbn.ilike.%${clean}%,category.ilike.%${clean}%`);
   if (virtual) items = items.or('file_id.not.is.null,url.not.is.null');
+  if (uuid(carrera)) items = items.eq('program_id', uuid(carrera)!);
+  if (uuid(asignatura)) items = items.eq('course_id', uuid(asignatura)!);
+  if (uuid(seccion)) items = items.eq('section_id', uuid(seccion)!);
   const [{ data: list }, { data: loans }, { data: courses }, { data: borrowers }, { data: mine }, { data: programs }, { data: sections }] = await Promise.all([
     items,
     ctx.supabase.from('library_loans').select('*, library_items(title), profiles:borrower_id(full_name)')
       .eq('organization_id', orgId).match(staff ? {} : { borrower_id: ctx.user.id }).is('returned_at', null).order('due_on'),
-    staff ? ctx.supabase.from('courses').select('id, code, name').eq('organization_id', orgId).order('name') : Promise.resolve({ data: [] as any[] }),
+    ctx.supabase.from('courses').select('id, code, name').eq('organization_id', orgId).order('name'),
     staff ? ctx.supabase.rpc('library_borrowers', { p_org: orgId }) : Promise.resolve({ data: [] as any[] }),
     ctx.studentId || ctx.teacherId ? ctx.supabase.rpc('my_virtual_books', { p_org: orgId }) : Promise.resolve({ data: [] as any[] }),
-    staff ? ctx.supabase.from('programs').select('id, code, name').eq('organization_id', orgId).eq('status', 'active').order('name') : Promise.resolve({ data: [] as any[] }),
-    staff ? ctx.supabase.from('sections').select('id, code, courses(name), academic_periods(code)').eq('organization_id', orgId).eq('status', 'active').order('code').limit(300) : Promise.resolve({ data: [] as any[] }),
+    ctx.supabase.from('programs').select('id, code, name').eq('organization_id', orgId).eq('status', 'active').order('name'),
+    ctx.supabase.from('sections').select('id, code, courses(name), academic_periods(code)').eq('organization_id', orgId).eq('status', 'active').order('code').limit(300),
   ]);
   const today = new Date().toISOString().slice(0, 10);
   const due = new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10);
@@ -67,7 +71,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
                   <Field label="ISBN" name="isbn" /><Field label="Categoría" name="category" />
                   <Field label="Ejemplares físicos (0 si es solo virtual)" name="copies" type="number" min={0} defaultValue="0" />
                 </Grid>
-                <p className="text-xs font-semibold text-slate-600">¿Para quién es? (los inscritos lo verán en «Mis libros virtuales»)</p>
+                <p className="text-xs font-semibold text-slate-600">¿Para quién es? * Elija al menos una carrera, asignatura o curso (los inscritos lo verán en «Mis libros virtuales»)</p>
                 <Grid cols={3}>
                   <SelectField label="Carrera" name="program_id" placeholder="—" options={(programs ?? []).map((c: any) => ({ value: c.id, label: c.name }))} />
                   <SelectField label="Asignatura" name="course_id" placeholder="—" options={(courses ?? []).map((c: any) => ({ value: c.id, label: `${c.code} · ${c.name}` }))} />
@@ -108,6 +112,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
       <Card title="Catálogo">
         <form className="mb-4 flex flex-wrap gap-2">
           <input className="input max-w-sm" name="q" defaultValue={q} placeholder="Buscar por título, autor, ISBN o categoría" />
+          <select name="carrera" defaultValue={carrera ?? ''} className="input max-w-[12rem]" aria-label="Carrera"><option value="">Todas las carreras</option>{(programs ?? []).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+          <select name="asignatura" defaultValue={asignatura ?? ''} className="input max-w-[12rem]" aria-label="Asignatura"><option value="">Todas las asignaturas</option>{(courses ?? []).map((c: any) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select>
+          <select name="seccion" defaultValue={seccion ?? ''} className="input max-w-[12rem]" aria-label="Sección"><option value="">Todos los cursos</option>{(sections ?? []).map((c: any) => <option key={c.id} value={c.id}>{c.code} · {c.courses?.name ?? ''}</option>)}</select>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="virtual" value="1" defaultChecked={!!virtual} /> Solo libros virtuales</label>
           <button className="btn-secondary">Buscar</button>
         </form>
@@ -116,7 +123,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
           <tbody>{list.map((i: any) => (
             <tr key={i.id}>
               <td><b>{i.title}</b>{i.year ? ` (${i.year})` : ''}{i.description && <span className="block text-xs text-slate-500">{i.description}</span>}</td>
-              <td>{i.author ?? '—'}</td><td>{TYPES.find(([v]) => v === i.item_type)?.[1]}</td><td className="text-xs">{[i.programs?.name && `Carrera: ${i.programs.name}`, i.courses?.name && `Asignatura: ${i.courses.name}`, i.sections?.code && `Curso: ${i.sections.code}`].filter(Boolean).join(' · ') || 'Toda la institución'}</td>
+              <td>{i.author ?? '—'}</td><td>{TYPES.find(([v]) => v === i.item_type)?.[1]}</td><td className="text-xs">{[i.programs?.name && `Carrera: ${i.programs.name}`, i.courses?.name && `Asignatura: ${i.courses.name}`, i.sections?.code && `Curso: ${i.sections.code}`].filter(Boolean).join(' · ') || <span className="text-amber-700">⚠ Sin asociar (edítelo)</span>}</td>
               <td>{i.total_copies ? `${i.available_copies} de ${i.total_copies}` : '—'}</td>
               <td className="space-y-1 whitespace-nowrap">{i.file_id && <a className="link block" href={`/app/biblioteca/libro/${i.file_id}`} target="_blank" rel="noopener noreferrer">📘 Leer</a>}
                 {i.url && <a className="link block" href={i.url} target="_blank" rel="noopener noreferrer">Abrir ↗</a>}

@@ -16,6 +16,8 @@ with sync_playwright() as pw:
     # Biblioteca
     go(s, BASE + '/app/biblioteca'); s.click('summary:has-text("Agregar libro")')
     s.fill('input[name=title]', 'Bases de Datos E2E'); s.fill('input[name=author]', 'Elmasri'); s.fill('input[name=copies]', '2')
+    s.click('button:has-text("Agregar")'); check('al menos' in status_msg(s), 'El libro debe asociarse a una carrera, asignatura o curso')
+    s.locator('form:has(input[name=title]) select[name=course_id]').select_option(index=1)
     s.click('button:has-text("Agregar")'); check('catálogo' in status_msg(s), 'Material agregado a la biblioteca')
     go(s, BASE + '/app/biblioteca'); s.click('summary:has-text("Registrar préstamo")')
     sel_re(s, 'select[name=item_id]', 'Bases de Datos E2E'); sel_re(s, 'select[name=borrower_id]', 'estudiante1')

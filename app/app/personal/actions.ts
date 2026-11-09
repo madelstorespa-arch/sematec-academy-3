@@ -1,7 +1,7 @@
 'use server';
 import { revalidatePath } from 'next/cache';
 import { getContext, can } from '@/lib/context';
-import { fail, guard, num, ok, reqStr, str, type ActionResult } from '@/lib/actions';
+import { docFields, fail, guard, num, ok, reqStr, str, type ActionResult } from '@/lib/actions';
 import { ensureAuthUser, checkPassword } from '@/lib/users';
 
 const back = () => revalidatePath('/app/personal');
@@ -16,7 +16,7 @@ export async function createEmployee(fd: FormData): Promise<ActionResult> {
     const first = reqStr(fd, 'first_names', 'Nombres'), last = reqStr(fd, 'last_names', 'Apellidos');
     const { data, error } = await ctx.supabase.from('employees').insert({
       organization_id: ctx.orgId, campus_id: str(fd, 'campus_id'), employee_code: reqStr(fd, 'employee_code', 'Código').toUpperCase(),
-      first_names: first, last_names: last, email, position: reqStr(fd, 'position', 'Cargo'),
+      first_names: first, last_names: last, email, position: reqStr(fd, 'position', 'Cargo'), ...docFields(fd),
     }).select('id').single();
     if (error) return fail(error);
     back();

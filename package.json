@@ -14,6 +14,9 @@
     "predev": "node scripts/build-sql.mjs"
   },
   "dependencies": {
+    "@ffmpeg/core": "^0.12.10",
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@livekit/components-react": "2.9.25",
     "@livekit/components-styles": "^1.1.6",
     "@livekit/track-processors": "^0.8.2",
@@ -22,6 +25,7 @@
     "livekit-client": "2.23.0",
     "livekit-server-sdk": "2.19.2",
     "next": "15.5.29",
+    "nodemailer": "^6.10.1",
     "pdf-lib": "^1.17.1",
     "pg": "^8.23.1",
     "qrcode": "^1.5.4",
@@ -33,6 +37,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "4.3.4",
     "@types/node": "^22",
+    "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.23.1",
     "@types/qrcode": "^1.5.5",
     "@types/react": "^19",

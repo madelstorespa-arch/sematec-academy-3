@@ -24,6 +24,9 @@ export function serverConfigChecks(): Check[] {
   add(true, 'warning', 'Conexión directa a la base',
     has('DATABASE_URL') ? 'DATABASE_URL vive solo en el servidor y la usa «Actualizar sistema» (solo superadministrador con MFA).'
       : 'DATABASE_URL no está definida: «Actualizar sistema» pedirá crearla para instalar mejoras.', '');
+  add(has('SMTP_HOST') && has('SMTP_FROM'), 'warning', 'Correo de recuperación de contraseña',
+    'Correo propio (SMTP) configurado: el enlace de recuperación llega a cualquier usuario y funciona en cualquier equipo.',
+    'Falta configurar el correo (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM): sin él, la recuperación depende del correo de Supabase, que solo envía a miembros del equipo.');
   add(has('LIVEKIT_API_SECRET') === has('LIVEKIT_API_KEY'), 'warning', 'Videoconferencias', 'Claves de LiveKit completas o no usadas.', 'Falta la clave o el secreto de LiveKit.');
   add(!has('MERCADOPAGO_ACCESS_TOKEN') || has('MERCADOPAGO_WEBHOOK_SECRET'), 'warning', 'Firma de avisos de Mercado Pago',
     'Los avisos de pago se validan con firma.', 'Configure MERCADOPAGO_WEBHOOK_SECRET para validar los avisos de pago.');

@@ -1,6 +1,7 @@
 'use client';
 import { useState, useTransition, type ReactNode } from 'react';
 import Link from 'next/link';
+import { DOC_TYPES } from '@/lib/identity';
 
 type Result = { ok: boolean; message?: string; error?: string; data?: any };
 type Action = (fd: FormData) => Promise<Result>;
@@ -31,12 +32,17 @@ export function In({ label, name, type = 'text', required, defaultValue, placeho
   return <label className="block"><span className="label">{label}{required && ' *'}</span><input className="input" name={name} type={type} required={required} defaultValue={defaultValue} placeholder={placeholder} /></label>;
 }
 
-function PersonFields({ countries }: { countries: { code: string; name: string }[] }) {
+function PersonFields({ countries, withDoc = true }: { countries: { code: string; name: string }[]; withDoc?: boolean }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <In label="Nombre completo" name="name" required />
       <In label="Correo electrónico" name="email" type="email" required />
       <In label="Teléfono" name="phone" placeholder="+56 9 1234 5678" />
+      {withDoc && <>
+        <label className="block"><span className="label">Documento de identidad *</span>
+          <select name="doc_type" required defaultValue="RUN" className="input">{DOC_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+        <In label="N° de documento (RUT, pasaporte…)" name="doc_number" required placeholder="Ej.: 12.345.678-5" />
+      </>}
     </div>
   );
 }
@@ -107,7 +113,7 @@ export function CheckoutForm({ action, offeringId, providers, countries, trackin
     <form onSubmit={submit} className="space-y-5">
       <Honeypot /><input type="hidden" name="offering_id" value={offeringId} />
       {trackingCode && <input type="hidden" name="tracking_code" value={trackingCode} />}
-      <PersonFields countries={countries} />
+      <PersonFields countries={countries} withDoc={!trackingCode} />
       {children}
       <fieldset>
         <legend className="label">Medio de pago *</legend>

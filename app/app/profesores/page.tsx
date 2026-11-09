@@ -1,5 +1,6 @@
 import { getContext, can, requirePerm, requireOrg } from '@/lib/context';
 import { OwnerActions } from '@/components/owner-actions';
+import { DOC_TYPES } from '@/lib/identity';
 import { PageHeader, Card, StatusBadge, Empty, Badge } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField } from '@/components/forms';
 import { campusOptions, countryOptions } from '@/lib/options';
@@ -32,6 +33,8 @@ export default async function Page() {
                 <Field label="Código" name="teacher_code" required />
                 <Field label="Nombres" name="first_names" required />
                 <Field label="Apellidos" name="last_names" required />
+                <SelectField label="Documento de identidad" name="id_document_type" defaultValue="RUN" options={DOC_TYPES.map(([value, label]) => ({ value, label }))} />
+                <Field label="N° de documento (RUT, pasaporte…)" name="id_document_number" placeholder="Ej.: 12.345.678-5" />
                 <Field label="Correo (será su usuario)" name="email" type="email" required />
                 <Field label="Contraseña de su cuenta" name="password" type="password" required autoComplete="new-password" placeholder="Mín. 10, con mayúsculas, minúsculas y números" />
                 <Field label="Grado académico" name="academic_degree" />

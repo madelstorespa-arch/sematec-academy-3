@@ -10,9 +10,11 @@ import {
 import { Track, RoomEvent, type LocalVideoTrack, type Participant } from 'livekit-client';
 import { CONF_ROLES } from '@/lib/format';
 import { createBrowser } from '@/lib/supabase/browser';
+import { uploadRecording } from '@/lib/recordings-client';
+import { uploadUserFile } from '@/components/file-uploader';
 
 type Conn = { token: string; url: string; role: string; moderator: boolean };
-type Opts = { sessionId: string; title: string; recording: boolean; chatEnabled: boolean };
+type Opts = { sessionId: string; title: string; recording: boolean; chatEnabled: boolean; orgId: string; sectionId: string | null };
 const EMOJIS = ['👍', '👏', '❤️', '😂', '😮', '🎉', '🙌', '🤔', '👌', '🔥', '✅', '❌', '😀', '😊', '😍', '🙏', '💯', '📌', '✋', '👋', '☕', '📚', '💡', '⭐'];
 const REACTIONS = ['👍', '👏', '❤️', '😂', '😮', '🎉', '🙌', '🤔'];
 const BACKGROUNDS = [
@@ -67,7 +69,7 @@ export function Room(props: Opts) {
 
 type Floating = { id: number; emoji: string; left: number; from: string };
 
-function Stage({ sessionId, title, recording, chatEnabled, conn }: Opts & { conn: Conn }) {
+function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, conn }: Opts & { conn: Conn }) {
   const room = useRoomContext();
   const { localParticipant } = useLocalParticipant();
   const hookPerms = useLocalParticipantPermissions();
@@ -113,7 +115,21 @@ function Stage({ sessionId, title, recording, chatEnabled, conn }: Opts & { conn
   const hands = participants.filter((p) => p.attributes?.hand).sort((a, b) => Number(a.attributes.hand) - Number(b.attributes.hand));
 
   const perms = hookPerms ?? localParticipant.permissions;
-  const canShare = !!perms?.canPublishSources?.some((x) => Number(x) === 3) && canDisplayCapture();
+  const sharePerm = !!perms?.canPublishSources?.some((x) => Number(x) === 3);
+  const canShare = sharePerm && canDisplayCapture();
+  const [shareHelp, setShareHelp] = useState(false);
+  const [facing, setFacing] = useState<'user' | 'environment'>('user');
+  const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  /** Cambia entre cámara frontal y trasera (en el celular sirve para mostrar un cuaderno, pizarra o documento). */
+  const flipCamera = async () => {
+    const next = facing === 'user' ? 'environment' : 'user';
+    try {
+      const pub = localParticipant.getTrackPublication(Track.Source.Camera);
+      if (!pub?.track) { await localParticipant.setCameraEnabled(true, { facingMode: next }); }
+      else await (pub.track as LocalVideoTrack).restartTrack({ facingMode: next });
+      setFacing(next); say(next === 'environment' ? '📷 Cámara trasera: muestre su cuaderno, pizarra o documento.' : '🤳 Cámara frontal');
+    } catch { say('No se pudo cambiar de cámara en este equipo.'); }
+  };
   const tracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: true }, { source: Track.Source.ScreenShare, withPlaceholder: false }], { onlySubscribed: false });
   const screen = tracks.find((t) => t.publication?.source === Track.Source.ScreenShare);
   const speaker = useMemo(() => [...participants].sort((a, b) => Number(b.isSpeaking) - Number(a.isSpeaking) || b.audioLevel - a.audioLevel)[0], [participants]);
@@ -160,18 +176,31 @@ function Stage({ sessionId, title, recording, chatEnabled, conn }: Opts & { conn
               <span>{panel === 'chat' ? '💬 Chat' : panel === 'people' ? `👥 Participantes (${participants.length})` : '🖼 Fondo y efectos'}</span>
               <button onClick={() => setPanel(null)} className="rounded px-2 hover:bg-white/10" aria-label="Cerrar panel">✕</button>
             </div>
-            {panel === 'chat' && <ChatPanel enabled={chatEnabled || mod} chat={chat} />}
+            {panel === 'chat' && <ChatPanel enabled={chatEnabled || mod} chat={chat} orgId={orgId} sectionId={sectionId} say={say} />}
             {panel === 'people' && <PeoplePanel mod={mod} me={localParticipant.identity} participants={participants} moderate={moderate} />}
             {panel === 'effects' && <EffectsPanel say={say} />}
           </aside>)}
       </div>
 
+      {shareHelp && (
+        <div className="absolute inset-x-2 bottom-24 z-30 mx-auto max-w-md rounded-xl bg-[#222] p-4 text-sm shadow-2xl" data-testid="ayuda-compartir">
+          <p className="font-semibold">📲 Compartir desde el celular</p>
+          <p className="mt-1 opacity-80">Los navegadores de celulares (Android y iPhone) no permiten transmitir la pantalla completa. Puede mostrar su contenido así:</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button className="rounded-lg bg-blue-600 px-3 py-2" onClick={() => { setShareHelp(false); flipCamera(); }}>📷 Mostrar con la cámara trasera</button>
+            <button className="rounded-lg bg-white/10 px-3 py-2" onClick={() => { setShareHelp(false); setPanel('chat'); }}>📎 Enviar foto, video o archivo al chat</button>
+            <button className="rounded-lg px-3 py-2 opacity-70" onClick={() => setShareHelp(false)}>Cerrar</button>
+          </div>
+          <p className="mt-2 text-xs opacity-60">Para compartir la pantalla completa, entre desde un computador con Chrome, Edge o Firefox.</p>
+        </div>)}
       {toast && <div className="absolute bottom-24 left-1/2 z-20 -translate-x-1/2 rounded-lg bg-black/80 px-4 py-2 text-sm">{toast}</div>}
 
       <footer className="flex flex-wrap items-center justify-center gap-1 border-t border-white/10 px-2 py-2 sm:gap-2">
         <span className="flex items-center"><TrackToggle source={Track.Source.Microphone} showIcon>Micrófono</TrackToggle><MediaDeviceMenu kind="audioinput" /></span>
         <span className="flex items-center"><TrackToggle source={Track.Source.Camera} showIcon>Cámara</TrackToggle><MediaDeviceMenu kind="videoinput" /></span>
         {canShare && <TrackToggle source={Track.Source.ScreenShare} showIcon captureOptions={{ audio: true, selfBrowserSurface: 'include' } as any}>Compartir pantalla</TrackToggle>}
+        {sharePerm && !canShare && <button className="lk-button" onClick={() => setShareHelp(true)} data-testid="compartir-celular">📲 Compartir pantalla</button>}
+        {(isMobile || !canDisplayCapture()) && <button className="lk-button" onClick={flipCamera} title="Cambiar entre cámara frontal y trasera">🔄 Cámara</button>}
         <button className={`lk-button ${panel === 'effects' ? 'lk-button-active' : ''}`} onClick={() => setPanel(panel === 'effects' ? null : 'effects')} title="Desenfoque y fondos virtuales">🖼 Fondo</button>
         <span className="relative">
           <button className="lk-button" onClick={() => setShowReactions((v) => !v)} title="Reacciones">😀 Reaccionar</button>
@@ -193,8 +222,23 @@ function Stage({ sessionId, title, recording, chatEnabled, conn }: Opts & { conn
   );
 }
 
-function ChatPanel({ enabled, chat }: { enabled: boolean; chat: ReturnType<typeof useChat> }) {
+const FILE_LINK = /\/app\/archivos\/ver\/([0-9a-f-]{36})/;
+function ChatPanel({ enabled, chat, orgId, sectionId, say }: { enabled: boolean; chat: ReturnType<typeof useChat>; orgId: string; sectionId: string | null; say: (m: string) => void }) {
   const { chatMessages, send, isSending } = chat;
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  /** 📎 Comparte una foto, video o documento con la clase (queda guardado en «Archivos»). */
+  const attach = async (f: File | undefined) => {
+    if (!f) return;
+    setUploading(true);
+    try {
+      let id: string;
+      try { id = await uploadUserFile(orgId, f, sectionId ? { visibility: 'section', section: sectionId } : { visibility: 'org' }); }
+      catch (e) { if (!sectionId) throw e; id = await uploadUserFile(orgId, f, { visibility: 'org' }); }
+      await send(`📎 ${f.name} — ${location.origin}/app/archivos/ver/${id}`);
+    } catch (e) { say((e as Error).message); }
+    finally { setUploading(false); if (fileInput.current) fileInput.current.value = ''; }
+  };
   const [text, setText] = useState('');
   const [emojis, setEmojis] = useState(false);
   const list = useRef<HTMLDivElement>(null);
@@ -210,7 +254,9 @@ function ChatPanel({ enabled, chat }: { enabled: boolean; chat: ReturnType<typeo
           return (
             <div key={m.id} className={`max-w-[85%] rounded-xl px-3 py-2 ${mine ? 'ml-auto bg-blue-600' : 'bg-white/10'}`}>
               <p className="text-[11px] opacity-70">{mine ? 'Usted' : m.from?.name || 'Participante'} · {new Date(m.timestamp).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</p>
-              <p className="whitespace-pre-wrap break-words">{m.message}</p>
+              {(() => { const f = FILE_LINK.exec(m.message); return f
+                ? <a className="whitespace-pre-wrap break-words underline" href={`/app/archivos/ver/${f[1]}`} target="_blank" rel="noopener noreferrer">{m.message.split(' — ')[0]}</a>
+                : <p className="whitespace-pre-wrap break-words">{m.message}</p>; })()}
             </div>);
         })}
       </div>
@@ -222,6 +268,8 @@ function ChatPanel({ enabled, chat }: { enabled: boolean; chat: ReturnType<typeo
             </div>)}
           <form className="flex gap-1" onSubmit={(e) => { e.preventDefault(); submit(); }}>
             <button type="button" className="rounded-lg px-2 text-xl hover:bg-white/10" onClick={() => setEmojis((v) => !v)} aria-label="Emojis">😊</button>
+            <button type="button" className="rounded-lg px-2 text-xl hover:bg-white/10 disabled:opacity-50" disabled={uploading} onClick={() => fileInput.current?.click()} aria-label="Adjuntar archivo" title="Enviar foto, video o archivo">{uploading ? '⏳' : '📎'}</button>
+            <input ref={fileInput} type="file" className="hidden" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip" data-testid="adjuntar-chat" onChange={(e) => attach(e.target.files?.[0])} />
             <input className="min-w-0 flex-1 rounded-lg bg-white/10 px-3 py-2 text-sm outline-none placeholder:text-white/50" value={text} maxLength={2000}
               onChange={(e) => setText(e.target.value)} placeholder="Escriba un mensaje…" aria-label="Mensaje del chat" />
             <button className="rounded-lg bg-blue-600 px-3 text-sm font-semibold disabled:opacity-50" disabled={isSending || !text.trim()}>Enviar</button>
@@ -249,7 +297,7 @@ function PeoplePanel({ mod, me, participants, moderate }: { mod: boolean; me: st
                 <div className="mt-1 flex flex-wrap gap-1 text-[11px]">
                   {p.isMicrophoneEnabled && <button className="rounded bg-white/10 px-2 py-0.5 hover:bg-white/20" onClick={() => moderate('mute', p.identity)}>Silenciar</button>}
                   {p.attributes?.hand && <button className="rounded bg-white/10 px-2 py-0.5 hover:bg-white/20" onClick={() => moderate('lower_hand', p.identity)}>Bajar mano</button>}
-                  {p.attributes?.share
+                  {(p.attributes?.share === '1' || (p.attributes?.share !== '0' && !!p.permissions?.canPublishSources?.some((x) => Number(x) === 3)))
                     ? <button className="rounded bg-white/10 px-2 py-0.5 hover:bg-white/20" onClick={() => moderate('revoke_share', p.identity)}>Quitar pantalla</button>
                     : <button className="rounded bg-white/10 px-2 py-0.5 hover:bg-white/20" onClick={() => moderate('allow_share', p.identity)}>Permitir compartir pantalla</button>}
                   <button className="rounded bg-red-600/70 px-2 py-0.5 hover:bg-red-600" onClick={() => { if (confirm(`¿Sacar a ${p.name} de la sala?`)) moderate('remove', p.identity); }}>Expulsar</button>
@@ -315,72 +363,104 @@ function EffectsPanel({ say }: { say: (m: string) => void }) {
 }
 
 /** Grabación desde el navegador del anfitrión: graba la pestaña de la clase (video + audio de todos + su micrófono). */
+const SEGMENT_MS = 2 * 60 * 1000; // cada 2 minutos se guarda una parte en la plataforma
+type Part = { n: number; secs: number; size: number; status: 'subiendo' | 'guardada' | 'error'; id?: string; blob?: Blob; error?: string };
+
+/**
+ * Grabación de la clase guardada en TIEMPO REAL: cada 2 minutos se sube una parte al almacenamiento privado,
+ * así no se pierde aunque se cierre el navegador. Después se pueden unir, cortar, descargar y enviar.
+ */
 function Recorder({ sessionId, title, say, broadcast }: { sessionId: string; title: string; say: (m: string) => void; broadcast: (on: boolean) => void }) {
-  const [state, setState] = useState<'idle' | 'rec' | 'done' | 'uploading' | 'saved'>('idle');
+  const [state, setState] = useState<'idle' | 'rec' | 'finishing' | 'done'>('idle');
   const [secs, setSecs] = useState(0);
-  const [blob, setBlob] = useState<Blob | null>(null);
-  const [savedId, setSavedId] = useState<string | null>(null);
+  const [parts, setParts] = useState<Part[]>([]);
   const rec = useRef<MediaRecorder | null>(null);
   const streams = useRef<MediaStream[]>([]);
+  const out = useRef<MediaStream | null>(null);
+  const audioCtx = useRef<AudioContext | null>(null);
   const started = useRef(0);
+  const segStart = useRef(0);
+  const stopping = useRef(false);
+  const group = useRef('');
+  const counter = useRef(0);
+  const queue = useRef<Promise<void>>(Promise.resolve());
+  const timer = useRef<ReturnType<typeof setInterval>>(undefined);
   useEffect(() => { if (state !== 'rec') return; const t = setInterval(() => setSecs(Math.round((Date.now() - started.current) / 1000)), 1000); return () => clearInterval(t); }, [state]);
+  useEffect(() => () => clearInterval(timer.current), []);
   if (!canDisplayCapture()) return null;
+
+  const filenameOf = (n: number) => `Grabación - ${title} - ${new Date(started.current).toLocaleDateString('es-CL')} - parte ${n}.webm`.replace(/[\\/:*?"<>|]/g, '-');
+  const patch = (n: number, p: Partial<Part>) => setParts((ps) => ps.map((x) => (x.n === n ? { ...x, ...p } : x)));
+
+  const save = (n: number, blob: Blob, dur: number) => {
+    setParts((ps) => [...ps, { n, secs: dur, size: blob.size, status: 'subiendo', blob }]);
+    queue.current = queue.current.then(async () => {
+      try {
+        const id = await uploadRecording(sessionId, blob, { filename: filenameOf(n), duration: dur, group: group.current, part: n });
+        patch(n, { status: 'guardada', id, blob: undefined }); // libera memoria: ya está en la plataforma
+      } catch (e) { patch(n, { status: 'error', error: (e as Error).message }); }
+    });
+  };
+
+  const startSegment = () => {
+    const mime = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find((m) => MediaRecorder.isTypeSupported(m)) ?? '';
+    const r = new MediaRecorder(out.current!, { mimeType: mime, videoBitsPerSecond: 1_200_000 });
+    const chunks: Blob[] = [];
+    const n = ++counter.current; segStart.current = Date.now();
+    r.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    r.onstop = () => {
+      const dur = Math.round((Date.now() - segStart.current) / 1000);
+      if (chunks.length) save(n, new Blob(chunks, { type: 'video/webm' }), dur);
+      if (!stopping.current) { startSegment(); return; }
+      clearInterval(timer.current);
+      streams.current.forEach((x) => x.getTracks().forEach((t) => t.stop())); streams.current = []; audioCtx.current?.close();
+      broadcast(false); setState('finishing');
+      queue.current.then(() => setState('done'));
+    };
+    r.start(5000); rec.current = r;
+  };
 
   const start = async () => {
     try {
       const display = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 24 }, audio: true, preferCurrentTab: true, selfBrowserSurface: 'include', systemAudio: 'include' } as any);
-      const ctx = new AudioContext(); const dest = ctx.createMediaStreamDestination();
+      const ctx = new AudioContext(); const dest = ctx.createMediaStreamDestination(); audioCtx.current = ctx;
       if (display.getAudioTracks().length) ctx.createMediaStreamSource(display).connect(dest);
       try { const mic = await navigator.mediaDevices.getUserMedia({ audio: true }); streams.current.push(mic); ctx.createMediaStreamSource(mic).connect(dest); } catch { /* sin micrófono */ }
       streams.current.push(display);
-      const out = new MediaStream([...display.getVideoTracks(), ...dest.stream.getAudioTracks()]);
-      const mime = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find((m) => MediaRecorder.isTypeSupported(m)) ?? '';
-      const r = new MediaRecorder(out, { mimeType: mime, videoBitsPerSecond: 1_200_000 });
-      const chunks: Blob[] = [];
-      r.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
-      r.onstop = () => {
-        streams.current.forEach((s) => s.getTracks().forEach((t) => t.stop())); streams.current = []; ctx.close();
-        setBlob(new Blob(chunks, { type: 'video/webm' })); setState('done'); broadcast(false);
-      };
-      display.getVideoTracks()[0].addEventListener('ended', () => r.state !== 'inactive' && r.stop());
-      r.start(5000); rec.current = r; started.current = Date.now(); setSecs(0); setState('rec'); broadcast(true);
-      say('🔴 Grabando. Todos ven el aviso de grabación.');
+      out.current = new MediaStream([...display.getVideoTracks(), ...dest.stream.getAudioTracks()]);
+      group.current = crypto.randomUUID(); counter.current = 0; stopping.current = false; setParts([]);
+      started.current = Date.now(); setSecs(0);
+      display.getVideoTracks()[0].addEventListener('ended', () => stop());
+      startSegment();
+      timer.current = setInterval(() => { if (rec.current?.state === 'recording') rec.current.stop(); }, (globalThis as { __sematecSegmentMs?: number }).__sematecSegmentMs ?? SEGMENT_MS);
+      setState('rec'); broadcast(true);
+      say('🔴 Grabando: se guarda en la plataforma cada 2 minutos. Todos ven el aviso.');
     } catch { say('Grabación cancelada. Elija «Esta pestaña» y marque «Compartir audio».'); }
   };
-  const stop = () => rec.current?.state !== 'inactive' && rec.current?.stop();
-  const filename = `Grabación - ${title} - ${new Date().toLocaleDateString('es-CL')}.webm`.replace(/[\\/:*?"<>|]/g, '-');
-  const download = () => { if (!blob) return; const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); };
-  const save = async () => {
-    if (!blob) return; setState('uploading');
-    try {
-      const r1 = await fetch('/api/grabaciones/subir', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session: sessionId, size: blob.size, mime: blob.type }) });
-      const j1 = await r1.json(); if (!r1.ok) throw new Error(j1.error);
-      const up = await createBrowser().storage.from('conference-recordings').uploadToSignedUrl(j1.path, j1.token, blob, { contentType: 'video/webm' });
-      if (up.error) throw new Error(/size|large|exceed/i.test(up.error.message) ? 'La grabación es más grande que lo que permite su plan de almacenamiento (Supabase Free: 50 MB por archivo). Descárguela en su equipo o active Supabase Pro.' : up.error.message);
-      const r2 = await fetch('/api/grabaciones/registrar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session: sessionId, path: j1.path, size: blob.size, duration: secs, filename }) });
-      const j2 = await r2.json(); if (!r2.ok) throw new Error(j2.error);
-      setSavedId(j2.id); setState('saved'); say('✓ Grabación guardada en la plataforma.');
-    } catch (e) { setState('done'); say((e as Error).message || 'No se pudo subir la grabación.'); }
-  };
-  const share = async () => {
-    const url = `${location.origin}/app/conferencias/grabacion/${savedId}`;
-    if (navigator.share) await navigator.share({ title: `Grabación: ${title}`, url }).catch(() => {}); else { await navigator.clipboard.writeText(url); say('Enlace copiado.'); }
-  };
-  const mmss = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+  const stop = () => { stopping.current = true; if (rec.current && rec.current.state !== 'inactive') rec.current.stop(); };
+  const download = (p: Part) => { if (!p.blob) return; const a = document.createElement('a'); a.href = URL.createObjectURL(p.blob); a.download = filenameOf(p.n); a.click(); };
+  const mmss = (x: number) => `${Math.floor(x / 60)}:${String(x % 60).padStart(2, '0')}`;
+  const saved = parts.filter((p) => p.status === 'guardada');
+  const first = saved.sort((a, b) => a.n - b.n)[0];
 
-  if (state === 'rec') return <button className="lk-button" style={{ background: '#dc2626' }} onClick={stop}>⏹ Detener ({mmss})</button>;
+  if (state === 'rec') return (
+    <button className="lk-button" style={{ background: '#dc2626' }} onClick={stop} data-testid="detener-grabacion">
+      ⏹ Detener ({mmss(secs)}{saved.length ? ` · ☁ ${saved.length}` : ''})</button>);
   if (state === 'idle') return <button className="lk-button" onClick={start}>⏺ Grabar</button>;
   return (
-    <span className="fixed bottom-20 left-1/2 z-30 w-[92vw] max-w-md -translate-x-1/2 rounded-xl bg-[#222] p-4 text-sm shadow-2xl">
-      <b>🎬 Grabación lista</b> <span className="opacity-70">({mmss}, {blob ? (blob.size / 1048576).toFixed(1) : 0} MB)</span>
+    <span className="fixed bottom-20 left-1/2 z-30 w-[92vw] max-w-md -translate-x-1/2 rounded-xl bg-[#222] p-4 text-sm shadow-2xl" data-testid="grabacion-lista">
+      <b>{state === 'finishing' ? '⏳ Guardando las últimas partes…' : `🎬 Grabación guardada (${mmss(secs)})`}</b>
+      <ul className="mt-2 space-y-1 text-xs">{parts.map((p) => (
+        <li key={p.n} className="flex items-center justify-between gap-2">
+          <span>Parte {p.n} · {mmss(p.secs)} · {(p.size / 1048576).toFixed(1)} MB</span>
+          <span>{p.status === 'guardada' ? '☁ guardada' : p.status === 'subiendo' ? 'subiendo…'
+            : <button className="underline" onClick={() => download(p)} title={p.error}>⚠ ⬇ Descargar</button>}</span>
+        </li>))}</ul>
       <span className="mt-3 flex flex-wrap gap-2">
-        <button className="rounded-lg bg-white/10 px-3 py-2 hover:bg-white/20" onClick={download}>⬇ Descargar</button>
-        {state !== 'saved'
-          ? <button className="rounded-lg bg-blue-600 px-3 py-2 disabled:opacity-60" disabled={state === 'uploading'} onClick={save}>{state === 'uploading' ? 'Subiendo…' : '☁ Guardar en la plataforma'}</button>
-          : <button className="rounded-lg bg-blue-600 px-3 py-2" onClick={share}>📤 Compartir enlace</button>}
-        <button className="rounded-lg px-3 py-2 opacity-70 hover:opacity-100" onClick={() => { setBlob(null); setState('idle'); setSavedId(null); }}>Cerrar</button>
+        {first && state === 'done' && <a className="rounded-lg bg-blue-600 px-3 py-2" href={`/app/conferencias/grabacion/${first.id}/editar`} target="_blank" rel="noopener noreferrer">✂ Unir, cortar, descargar o enviar</a>}
+        <button className="rounded-lg px-3 py-2 opacity-70 hover:opacity-100" disabled={state === 'finishing'} onClick={() => { setParts([]); setState('idle'); }}>Cerrar</button>
       </span>
-      {state === 'saved' && <span className="mt-2 block text-xs opacity-70">Los participantes la verán en el detalle de la sesión.</span>}
+      {parts.some((p) => p.status === 'error') && <span className="mt-2 block text-xs text-amber-300">Las partes con ⚠ no se pudieron subir (revise el plan de almacenamiento): descárguelas en este equipo antes de cerrar.</span>}
     </span>
   );
 }

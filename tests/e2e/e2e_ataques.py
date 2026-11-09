@@ -88,7 +88,8 @@ with sync_playwright() as pw:
     # 8. Archivo disfrazado
     exe = '/tmp/malicioso.pdf'; open(exe, 'wb').write(b'MZ\x90\x00' + b'\x00' * 200)
     go(ow, BASE + '/app/biblioteca'); ow.click('summary:has-text("Agregar libro")')
-    ow.fill('input[name=title]', 'Libro falso'); ow.set_input_files('input[name=file]', exe); ow.click('button:has-text("Agregar")')
+    ow.fill('input[name=title]', 'Libro falso'); ow.locator('form:has(input[name=title]) select[name=course_id]').select_option(index=1)
+    ow.set_input_files('input[name=file]', exe); ow.click('button:has-text("Agregar")')
     check('no permitido' in status_msg(ow), 'Un ejecutable renombrado a .pdf es rechazado')
 
     # 9. Último propietario

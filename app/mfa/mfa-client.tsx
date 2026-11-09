@@ -34,7 +34,8 @@ export function MfaClient() {
     try {
       const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId, code: code.trim() });
       if (error) { setError('Código incorrecto o vencido. Intente con el código actual.'); return; }
-      window.location.href = '/app';
+      const nx = new URLSearchParams(window.location.search).get('next') ?? '/app';
+      window.location.href = /^\/(?![/\\])[^\s\\]*$/.test(nx) && !nx.includes('://') ? nx : '/app';
     } catch {
       setError('Sin conexión: no se pudo verificar el código. Reintente.');
     } finally { setBusy(false); }

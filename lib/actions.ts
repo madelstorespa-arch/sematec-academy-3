@@ -1,4 +1,5 @@
 import 'server-only';
+import { checkDocument } from '@/lib/identity';
 
 export type ActionResult = { ok: boolean; message?: string; error?: string; data?: unknown };
 
@@ -71,4 +72,12 @@ export async function guard(fn: () => Promise<ActionResult>): Promise<ActionResu
     console.error(e);
     return { ok: false, error: 'Error inesperado del servidor. La operación no se completó.' };
   }
+}
+
+/** Documento de identidad del formulario (tipo + número), validado; lanza un error claro si no es válido. */
+export function docFields(fd: FormData, required = false): { id_document_country: string | null; id_document_type: string | null; id_document_number: string | null } {
+  const r = checkDocument(str(fd, 'id_document_type'), str(fd, 'id_document_number'), required);
+  if (!r.ok) throw new ValidationError(r.error);
+  return r.number ? { id_document_country: r.type === 'RUN' ? 'CL' : null, id_document_type: r.type, id_document_number: r.number }
+    : { id_document_country: null, id_document_type: null, id_document_number: null };
 }

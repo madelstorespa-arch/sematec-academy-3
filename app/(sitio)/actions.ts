@@ -1,4 +1,5 @@
 'use server';
+import { checkDocument } from '@/lib/identity';
 import { headers } from 'next/headers';
 import { anonClient, getPublicSite } from '@/lib/site';
 import { explain, type ActionResult } from '@/lib/actions';
@@ -7,6 +8,13 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import type { ProviderId } from '@/lib/payments/types';
 
 const v = (fd: FormData, k: string) => String(fd.get(k) ?? '').trim();
+
+/** Documento de identidad de postulaciones y compras (RUT validado). */
+function publicDoc(fd: FormData, required = true): { country: string | null; type: string | null; number: string | null } | { error: string } {
+  const r = checkDocument(v(fd, 'doc_type') || null, v(fd, 'doc_number') || null, required);
+  if (!r.ok) return { error: r.error };
+  return { country: 'CL', type: r.type, number: r.number };
+}
 const ip = async () => ((await headers()).get('x-forwarded-for') ?? '').split(',')[0].trim() || null;
 const human = (fd: FormData) => v(fd, 'website') === ''; // campo trampa anti-bots
 
@@ -26,9 +34,11 @@ export async function sendContact(fd: FormData): Promise<ActionResult> {
 export async function applyToCourse(fd: FormData): Promise<ActionResult> {
   if (!human(fd)) return { ok: false, error: 'Solicitud inválida.' };
   if (!fd.get('consent')) return { ok: false, error: 'Debe aceptar los términos y la política de privacidad.' };
+  const doc = publicDoc(fd);
+  if ('error' in doc) return { ok: false, error: doc.error };
   const { data, error } = await anonClient().rpc('submit_public_application', {
     p_offering: v(fd, 'offering_id'), p_name: v(fd, 'name'), p_email: v(fd, 'email'), p_phone: v(fd, 'phone'),
-    p_doc_country: 'CL', p_doc_type: null, p_doc_number: null, // el N° de documento no se solicita
+    p_doc_country: doc.country, p_doc_type: doc.type, p_doc_number: doc.number,
     p_form: { motivation: v(fd, 'motivation'), education: v(fd, 'education') }, p_ip: await ip(),
   });
   if (error) return { ok: false, error: explain(error) };
@@ -47,9 +57,11 @@ export async function startCheckout(fd: FormData): Promise<ActionResult> {
   if (!human(fd)) return { ok: false, error: 'Solicitud inválida.' };
   if (!fd.get('consent')) return { ok: false, error: 'Debe aceptar los términos y la política de privacidad.' };
   const provider = v(fd, 'provider') as ProviderId;
+  const doc = publicDoc(fd, !v(fd, 'tracking_code'));
+  if ('error' in doc) return { ok: false, error: doc.error };
   const { data, error } = await anonClient().rpc('create_checkout_order', {
     p_offering: v(fd, 'offering_id'), p_provider: provider, p_name: v(fd, 'name'), p_email: v(fd, 'email'), p_phone: v(fd, 'phone'),
-    p_doc_country: 'CL', p_doc_type: null, p_doc_number: null,
+    p_doc_country: doc.country, p_doc_type: doc.type, p_doc_number: doc.number,
     p_tracking_code: v(fd, 'tracking_code') || null,
   });
   if (error) return { ok: false, error: explain(error) };

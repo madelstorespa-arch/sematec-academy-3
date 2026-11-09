@@ -24,7 +24,7 @@ def buy(browser, provider, email, doc, button='#approve', slug='sql-desde-cero',
     c = browser.new_context(viewport={'width': 1366, 'height': 900}); p = c.new_page()
     go(p, f'{BASE}/cursos/{slug}/inscripcion' + (f'?codigo={code}' if code else ''))
     if not code:
-        p.fill('input[name=name]', f'Comprador {provider.title()}'); p.fill('input[name=email]', email)
+        p.fill('input[name=name]', f'Comprador {provider.title()}'); p.fill('input[name=email]', email); p.fill('input[name=doc_number]', '13.131.313-6')
     else:
         p.fill('input[name=name]', 'Postulante Web'); p.fill('input[name=email]', email)
     p.check(f'input[name=provider][value={provider}]'); p.check('input[name=consent]')
@@ -103,7 +103,7 @@ def main():
         # 4. Postulación → aprobación → pago
         c = new(); p = c.new_page(); go(p, BASE + '/cursos/tecnico-informatica/inscripcion')
         p.fill('input[name=name]', 'Pablo Postulante'); p.fill('input[name=email]', 'pablo.post@demo.sematec.test')
-        p.fill('input[name=education]', 'Enseñanza media completa'); p.fill('textarea[name=motivation]', 'Quiero trabajar en desarrollo de software')
+        p.fill('input[name=doc_number]', '15.151.515-0'); p.fill('input[name=education]', 'Enseñanza media completa'); p.fill('textarea[name=motivation]', 'Quiero trabajar en desarrollo de software')
         p.check('input[name=consent]'); p.click('button:has-text("Enviar postulación")')
         p.wait_for_selector('text=Postulación recibida'); code = re.search(r'SA-[A-Z0-9]{8}', p.inner_text('body')).group(0)
         check(bool(code), f'Postulación enviada con código de seguimiento {code}'); shot(p, 'web_08_postulacion')

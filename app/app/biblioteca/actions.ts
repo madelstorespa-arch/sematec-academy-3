@@ -10,6 +10,8 @@ export async function addItem(fd: FormData): Promise<ActionResult> {
     const copies = Math.max(0, Math.floor(num(fd, 'copies') ?? 0));
     const url = str(fd, 'url');
     if (url && !url.startsWith('https://')) return fail('El enlace debe comenzar con https://');
+    if (!str(fd, 'program_id') && !str(fd, 'course_id') && !str(fd, 'section_id'))
+      return fail('Asocie el libro al menos a una carrera, asignatura o curso/sección.');
     let fileId: string | null = null;
     try { fileId = await saveLibraryFile(ctx, fd.get('file') as File | null); } catch (e) { return fail((e as Error).message); }
     const { error } = await ctx.supabase.from('library_items').insert({

@@ -80,7 +80,8 @@ def main():
         go(page, f'{BASE}/app/estudiantes?nuevo=1')
         page.fill('input[name=student_code]', 'EST-E2E1'); page.fill('input[name=first_names]', 'Camila')
         page.fill('input[name=last_names]', 'Prueba Navegador')
-        check(page.locator('input[name=id_document_number]').count() == 0, 'Formulario sin N° de documento')
+        check(page.locator('input[name=id_document_number]').count() == 1, 'Formulario con documento de identidad (RUT / pasaporte)')
+        page.fill('form:has(input[name=student_code]) input[name=id_document_number]', '22.222.222-2')
         page.fill('input[name=email]', 'camila.e2e@demo.sematec.test'); page.fill('form:has(input[name=student_code]) input[name=password]', 'CamilaPrueba2026')
         page.select_option('select[name=campus_id]', label='Sede Santiago (STGO)')
         page.click('button:has-text("Registrar estudiante")')
@@ -92,7 +93,8 @@ def main():
         # validación
         go(page, f'{BASE}/app/estudiantes?nuevo=1')
         page.fill('input[name=student_code]', 'EST-E2E1'); page.fill('input[name=first_names]', 'Dup'); page.fill('input[name=last_names]', 'Licado')
-        page.fill('input[name=email]', 'dup.e2e@demo.sematec.test'); page.fill('form:has(input[name=student_code]) input[name=password]', 'DupLicado20266'); page.click('button:has-text("Registrar estudiante")')
+        page.fill('input[name=email]', 'dup.e2e@demo.sematec.test'); page.fill('form:has(input[name=student_code]) input[name=password]', 'DupLicado20266')
+        page.fill('form:has(input[name=student_code]) input[name=id_document_number]', '11.111.111-1'); page.click('button:has-text("Registrar estudiante")')
         check('Ya existe' in status_msg(page), 'Código duplicado rechazado con mensaje claro')
 
         # 3. Otro dispositivo (contexto independiente) ve el mismo dato
@@ -106,6 +108,7 @@ def main():
         go(page, f'{BASE}/app/estudiantes?nuevo=1')
         page.fill('input[name=student_code]', 'EST-E2E9'); page.fill('input[name=first_names]', 'Sin'); page.fill('input[name=last_names]', 'Conexion')
         page.fill('input[name=email]', 'sin.conexion@demo.sematec.test'); page.fill('form:has(input[name=student_code]) input[name=password]', 'SinConexion2026')
+        page.fill('form:has(input[name=student_code]) input[name=id_document_number]', '13.131.313-6')
         c1.set_offline(True); page.click('button:has-text("Registrar estudiante")')
         msg = status_msg(page); c1.set_offline(False)
         check('NO fue guardada' in msg, 'Sin internet: mensaje claro de que NO se guardó')

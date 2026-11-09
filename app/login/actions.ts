@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { env } from '@/lib/env';
 import { safeNext } from '@/lib/safe-redirect';
+import { mailEnabled, mailLayout, sendMail } from '@/lib/mailer';
 import type { ActionResult } from '@/lib/actions';
 
 /** IP real del visitante (Vercel la entrega en x-real-ip; x-forwarded-for puede ser falsificado por el cliente). */
@@ -51,12 +52,41 @@ export async function signIn(fd: FormData): Promise<ActionResult> {
 }
 
 export async function requestReset(fd: FormData): Promise<ActionResult> {
-  const email = String(fd.get('email') ?? '').trim().toLowerCase();
-  if (!email) return { ok: false, error: 'Ingrese su correo.' };
+  const email = String(fd.get('email') ?? '').trim().toLowerCase().slice(0, 254);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { ok: false, error: 'Ingrese un correo válido.' };
+  const generic: ActionResult = { ok: true, message: 'Si el correo está registrado, recibirá en unos minutos un enlace para crear una nueva contraseña (revise también «Spam»). El enlace vence en 1 hora.' };
+  const ip = await clientIp();
+  try {
+    const { data: limited } = await createAdminClient().rpc('password_reset_limited', { p_ip: ip, p_email: email });
+    if (limited) return { ok: false, error: 'Se pidieron demasiados enlaces. Espere unos minutos e intente de nuevo.' };
+  } catch { /* si la verificación falla se continúa */ }
+
+  if (mailEnabled()) {
+    // Correo propio: enlace que funciona en cualquier equipo (no depende del navegador donde se pidió)
+    try {
+      const admin = createAdminClient();
+      const { data, error } = await admin.auth.admin.generateLink({ type: 'recovery', email });
+      if (error || !data?.properties?.hashed_token) return generic; // misma respuesta exista o no la cuenta
+      const { data: prof } = await admin.from('profiles').select('full_name, status').eq('id', data.user.id).maybeSingle();
+      if (prof && prof.status !== 'active') return generic;
+      const link = `${env.siteUrl()}/auth/confirm?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=recovery`;
+      const { data: site } = await admin.from('site_settings').select('site_name').limit(1).maybeSingle();
+      const brand = site?.site_name ?? 'SEMATEC ACADEMY';
+      const hi = prof?.full_name ? `Hola ${prof.full_name.split(' ')[0]},` : 'Hola,';
+      await sendMail(email, `${brand}: crear una nueva contraseña`,
+        mailLayout(brand, 'Crear una nueva contraseña', `<p>${hi}</p><p>Recibimos una solicitud para restablecer la contraseña de su cuenta. Toque el botón para crear una nueva. El enlace sirve una sola vez y vence en 1 hora.</p>`,
+          { href: link, label: 'Crear nueva contraseña' }),
+        `${hi}\n\nPara crear una nueva contraseña abra este enlace (vence en 1 hora):\n${link}\n\nSi usted no lo pidió, ignore este correo.`);
+    } catch (e) {
+      console.error('[recuperar] no se pudo enviar el correo:', (e as Error).message);
+      return { ok: false, error: 'No se pudo enviar el correo en este momento. Intente en unos minutos o pida ayuda a la administración.' };
+    }
+    return generic;
+  }
+  // Sin correo propio: lo envía Supabase (requiere su configuración de SMTP y de URL del sitio)
   const supabase = await createClient();
   await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${env.siteUrl()}/auth/confirm?next=/cambiar-clave` });
-  // Misma respuesta exista o no la cuenta (evita enumerar usuarios)
-  return { ok: true, message: 'Si el correo está registrado, recibirá un enlace temporal para restablecer la contraseña.' };
+  return generic;
 }
 
 export async function changePassword(fd: FormData): Promise<ActionResult> {

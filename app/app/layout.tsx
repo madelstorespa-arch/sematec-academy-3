@@ -42,6 +42,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (ctx.studentId || can(ctx, 'alumni.view')) items.push({ href: '/app/egresados', label: 'Egresados', icon: '🎓' });
   if (ctx.studentId || can(ctx, 'alumni.view')) items.push({ href: '/app/empleos', label: 'Bolsa de empleo', icon: '💼' });
   if (ctx.orgId) items.push({ href: '/app/calendario', label: 'Calendario', icon: '📅' });
+  if (ctx.orgId) items.push({ href: '/app/archivos', label: 'Archivos', icon: '📁' });
+  if (ctx.orgId && (ctx.studentId || ctx.teacherId || ctx.isOwner || can(ctx, 'grades.view') || can(ctx, 'reports.view'))) items.push({ href: '/app/calificaciones', label: 'Calificaciones', icon: '📝' });
   if (ctx.orgId && (ctx.studentId || ctx.teacherId || ctx.isOwner || can(ctx, 'attendance.view') || can(ctx, 'reports.view'))) items.push({ href: '/app/asistencia', label: 'Asistencia', icon: '✅' });
   if (ctx.teacherId || can(ctx, 'facilities.view')) items.push({ href: '/app/reservas', label: 'Salas y recursos', icon: '🏫' });
   if (can(ctx, 'employees.view') || ctx.isEmployee) items.push({ href: '/app/personal', label: 'Personal y RR. HH.', icon: '🧾' });

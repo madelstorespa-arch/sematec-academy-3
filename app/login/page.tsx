@@ -5,10 +5,11 @@ import { signIn } from './actions';
 
 export const metadata = { title: 'Iniciar sesión' };
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
-  const { next } = await searchParams;
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; error?: string }> }) {
+  const { next, error } = await searchParams;
   return (
     <AuthShell title="Iniciar sesión" subtitle="Acceda con su cuenta institucional.">
+      {error === 'enlace' && <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">El enlace del correo ya se usó o venció. <Link className="link" href="/recuperar">Pida uno nuevo</Link>.</p>}
       <ActionForm action={signIn} submitLabel="Ingresar" submitClass="btn-primary w-full" resetOnSuccess={false}>
         <input type="hidden" name="next" value={next ?? '/app'} />
         <Field label="Correo" name="email" type="email" required autoComplete="email" />

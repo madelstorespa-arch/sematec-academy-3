@@ -1,7 +1,7 @@
 'use server';
 import { revalidatePath } from 'next/cache';
 import { getContext } from '@/lib/context';
-import { fail, guard, ok, reqStr, str, type ActionResult } from '@/lib/actions';
+import { docFields, fail, guard, ok, reqStr, str, type ActionResult } from '@/lib/actions';
 import { checkPassword } from '@/lib/users';
 import { createAndLinkAccount } from '@/lib/accounts';
 
@@ -13,6 +13,7 @@ export async function createTeacher(fd: FormData): Promise<ActionResult> {
       teacher_code: reqStr(fd, 'teacher_code', 'Código').toUpperCase(),
       first_names: reqStr(fd, 'first_names', 'Nombres'),
       last_names: reqStr(fd, 'last_names', 'Apellidos'),
+      ...docFields(fd),
       email: reqStr(fd, 'email', 'Correo').toLowerCase(),
       academic_degree: str(fd, 'academic_degree'),
       specialty: str(fd, 'specialty'),

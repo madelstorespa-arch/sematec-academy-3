@@ -105,8 +105,8 @@ export async function deleteRecording(fd: FormData): Promise<ActionResult> {
     const id = reqStr(fd, 'id', 'id');
     const { data: r } = await ctx.supabase.from('conference_recordings').select('session_id, storage_bucket, storage_path').eq('id', id).maybeSingle();
     if (!r) return fail('Grabación no encontrada.');
-    const { data: isMod } = await ctx.supabase.rpc('conference_is_moderator', { p_session: r.session_id });
-    if (!isMod) return fail('Solo el anfitrión puede eliminar grabaciones.');
+    const { data: allowed } = await ctx.supabase.rpc('can_manage_recordings', { p_session: r.session_id });
+    if (!allowed) return fail('Solo el anfitrión o personas autorizadas pueden eliminar grabaciones.');
     const admin = (await import('@/lib/supabase/admin')).createAdminClient();
     await admin.storage.from(r.storage_bucket).remove([r.storage_path]);
     const { error } = await admin.from('conference_recordings').update({ status: 'deleted' }).eq('id', id);
