@@ -1,5 +1,12 @@
 /** Tipos de archivo que se pueden subir (sin ejecutables, HTML ni SVG). */
-export const FILE_MAX = 50 * 1024 * 1024; // Supabase Free: 50 MB por archivo
+/**
+ * Tamaño máximo por archivo. Se ajusta con NEXT_PUBLIC_FILES_MAX_MB en Vercel (por defecto 50 MB, el tope del plan
+ * gratis de Supabase). Con Supabase Pro puede subirlo hasta 5000 MB (5 GB) y además subir el límite en
+ * Supabase → Storage → Settings → «Upload file size limit».
+ */
+const MAX_MB = Math.min(5000, Math.max(1, Number(process.env.NEXT_PUBLIC_FILES_MAX_MB) || 50));
+export const FILE_MAX = MAX_MB * 1024 * 1024;
+export const FILE_MAX_LABEL = MAX_MB >= 1024 ? `${(MAX_MB / 1024).toFixed(MAX_MB % 1024 ? 1 : 0)} GB` : `${MAX_MB} MB`;
 export const FILE_TYPES: Record<string, string> = {
   'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/heic': 'heic', 'image/heif': 'heif',
   'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov', 'video/3gpp': '3gp',

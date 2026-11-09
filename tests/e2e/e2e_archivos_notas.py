@@ -154,7 +154,10 @@ with sync_playwright() as pw:
     go(o, BASE + '/app/archivos?t=eliminados')
     card = o.locator('[data-testid=archivo]:has-text("foto.png")').first
     check(card.count() == 1 and 'Eliminado' in card.inner_text(), 'El propietario ve el historial de eliminados (quién y cuándo)')
-    card.locator('button:has-text("Restaurar")').click(); status_msg(o)
+    card.locator('button:has-text("Restaurar")').click()
+    for _ in range(40):
+        if sql(f"select deleted_at is null from user_files where id = '{fid}'") == 't': break
+        time.sleep(0.5)
     check(sql(f"select deleted_at is null from user_files where id = '{fid}'") == 't', 'El propietario restaura el archivo')
     as_e = sql("select id from auth.users where email = 'estudiante1.a@demo.sematec.test'")
     sql(f"begin; set local role authenticated; set local request.jwt.claims = '{{\"sub\":\"{as_e}\",\"role\":\"authenticated\"}}'; select delete_user_file('{fid}'); commit;")
@@ -187,7 +190,7 @@ with sync_playwright() as pw:
     check(True, 'Celular envía una foto al chat y el profesor la recibe como enlace')
     # Grabación guardada en tiempo real (partes de 6 s en la prueba)
     t.evaluate("window.__sematecSegmentMs = 6000")
-    t.locator('footer button:has-text("Grabar")').click()
+    t.locator('footer button:has-text("Grabar")').click(); t.locator('button:has-text("Empezar a grabar")').click()
     t.wait_for_selector('[data-testid=detener-grabacion]', timeout=20000); time.sleep(15)
     saved_live = int(sql(f"select count(*) from conference_recordings where session_id = '{sess}' and group_id is not null"))
     check(saved_live >= 1, f'Mientras graba, las partes ya se guardan en la plataforma ({saved_live})')

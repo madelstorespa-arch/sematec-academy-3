@@ -7,7 +7,7 @@ import {
   CarouselLayout, ParticipantTile, TrackToggle, DisconnectButton, MediaDeviceMenu, useTracks, useChat, useParticipants,
   useLocalParticipant, useRoomContext, useDataChannel, useLocalParticipantPermissions, LayoutContextProvider,
 } from '@livekit/components-react';
-import { Track, RoomEvent, type LocalVideoTrack, type Participant } from 'livekit-client';
+import { Track, RoomEvent, ScreenSharePresets, type LocalVideoTrack, type Participant } from 'livekit-client';
 import { CONF_ROLES } from '@/lib/format';
 import { createBrowser } from '@/lib/supabase/browser';
 import { uploadRecording } from '@/lib/recordings-client';
@@ -150,6 +150,16 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, con
           <span className="opacity-70">{participants.length} 👥 · {CONF_ROLES[conn.role] ?? conn.role}</span>
         </span>
       </header>
+      {localParticipant.isScreenShareEnabled && (
+        <div className="flex flex-wrap items-center justify-center gap-2 bg-emerald-600/30 px-3 py-1 text-xs" data-testid="compartiendo">
+          🟢 Está compartiendo su pantalla con todos
+          <button className="rounded bg-white/15 px-2 py-0.5 font-semibold hover:bg-white/25" onClick={() => localParticipant.setScreenShareEnabled(false)}>⏹ Dejar de compartir</button>
+        </div>)}
+      {screen && screen.participant.identity !== localParticipant.identity && (
+        <div className="flex items-center justify-center gap-2 bg-blue-600/20 px-3 py-1 text-xs" data-testid="pantalla-de">
+          📺 Pantalla de {screen.participant.name || 'un participante'}
+          <button className="rounded bg-white/15 px-2 py-0.5 hover:bg-white/25" onClick={() => (document.querySelector('.lk-focus-layout') as HTMLElement | null)?.requestFullscreen?.().catch(() => {})}>⛶ Ver en grande</button>
+        </div>)}
       {hands.length > 0 && (
         <div className="flex flex-wrap gap-2 bg-amber-500/20 px-3 py-1 text-xs" data-testid="manos">
           ✋ {hands.map((p) => p.name || 'Participante').join(', ')}
@@ -198,7 +208,7 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, con
       <footer className="flex flex-wrap items-center justify-center gap-1 border-t border-white/10 px-2 py-2 sm:gap-2">
         <span className="flex items-center"><TrackToggle source={Track.Source.Microphone} showIcon>Micrófono</TrackToggle><MediaDeviceMenu kind="audioinput" /></span>
         <span className="flex items-center"><TrackToggle source={Track.Source.Camera} showIcon>Cámara</TrackToggle><MediaDeviceMenu kind="videoinput" /></span>
-        {canShare && <TrackToggle source={Track.Source.ScreenShare} showIcon captureOptions={{ audio: true, selfBrowserSurface: 'include' } as any}>Compartir pantalla</TrackToggle>}
+        {canShare && <ShareButton say={say} />}
         {sharePerm && !canShare && <button className="lk-button" onClick={() => setShareHelp(true)} data-testid="compartir-celular">📲 Compartir pantalla</button>}
         {(isMobile || !canDisplayCapture()) && <button className="lk-button" onClick={flipCamera} title="Cambiar entre cámara frontal y trasera">🔄 Cámara</button>}
         <button className={`lk-button ${panel === 'effects' ? 'lk-button-active' : ''}`} onClick={() => setPanel(panel === 'effects' ? null : 'effects')} title="Desenfoque y fondos virtuales">🖼 Fondo</button>
@@ -219,6 +229,55 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, con
         <DisconnectButton>Salir</DisconnectButton>
       </footer>
     </div>
+  );
+}
+
+/** 🖥 Compartir pantalla con calidad a elección, audio y mensajes claros si el sistema bloquea el permiso. */
+function ShareButton({ say }: { say: (m: string) => void }) {
+  const { localParticipant } = useLocalParticipant();
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<'detail' | 'motion'>('detail');
+  const [audio, setAudio] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const sharing = localParticipant.isScreenShareEnabled;
+  const share = async () => {
+    setBusy(true); setOpen(false);
+    try {
+      const preset = mode === 'motion' ? ScreenSharePresets.h1080fps30 : ScreenSharePresets.h1080fps15;
+      await localParticipant.setScreenShareEnabled(true, {
+        audio, resolution: preset.resolution, contentHint: mode, selfBrowserSurface: 'include', surfaceSwitching: 'include',
+        systemAudio: audio ? 'include' : 'exclude',
+      } as any, { screenShareEncoding: preset.encoding, simulcast: false });
+      say('🟢 Compartiendo su pantalla con todos.');
+    } catch (e) {
+      const n = (e as DOMException)?.name;
+      say(n === 'NotAllowedError' ? 'No se compartió: canceló la ventana o el sistema no dio permiso. En Mac: Configuración → Privacidad → Grabación de pantalla → active Chrome.'
+        : n === 'NotReadableError' ? 'El sistema bloqueó la captura de pantalla. En Windows/Mac, permita a Chrome grabar la pantalla y vuelva a intentar.'
+        : n === 'NotFoundError' ? 'No se encontró una pantalla para compartir.'
+        : `No se pudo compartir la pantalla (${(e as Error)?.message ?? n}).`);
+    } finally { setBusy(false); }
+  };
+  if (sharing) return <button className="lk-button lk-button-active" onClick={() => localParticipant.setScreenShareEnabled(false)} data-testid="dejar-compartir">⏹ Dejar de compartir</button>;
+  return (
+    <span className="relative">
+      <button className="lk-button" disabled={busy} onClick={() => setOpen((v) => !v)}>🖥 Compartir pantalla</button>
+      {open && (
+        <span className="absolute bottom-12 left-1/2 z-30 block w-[min(92vw,22rem)] -translate-x-1/2 rounded-xl bg-[#222] p-4 text-left text-sm shadow-2xl" data-testid="opciones-compartir">
+          <b>Compartir pantalla</b>
+          <label className={`mt-2 flex cursor-pointer gap-2 rounded-lg p-2 ${mode === 'detail' ? 'bg-blue-600/30' : 'hover:bg-white/5'}`}>
+            <input type="radio" name="calidad" checked={mode === 'detail'} onChange={() => setMode('detail')} className="mt-1" />
+            <span><span className="font-semibold">📄 Texto nítido</span><span className="block text-xs opacity-70">Documentos, presentaciones, código (1080p).</span></span></label>
+          <label className={`mt-1 flex cursor-pointer gap-2 rounded-lg p-2 ${mode === 'motion' ? 'bg-blue-600/30' : 'hover:bg-white/5'}`}>
+            <input type="radio" name="calidad" checked={mode === 'motion'} onChange={() => setMode('motion')} className="mt-1" />
+            <span><span className="font-semibold">🎞 Video fluido</span><span className="block text-xs opacity-70">Videos y movimientos (1080p, 30 cuadros por segundo).</span></span></label>
+          <label className="mt-2 flex items-center gap-2 text-xs"><input type="checkbox" checked={audio} onChange={(e) => setAudio(e.target.checked)} /> Compartir también el audio (videos, música)</label>
+          <span className="mt-3 flex gap-2">
+            <button className="rounded-lg bg-blue-600 px-3 py-2 font-semibold" onClick={share}>Elegir qué compartir →</button>
+            <button className="rounded-lg px-3 py-2 opacity-70" onClick={() => setOpen(false)}>Cancelar</button>
+          </span>
+          <span className="mt-2 block text-xs opacity-60">Podrá elegir una pestaña, una ventana o toda la pantalla. Para que no se vea «en espejo», comparta otra ventana o pestaña, no esta.</span>
+        </span>)}
+    </span>
   );
 }
 
@@ -365,31 +424,62 @@ function EffectsPanel({ say }: { say: (m: string) => void }) {
 /** Grabación desde el navegador del anfitrión: graba la pestaña de la clase (video + audio de todos + su micrófono). */
 const SEGMENT_MS = 2 * 60 * 1000; // cada 2 minutos se guarda una parte en la plataforma
 type Part = { n: number; secs: number; size: number; status: 'subiendo' | 'guardada' | 'error'; id?: string; blob?: Blob; error?: string };
+type RecMode = 'tab' | 'screen' | 'choose' | 'area' | 'shared';
+const REC_MODES: [RecMode, string, string][] = [
+  ['tab', '🎬 Toda la sala', 'Graba esta pestaña: videos, pantalla compartida, chat y audio de todos.'],
+  ['screen', '🖥 Pantalla completa con todos los movimientos', 'Todo lo que pasa en su monitor, con el cursor, a 30 cuadros por segundo.'],
+  ['choose', '🪟 Una ventana o pestaña que yo elija', 'El navegador le deja escoger qué ventana, pestaña o pantalla grabar.'],
+  ['area', '✂ Solo un área', 'Después de aceptar, arrastre el mouse para marcar el rectángulo que quiere grabar.'],
+  ['shared', '📺 Solo la pantalla compartida', 'Graba la pantalla que alguien está compartiendo, con el audio de la clase.'],
+];
+type Rect = { x: number; y: number; w: number; h: number };
 
 /**
- * Grabación de la clase guardada en TIEMPO REAL: cada 2 minutos se sube una parte al almacenamiento privado,
- * así no se pierde aunque se cierre el navegador. Después se pueden unir, cortar, descargar y enviar.
+ * Grabación de la clase guardada en TIEMPO REAL (una parte cada 2 minutos), con modos:
+ * toda la sala, pantalla completa con movimientos, ventana elegida, solo un área o solo la pantalla compartida.
+ * Se puede pausar y reanudar para grabar solo lo que interesa.
  */
 function Recorder({ sessionId, title, say, broadcast }: { sessionId: string; title: string; say: (m: string) => void; broadcast: (on: boolean) => void }) {
-  const [state, setState] = useState<'idle' | 'rec' | 'finishing' | 'done'>('idle');
+  const room = useRoomContext();
+  const [state, setState] = useState<'idle' | 'setup' | 'area' | 'rec' | 'finishing' | 'done'>('idle');
+  const [mode, setMode] = useState<RecMode>('tab');
+  const [hq, setHq] = useState(false);
+  const [paused, setPaused] = useState(false);
   const [secs, setSecs] = useState(0);
   const [parts, setParts] = useState<Part[]>([]);
+  const [drag, setDrag] = useState<Rect | null>(null);
   const rec = useRef<MediaRecorder | null>(null);
   const streams = useRef<MediaStream[]>([]);
   const out = useRef<MediaStream | null>(null);
   const audioCtx = useRef<AudioContext | null>(null);
-  const started = useRef(0);
+  const dest = useRef<MediaStreamAudioDestinationNode | null>(null);
+  const display = useRef<MediaStream | null>(null);
+  const cropTimer = useRef<ReturnType<typeof setInterval>>(undefined);
+  const elapsed = useRef(0);
+  const lastTick = useRef(0);
   const segStart = useRef(0);
   const stopping = useRef(false);
+  const pausedRef = useRef(false);
   const group = useRef('');
   const counter = useRef(0);
   const queue = useRef<Promise<void>>(Promise.resolve());
   const timer = useRef<ReturnType<typeof setInterval>>(undefined);
-  useEffect(() => { if (state !== 'rec') return; const t = setInterval(() => setSecs(Math.round((Date.now() - started.current) / 1000)), 1000); return () => clearInterval(t); }, [state]);
-  useEffect(() => () => clearInterval(timer.current), []);
+  const origin = useRef<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (state !== 'rec') return;
+    const t = setInterval(() => {
+      const now = Date.now();
+      if (!pausedRef.current) elapsed.current += now - lastTick.current;
+      lastTick.current = now; setSecs(Math.round(elapsed.current / 1000));
+    }, 1000);
+    return () => clearInterval(t);
+  }, [state]);
+  useEffect(() => () => { clearInterval(timer.current); clearInterval(cropTimer.current); }, []);
   if (!canDisplayCapture()) return null;
 
-  const filenameOf = (n: number) => `Grabación - ${title} - ${new Date(started.current).toLocaleDateString('es-CL')} - parte ${n}.webm`.replace(/[\\/:*?"<>|]/g, '-');
+  const fps = hq ? 30 : 24;
+  const bitrate = hq ? 3_000_000 : 1_200_000;
+  const filenameOf = (n: number) => `Grabación - ${title} - ${new Date().toLocaleDateString('es-CL')} - parte ${n}.webm`.replace(/[\\/:*?"<>|]/g, '-');
   const patch = (n: number, p: Partial<Part>) => setParts((ps) => ps.map((x) => (x.n === n ? { ...x, ...p } : x)));
 
   const save = (n: number, blob: Blob, dur: number) => {
@@ -402,51 +492,152 @@ function Recorder({ sessionId, title, say, broadcast }: { sessionId: string; tit
     });
   };
 
+  const cleanup = () => {
+    clearInterval(timer.current); clearInterval(cropTimer.current);
+    streams.current.forEach((x) => x.getTracks().forEach((t) => t.stop())); streams.current = [];
+    audioCtx.current?.close().catch(() => {}); audioCtx.current = null;
+  };
+
   const startSegment = () => {
     const mime = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find((m) => MediaRecorder.isTypeSupported(m)) ?? '';
-    const r = new MediaRecorder(out.current!, { mimeType: mime, videoBitsPerSecond: 1_200_000 });
+    const r = new MediaRecorder(out.current!, { mimeType: mime, videoBitsPerSecond: bitrate });
     const chunks: Blob[] = [];
-    const n = ++counter.current; segStart.current = Date.now();
+    const n = ++counter.current; segStart.current = elapsed.current;
     r.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
     r.onstop = () => {
-      const dur = Math.round((Date.now() - segStart.current) / 1000);
+      const dur = Math.max(1, Math.round((elapsed.current - segStart.current) / 1000));
       if (chunks.length) save(n, new Blob(chunks, { type: 'video/webm' }), dur);
       if (!stopping.current) { startSegment(); return; }
-      clearInterval(timer.current);
-      streams.current.forEach((x) => x.getTracks().forEach((t) => t.stop())); streams.current = []; audioCtx.current?.close();
-      broadcast(false); setState('finishing');
+      cleanup(); broadcast(false); setState('finishing');
       queue.current.then(() => setState('done'));
     };
     r.start(5000); rec.current = r;
   };
 
+  const beginRecording = (video: MediaStreamTrack) => {
+    out.current = new MediaStream([video, ...dest.current!.stream.getAudioTracks()]);
+    group.current = crypto.randomUUID(); counter.current = 0; stopping.current = false; pausedRef.current = false; setPaused(false); setParts([]);
+    elapsed.current = 0; lastTick.current = Date.now(); setSecs(0);
+    startSegment();
+    // Rota la parte cada 2 minutos de grabación efectiva (no mientras está en pausa)
+    timer.current = setInterval(() => {
+      if (rec.current?.state === 'recording' && elapsed.current - segStart.current >= ((globalThis as { __sematecSegmentMs?: number }).__sematecSegmentMs ?? SEGMENT_MS)) rec.current.stop();
+    }, 1000);
+    setState('rec'); broadcast(true);
+    say('🔴 Grabando: se guarda en la plataforma cada 2 minutos. Todos ven el aviso.');
+  };
+
+  /** Mezcla el micrófono propio y el audio de los participantes (o el de la pantalla capturada). */
+  const audioMix = async (captured?: MediaStream) => {
+    const ctx = new AudioContext(); const d = ctx.createMediaStreamDestination(); audioCtx.current = ctx; dest.current = d;
+    if (captured?.getAudioTracks().length) ctx.createMediaStreamSource(captured).connect(d);
+    else {
+      // sin audio capturado: se graba el audio de la clase directamente desde la sala
+      room.remoteParticipants.forEach((p) => p.audioTrackPublications.forEach((pub) => {
+        const t = pub.track?.mediaStreamTrack; if (t) ctx.createMediaStreamSource(new MediaStream([t])).connect(d);
+      }));
+    }
+    try { const mic = await navigator.mediaDevices.getUserMedia({ audio: true }); streams.current.push(mic); ctx.createMediaStreamSource(mic).connect(d); } catch { /* sin micrófono */ }
+  };
+
   const start = async () => {
     try {
-      const display = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 24 }, audio: true, preferCurrentTab: true, selfBrowserSurface: 'include', systemAudio: 'include' } as any);
-      const ctx = new AudioContext(); const dest = ctx.createMediaStreamDestination(); audioCtx.current = ctx;
-      if (display.getAudioTracks().length) ctx.createMediaStreamSource(display).connect(dest);
-      try { const mic = await navigator.mediaDevices.getUserMedia({ audio: true }); streams.current.push(mic); ctx.createMediaStreamSource(mic).connect(dest); } catch { /* sin micrófono */ }
-      streams.current.push(display);
-      out.current = new MediaStream([...display.getVideoTracks(), ...dest.stream.getAudioTracks()]);
-      group.current = crypto.randomUUID(); counter.current = 0; stopping.current = false; setParts([]);
-      started.current = Date.now(); setSecs(0);
-      display.getVideoTracks()[0].addEventListener('ended', () => stop());
-      startSegment();
-      timer.current = setInterval(() => { if (rec.current?.state === 'recording') rec.current.stop(); }, (globalThis as { __sematecSegmentMs?: number }).__sematecSegmentMs ?? SEGMENT_MS);
-      setState('rec'); broadcast(true);
-      say('🔴 Grabando: se guarda en la plataforma cada 2 minutos. Todos ven el aviso.');
-    } catch { say('Grabación cancelada. Elija «Esta pestaña» y marque «Compartir audio».'); }
+      if (mode === 'shared') {
+        const pub = [...room.remoteParticipants.values(), room.localParticipant].flatMap((p) => [...p.trackPublications.values()])
+          .find((x) => x.source === Track.Source.ScreenShare && x.track);
+        const t = pub?.track?.mediaStreamTrack;
+        if (!t) { say('Nadie está compartiendo pantalla en este momento.'); return; }
+        await audioMix();
+        t.addEventListener('ended', () => stop());
+        beginRecording(t);
+        return;
+      }
+      const video: Record<string, unknown> = { frameRate: mode === 'screen' ? 30 : fps };
+      const opts: Record<string, unknown> = { audio: true, systemAudio: 'include', selfBrowserSurface: 'include', surfaceSwitching: 'include' };
+      if (mode === 'tab' || mode === 'area') opts.preferCurrentTab = true;
+      if (mode === 'screen') { video.displaySurface = 'monitor'; video.cursor = 'always'; opts.monitorTypeSurfaces = 'include'; }
+      if (mode === 'choose') video.cursor = 'always';
+      const cap = await navigator.mediaDevices.getDisplayMedia({ ...opts, video } as DisplayMediaStreamOptions);
+      streams.current.push(cap); display.current = cap;
+      await audioMix(cap);
+      cap.getVideoTracks()[0].addEventListener('ended', () => stop());
+      if (mode === 'area') { setDrag(null); setState('area'); return; } // primero marca el área
+      beginRecording(cap.getVideoTracks()[0]);
+    } catch (e) {
+      cleanup();
+      const n = (e as DOMException)?.name;
+      say(n === 'NotAllowedError' ? 'Grabación cancelada (no se dio permiso para capturar la pantalla).'
+        : n === 'NotReadableError' ? 'El sistema bloqueó la captura: en Mac active Chrome en «Privacidad → Grabación de pantalla».'
+        : 'No se pudo iniciar la grabación en este navegador.');
+      setState('idle');
+    }
   };
-  const stop = () => { stopping.current = true; if (rec.current && rec.current.state !== 'inactive') rec.current.stop(); };
+
+  /** ✂ Recorta el área marcada: dibuja ese rectángulo de la captura en un lienzo y graba el lienzo. */
+  const startArea = (r: Rect) => {
+    const cap = display.current!; const track = cap.getVideoTracks()[0];
+    const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.srcObject = new MediaStream([track]);
+    v.play().then(() => {
+      const sx = (v.videoWidth || window.innerWidth) / window.innerWidth; const sy = (v.videoHeight || window.innerHeight) / window.innerHeight;
+      const c = document.createElement('canvas');
+      c.width = Math.max(2, Math.round(r.w * sx / 2) * 2); c.height = Math.max(2, Math.round(r.h * sy / 2) * 2);
+      const g = c.getContext('2d')!;
+      const draw = () => g.drawImage(v, r.x * sx, r.y * sy, r.w * sx, r.h * sy, 0, 0, c.width, c.height);
+      draw(); cropTimer.current = setInterval(draw, Math.round(1000 / fps));
+      const cs = c.captureStream(fps); streams.current.push(cs);
+      beginRecording(cs.getVideoTracks()[0]);
+    }).catch(() => { say('No se pudo preparar el área.'); stop(); });
+  };
+
+  const stop = () => {
+    stopping.current = true;
+    if (rec.current && rec.current.state !== 'inactive') rec.current.stop();
+    else { cleanup(); broadcast(false); setState(counter.current ? 'finishing' : 'idle'); queue.current.then(() => setState(counter.current ? 'done' : 'idle')); }
+  };
+  const togglePause = () => {
+    const r = rec.current; if (!r) return;
+    if (r.state === 'recording') { r.pause(); pausedRef.current = true; setPaused(true); broadcast(false); say('⏸ Grabación en pausa: lo que pase ahora no se graba.'); }
+    else if (r.state === 'paused') { r.resume(); pausedRef.current = false; lastTick.current = Date.now(); setPaused(false); broadcast(true); say('▶ Grabación reanudada.'); }
+  };
   const download = (p: Part) => { if (!p.blob) return; const a = document.createElement('a'); a.href = URL.createObjectURL(p.blob); a.download = filenameOf(p.n); a.click(); };
   const mmss = (x: number) => `${Math.floor(x / 60)}:${String(x % 60).padStart(2, '0')}`;
   const saved = parts.filter((p) => p.status === 'guardada');
-  const first = saved.sort((a, b) => a.n - b.n)[0];
+  const first = [...saved].sort((a, b) => a.n - b.n)[0];
 
+  if (state === 'area') return (
+    <div className="fixed inset-0 z-50 cursor-crosshair bg-black/30" data-testid="marcar-area"
+      onMouseDown={(e) => { origin.current = { x: e.clientX, y: e.clientY }; setDrag({ x: e.clientX, y: e.clientY, w: 0, h: 0 }); }}
+      onMouseMove={(e) => { const o = origin.current; if (!o) return; setDrag({ x: Math.min(o.x, e.clientX), y: Math.min(o.y, e.clientY), w: Math.abs(e.clientX - o.x), h: Math.abs(e.clientY - o.y) }); }}
+      onMouseUp={() => { const r = drag; origin.current = null; if (!r || r.w < 40 || r.h < 40) { say('Marque un área más grande (arrastre el mouse).'); return; } startArea(r); }}>
+      <p className="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-lg bg-black/80 px-4 py-2 text-sm">✂ Arrastre el mouse para marcar el área que quiere grabar · <button className="pointer-events-auto underline" onMouseDown={(e) => e.stopPropagation()} onClick={() => stop()}>Cancelar</button></p>
+      {drag && <div className="pointer-events-none absolute border-2 border-red-500 bg-white/10" style={{ left: drag.x, top: drag.y, width: drag.w, height: drag.h }} />}
+    </div>
+  );
   if (state === 'rec') return (
-    <button className="lk-button" style={{ background: '#dc2626' }} onClick={stop} data-testid="detener-grabacion">
-      ⏹ Detener ({mmss(secs)}{saved.length ? ` · ☁ ${saved.length}` : ''})</button>);
-  if (state === 'idle') return <button className="lk-button" onClick={start}>⏺ Grabar</button>;
+    <span className="flex items-center gap-1">
+      <button className="lk-button" style={{ background: paused ? '#b45309' : '#dc2626' }} onClick={stop} data-testid="detener-grabacion">
+        ⏹ Detener ({mmss(secs)}{saved.length ? ` · ☁ ${saved.length}` : ''})</button>
+      <button className="lk-button" onClick={togglePause} data-testid="pausar-grabacion">{paused ? '▶ Reanudar' : '⏸ Pausar'}</button>
+    </span>);
+  if (state === 'idle' || state === 'setup') return (
+    <span className="relative">
+      <button className="lk-button" onClick={() => setState(state === 'setup' ? 'idle' : 'setup')}>⏺ Grabar</button>
+      {state === 'setup' && (
+        <span className="absolute bottom-12 left-1/2 z-30 block w-[min(92vw,26rem)] -translate-x-1/2 rounded-xl bg-[#222] p-4 text-left text-sm shadow-2xl" data-testid="opciones-grabacion">
+          <b>¿Qué quiere grabar?</b>
+          {REC_MODES.map(([k, l, d]) => (
+            <label key={k} className={`mt-2 flex cursor-pointer gap-2 rounded-lg p-2 ${mode === k ? 'bg-blue-600/30' : 'hover:bg-white/5'}`}>
+              <input type="radio" name="modo-grabacion" value={k} checked={mode === k} onChange={() => setMode(k)} className="mt-1" />
+              <span><span className="font-semibold">{l}</span><span className="block text-xs opacity-70">{d}</span></span>
+            </label>))}
+          <label className="mt-3 flex items-center gap-2 text-xs"><input type="checkbox" checked={hq} onChange={(e) => setHq(e.target.checked)} /> Alta calidad (más nítido y fluido; archivos más grandes)</label>
+          <span className="mt-3 flex gap-2">
+            <button className="rounded-lg bg-red-600 px-3 py-2 font-semibold" onClick={start}>⏺ Empezar a grabar</button>
+            <button className="rounded-lg px-3 py-2 opacity-70" onClick={() => setState('idle')}>Cancelar</button>
+          </span>
+          <span className="mt-2 block text-xs opacity-60">Durante la grabación puede ⏸ pausar y ▶ reanudar para grabar solo las partes que quiera.</span>
+        </span>)}
+    </span>);
   return (
     <span className="fixed bottom-20 left-1/2 z-30 w-[92vw] max-w-md -translate-x-1/2 rounded-xl bg-[#222] p-4 text-sm shadow-2xl" data-testid="grabacion-lista">
       <b>{state === 'finishing' ? '⏳ Guardando las últimas partes…' : `🎬 Grabación guardada (${mmss(secs)})`}</b>
