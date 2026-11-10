@@ -1,3 +1,4 @@
+import { allowedSources, type RoomPolicy } from '@/lib/room-policy';
 import { NextResponse, type NextRequest } from 'next/server';
 import { AccessToken, TrackSource } from 'livekit-server-sdk';
 import { createClient } from '@/lib/supabase/server';
@@ -42,15 +43,20 @@ export async function POST(request: NextRequest) {
   const at = new AccessToken(key, secret, { identity: user.id, name: profile?.full_name || user.email || 'Participante', ttl, metadata: JSON.stringify({ role: auth.role }) });
   const g = auth.grants;
   // Opción de la sesión: los estudiantes también pueden compartir pantalla
-  const { data: opts } = await supabase.from('conference_sessions').select('students_can_share').eq('id', session).maybeSingle();
+  const { data: opts } = await supabase.from('conference_sessions').select('students_can_share, room_policy').eq('id', session).maybeSingle();
   const sources: string[] = [...(g.canPublishSources ?? [])];
   if (opts?.students_can_share && g.canPublish && !sources.includes('screen_share')) sources.push('screen_share', 'screen_share_audio');
+  const isMod = ['organizer', 'moderator', 'teacher'].includes(auth.role ?? '') || !!g.roomAdmin;
   at.addGrant({
     room: g.room, roomJoin: true, roomAdmin: !!g.roomAdmin, roomRecord: !!g.roomRecord,
     canSubscribe: !!g.canSubscribe, canPublish: !!g.canPublish, canPublishData: !!g.canPublishData,
     canUpdateOwnMetadata: true, // levantar la mano (atributo propio)
-    canPublishSources: sources.map((s: string) => SOURCES[s]).filter((s: TrackSource | undefined) => s !== undefined),
+    // ⚙ Configuración de la sala (micrófono, cámara, pantalla) para quienes no son anfitriones
+    canPublishSources: (() => {
+      const base = sources.map((s: string) => SOURCES[s]).filter((s: TrackSource | undefined): s is TrackSource => s !== undefined);
+      return isMod ? base : allowedSources((opts?.room_policy ?? {}) as RoomPolicy, base);
+    })(),
   });
-  const moderator = ['organizer', 'moderator', 'teacher'].includes(auth.role ?? '') || !!g.roomAdmin;
+  const moderator = isMod;
   return NextResponse.json({ token: await at.toJwt(), url, role: auth.role, moderator }, { headers: { 'Cache-Control': 'no-store' } });
 }

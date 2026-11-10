@@ -17,6 +17,8 @@ import { useBoard, Whiteboard } from './whiteboard';
 import { usePolls, PollPanel, PollCard } from './poll';
 import { InvitePanel } from './invite';
 import { IconMin } from '@/components/win-icons';
+import { useTools, useMySettings, useApplySettings, useShortcuts, ConnectionChip, AppStage, ToolBanners, ToolsHub, NotesPanel, QAPanel, AppsPanel,
+  RoomConfigPanel, MySettingsPanel, AttendancePanel, PrivateMessages, isModP, type Tools } from './tools';
 import { useControls, useCaptions, CaptionsOverlay, HostPanel, GroupsPanel, TimerChip, useGroupsChannel, spotTrack } from './pro';
 
 type Opts = RoomOpts;
@@ -26,7 +28,8 @@ const BACKGROUNDS = [
   ['azul-institucional', 'Azul institucional'], ['aula', 'Aula'], ['biblioteca', 'Biblioteca'],
   ['oficina', 'Oficina'], ['naturaleza', 'Naturaleza'], ['atardecer', 'Atardecer'],
 ] as const;
-const canDisplayCapture = () => typeof navigator !== 'undefined' && !!navigator.mediaDevices && 'getDisplayMedia' in navigator.mediaDevices;
+const canDisplayCapture = () => typeof navigator !== 'undefined' && !!navigator.mediaDevices && 'getDisplayMedia' in navigator.mediaDevices
+  && !/Android/i.test(navigator.userAgent); // Chrome/Firefox/Samsung en Android tienen la función pero siempre la rechazan
 const enc = new TextEncoder(); const dec = new TextDecoder();
 export type View = 'full' | 'mini';
 
@@ -119,8 +122,9 @@ export function RoomShell({ conn: main, opts, view, onMinimize, onExpand, onLeav
 }
 
 type Floating = { id: number; emoji: string; left: number; from: string };
-type Panel = 'chat' | 'people' | 'effects' | 'poll' | 'invite' | 'host' | 'groups' | null;
-const PANEL_TITLE: Record<string, string> = { effects: '🖼 Fondo y efectos', poll: '📊 Encuesta en vivo', invite: '🔗 Invitar a personas externas', host: '🛡 Controles del anfitrión', groups: '👥 Salas de grupos' };
+type Panel = 'chat' | 'people' | 'effects' | 'poll' | 'invite' | 'host' | 'groups' | 'tools' | 'notes' | 'qa' | 'apps' | 'attendance' | 'roomcfg' | 'mysettings' | null;
+const PANEL_TITLE: Record<string, string> = { effects: '🖼 Fondo y efectos', poll: '📊 Encuesta en vivo', invite: '🔗 Invitar a personas externas', host: '🛡 Controles del anfitrión', groups: '👥 Salas de grupos',
+  tools: '🧰 Herramientas', notes: '📝 Notas compartidas', qa: '❓ Preguntas y respuestas', apps: '📱 Apps y enlaces', attendance: '📋 Asistencia', roomcfg: '⚙ Configuración de la sala', mysettings: '🎛 Mis ajustes' };
 
 /** Pantalla angosta (celular): los controles se agrupan para no llenar la pantalla. */
 function useNarrow() {
@@ -180,6 +184,9 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
 
   const say = useCallback((m: string) => { setToast(m); setTimeout(() => setToast(null), m.startsWith('📣') ? 9000 : 3500); }, []);
   const controls = useControls(mod && !group);
+  const [my, setMy] = useMySettings();
+  useApplySettings(my);
+  const tools = useTools({ sessionId, mod, guest, say });
   const cc = useCaptions(controls.ccAll);
   useGroupsChannel((c, g) => { say(`👥 Pasando al grupo ${g}…`); onGroup(c, g); }, () => { if (group) { say('↩ Volviendo a la sala principal…'); onMain(); } }, say);
   const addFloating = useCallback((emoji: string, from: string) => {
@@ -204,6 +211,21 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
   const [shareHelp, setShareHelp] = useState(false);
   useEffect(() => { if (shareHelp) setMore(false); }, [shareHelp]);
   const [facing, setFacing] = useState<'user' | 'environment'>('user');
+  const [seeOwnScreen, setSeeOwnScreen] = useState(false);
+  const restoreCam = useRef(false);
+  const sharingNow = localParticipant.isScreenShareEnabled;
+  useEffect(() => { if (!sharingNow && restoreCam.current) { restoreCam.current = false; localParticipant.setCameraEnabled(true).catch(() => {}); } }, [sharingNow, localParticipant]);
+  const pttOn = useRef(false);
+  useShortcuts({
+    mic: () => localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled).catch(() => say('El anfitrión no permite activar el micrófono.')),
+    cam: () => localParticipant.setCameraEnabled(!localParticipant.isCameraEnabled).catch(() => say('El anfitrión no permite encender la cámara.')),
+    hand: () => toggleHand(), chat: () => setPanel((p) => (p === 'chat' ? null : 'chat')), people: () => setPanel((p) => (p === 'people' ? null : 'people')),
+    tools: () => setPanel((p) => (p === 'tools' ? null : 'tools')), pttOn: my.ptt,
+    ptt: (down) => {
+      if (down && !localParticipant.isMicrophoneEnabled) { pttOn.current = true; localParticipant.setMicrophoneEnabled(true).catch(() => {}); say('🎙 Hablando… (suelte Espacio para silenciar)'); }
+      else if (!down && pttOn.current) { pttOn.current = false; localParticipant.setMicrophoneEnabled(false).catch(() => {}); }
+    },
+  });
   const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
   /** Cambia entre cámara frontal y trasera (en el celular sirve para mostrar un cuaderno, pizarra o documento). */
   const flipCamera = async () => {
@@ -215,7 +237,12 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
       setFacing(next); say(next === 'environment' ? '📷 Cámara trasera: muestre su cuaderno, pizarra o documento.' : '🤳 Cámara frontal');
     } catch { say('No se pudo cambiar de cámara en este equipo.'); }
   };
-  const tracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: true }, { source: Track.Source.ScreenShare, withPlaceholder: false }], { onlySubscribed: false });
+  const allTracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: true }, { source: Track.Source.ScreenShare, withPlaceholder: false }], { onlySubscribed: false });
+  const tracks = allTracks.filter((t) => {
+    if (t.source === Track.Source.ScreenShare && t.participant.isLocal && !seeOwnScreen) return false; // evita el «efecto espejo» al compartir
+    if (my.hideNoVideo && t.source === Track.Source.Camera && !t.participant.isLocal && !t.participant.isCameraEnabled) return false;
+    return true;
+  });
   const pinned = usePinnedTracks();
   const screen = tracks.find((t) => t.publication?.source === Track.Source.ScreenShare);
   const speaker = useMemo(() => [...participants].sort((a, b) => Number(b.isSpeaking) - Number(a.isSpeaking) || b.audioLevel - a.audioLevel)[0], [participants]);
@@ -223,6 +250,7 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
   const pinnedTrack = pinned[0] ? tracks.find((t) => t.participant.identity === pinned[0].participant.identity && t.source === pinned[0].source) : undefined;
   const spotlit = spotTrack(tracks, controls.spot);
   const focus = pinnedTrack ?? spotlit ?? screen ?? (layout === 'speaker' ? speakerTrack : undefined);
+  const onlyScreen = !!focus && focus === screen && my.screenOnly;
   const miniFocus = screen ?? pinnedTrack ?? speakerTrack ?? tracks[0];
 
   const moderate = async (action: string, identity?: string) => {
@@ -262,7 +290,7 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
 
   return (
     <>
-    <div className={mini ? 'hidden' : 'relative flex min-h-0 flex-1 flex-col text-white'}>
+    <div className={mini ? 'hidden' : `relative flex min-h-0 flex-1 flex-col text-white ${my.mirror ? '' : 'sin-espejo'}`}>
       <header className="flex items-center justify-between gap-2 border-b border-white/10 bg-gradient-to-r from-[#141a2e] to-[#111] px-3 py-2 text-sm">
         <span className="flex min-w-0 items-center gap-2">
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-blue-600 text-xs">🎥</span>
@@ -270,24 +298,28 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
           <span className="hidden rounded bg-white/10 px-1.5 py-0.5 font-mono text-[11px] sm:inline" title="Tiempo conectado">⏱ {elapsed}</span>
           {group > 0 && <span className="rounded bg-emerald-600 px-2 py-0.5 text-xs font-bold" data-testid="en-grupo">👥 Grupo {group}</span>}
           <TimerChip timer={controls.timer} onEnd={() => say('⏱ ¡Se acabó el tiempo!')} />
+          <ConnectionChip />
         </span>
         <span className="flex shrink-0 items-center gap-2 text-xs">
           {recBy && <span className="animate-pulse rounded bg-red-600 px-2 py-0.5 font-bold">● GRABANDO</span>}
           <span className="opacity-70">{participants.length} 👥<span className="hidden sm:inline"> · {CONF_ROLES[conn.role] ?? conn.role}</span></span>
           {group > 0 && <button className="rounded-lg bg-emerald-600 px-2 py-1 hover:bg-emerald-500" onClick={onMain} data-testid="volver-principal">↩ Sala principal</button>}
           {onMinimize && <button className="rounded-lg bg-white/10 px-2 py-1 hover:bg-white/20" onClick={onMinimize} title="Minimizar: siga navegando por el sistema sin salir de la clase" data-testid="minimizar"><span className="flex items-center gap-1"><IconMin /><span className="hidden sm:inline">Minimizar</span></span></button>}
-          {(canDocPip() || onMinimize) && <button className="hidden rounded-lg bg-white/10 px-2 py-1 hover:bg-white/20 sm:inline" onClick={openPip} title="Ventana flotante encima de todos los programas">⧉ Flotante</button>}
+          {(canDocPip() || onMinimize || isMobile) && <button className="rounded-lg bg-white/10 px-2 py-1 hover:bg-white/20" onClick={openPip} title="Ventana flotante: use otras apps sin salir de la clase" data-testid="flotante">⧉<span className="hidden sm:inline"> Flotante</span></button>}
         </span>
       </header>
       {localParticipant.isScreenShareEnabled && (
         <div className="flex flex-wrap items-center justify-center gap-2 bg-emerald-600/30 px-3 py-1 text-xs" data-testid="compartiendo">
           🟢 Está compartiendo su pantalla con todos
+          <button className="rounded bg-white/15 px-2 py-0.5 hover:bg-white/25" onClick={() => setSeeOwnScreen((v) => !v)} data-testid="ver-mi-pantalla">{seeOwnScreen ? '🙈 Ocultar mi pantalla en mi vista' : '👁 Ver lo que comparto'}</button>
+          <button className="rounded bg-white/15 px-2 py-0.5 hover:bg-white/25" onClick={() => localParticipant.setCameraEnabled(!localParticipant.isCameraEnabled).catch(() => {})}>{localParticipant.isCameraEnabled ? '📷 Ocultar mi video' : '📷 Mostrar mi video'}</button>
           {onMinimize && <button className="rounded bg-white/15 px-2 py-0.5 font-semibold hover:bg-white/25" onClick={onMinimize}>Minimizar y seguir trabajando</button>}
           <button className="rounded bg-white/15 px-2 py-0.5 font-semibold hover:bg-white/25" onClick={() => localParticipant.setScreenShareEnabled(false)}>⏹ Dejar de compartir</button>
         </div>)}
       {screen && screen.participant.identity !== localParticipant.identity && (
         <div className="flex items-center justify-center gap-2 bg-blue-600/20 px-3 py-1 text-xs" data-testid="pantalla-de">
           📺 Pantalla de {screen.participant.name || 'un participante'}
+          <button className="rounded bg-white/15 px-2 py-0.5 hover:bg-white/25" onClick={() => setMy({ screenOnly: !my.screenOnly })} data-testid="solo-pantalla">{my.screenOnly ? '👥 Mostrar videos' : '🙈 Ocultar videos'}</button>
           <button className="rounded bg-white/15 px-2 py-0.5 hover:bg-white/25" onClick={() => (document.querySelector('.lk-focus-layout') as HTMLElement | null)?.requestFullscreen?.().catch(() => {})}>⛶ Ver en grande</button>
         </div>)}
       {hands.length > 0 && (
@@ -307,13 +339,15 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
         <div className="lk-video-conference relative min-w-0 flex-1" style={{ height: '100%' }}>
           {focus ? (
             <FocusLayoutContainer>
-              <CarouselLayout tracks={tracks.filter((t) => t !== focus)}><ParticipantTile /></CarouselLayout>
+              {!onlyScreen && <CarouselLayout tracks={tracks.filter((t) => t !== focus)}><ParticipantTile /></CarouselLayout>}
               <FocusLayout trackRef={focus as any} />
             </FocusLayoutContainer>
           ) : (
             <GridLayout tracks={tracks} style={{ height: '100%' }}><ParticipantTile /></GridLayout>
           )}
+          <AppStage tools={tools} mod={mod} />
           {showBoard && <Whiteboard board={board} title={title} />}
+          <ToolBanners tools={tools} />
           <PollCard polls={polls} />
           <CaptionsOverlay cc={cc} />
           <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
@@ -325,10 +359,22 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
           <aside className="absolute inset-0 z-20 flex flex-col bg-[#1b1b1f] sm:static sm:w-80 sm:border-l sm:border-white/10">
             <div className="flex items-center justify-between border-b border-white/10 px-3 py-2 text-sm font-semibold">
               <span>{panel === 'chat' ? '💬 Chat' : panel === 'people' ? `👥 Participantes (${participants.length})` : PANEL_TITLE[panel]}</span>
-              <button onClick={() => setPanel(null)} className="rounded px-2 hover:bg-white/10" aria-label="Cerrar panel">✕</button>
+              <span className="flex gap-1">
+                {['notes', 'qa', 'apps', 'attendance', 'roomcfg', 'mysettings'].includes(panel) && <button onClick={() => setPanel('tools')} className="rounded px-2 text-xs hover:bg-white/10">← Herramientas</button>}
+                <button onClick={() => setPanel(null)} className="rounded px-2 hover:bg-white/10" aria-label="Cerrar panel">✕</button>
+              </span>
             </div>
-            {panel === 'chat' && <ChatPanel enabled={chatEnabled || mod} chat={chat} orgId={orgId} sectionId={sectionId} say={say} attachments={!guest} />}
-            {panel === 'people' && <PeoplePanel mod={mod} me={localParticipant.identity} participants={participants} moderate={moderate} spot={controls.spot} onSpot={group ? undefined : controls.spotlight} />}
+            {panel === 'chat' && <PrivateMessages tools={tools} me={localParticipant.identity} />}
+            {panel === 'chat' && <ChatPanel enabled={(chatEnabled && tools.can('chat')) || mod} chat={chat} orgId={orgId} sectionId={sectionId} say={say} attachments={!guest} />}
+            {panel === 'people' && <PeoplePanel mod={mod} me={localParticipant.identity} participants={participants} moderate={moderate} spot={controls.spot} onSpot={group ? undefined : controls.spotlight} tools={tools} say={say} />}
+            {panel === 'tools' && <ToolsHub mod={mod} tools={tools} open={(p) => setPanel(p)} onPip={openPip} participants={participants.length}
+              onPick={() => tools.pick(participants.filter((p) => !isModP(p) && p.identity !== localParticipant.identity))} />}
+            {panel === 'notes' && <NotesPanel tools={tools} mod={mod} title={title} />}
+            {panel === 'qa' && <QAPanel tools={tools} mod={mod} />}
+            {panel === 'apps' && <AppsPanel tools={tools} mod={mod} say={say} />}
+            {panel === 'mysettings' && <MySettingsPanel s={my} set={setMy} tools={tools} say={say} />}
+            {panel === 'roomcfg' && mod && <RoomConfigPanel tools={tools} sessionId={sessionId} say={say} />}
+            {panel === 'attendance' && mod && <AttendancePanel sessionId={sessionId} title={title} live={participants} />}
             {panel === 'host' && <HostPanel sessionId={sessionId} title={title} controls={controls} cc={cc} say={say} />}
             {panel === 'groups' && <GroupsPanel sessionId={sessionId} me={localParticipant.identity} say={say} onVisit={(c, g) => onGroup(c, g)}
               people={participants.map((p) => { let r = ''; try { r = JSON.parse(p.metadata || '{}').role ?? ''; } catch { /* */ } return { identity: p.identity, name: p.name || 'Participante', mod: ['organizer', 'moderator', 'teacher'].includes(r) }; })} />}
@@ -354,17 +400,17 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
       {narrow && more && (<>
         <div className="absolute inset-0 z-30 bg-black/50" onClick={() => setMore(false)} aria-hidden />
         <div className="absolute inset-x-0 bottom-[60px] z-40 flex flex-wrap justify-center gap-2 rounded-t-2xl border-t border-white/10 bg-[#1b1b1f] p-3 shadow-2xl" data-testid="mas-opciones">
-        {canShare && <ShareButton say={say} />}
+        {canShare && <ShareButton say={say} onFail={() => isMobile && setShareHelp(true)} onCamOff={() => { restoreCam.current = true; }} />}
         {sharePerm && !canShare && <button className="lk-button" onClick={() => setShareHelp(true)} data-testid="compartir-celular">📲 Compartir pantalla</button>}
         {(isMobile || !canDisplayCapture()) && <button className="lk-button" onClick={flipCamera} title="Cambiar entre cámara frontal y trasera">🔄 Cámara</button>}
         <button className={btn(panel === 'effects')} onClick={() => toggle('effects')} title="Desenfoque y fondos virtuales">🖼 Fondo</button>
-        <span className="relative">
+        {tools.can('reactions') && <span className="relative">
           <button className="lk-button" onClick={() => setShowReactions((v) => !v)} title="Reacciones">😀 Reaccionar</button>
           {showReactions && (
             <span className="absolute bottom-12 left-1/2 z-20 flex -translate-x-1/2 gap-1 rounded-xl bg-[#222] p-2 shadow-xl">
               {REACTIONS.map((e) => <button key={e} className="rounded p-1 text-2xl hover:bg-white/10" onClick={() => react(e)} aria-label={`Reaccionar ${e}`}>{e}</button>)}
             </span>)}
-        </span>
+        </span>}
         <button className={btn(hand)} onClick={toggleHand}>{hand ? '✋ Bajar la mano' : '✋ Levantar la mano'}</button>
         {mod
           ? <button className={btn(board.open)} onClick={() => (board.open ? board.hide() : board.show())} data-testid="boton-pizarra">🖍 {board.open ? 'Cerrar pizarra' : 'Pizarra'}</button>
@@ -375,6 +421,7 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
           onClick={() => { const on = !cc.show; cc.setShow(on); cc.setMine(on); if (on) say('💬 Subtítulos activados: lo que usted diga aparecerá escrito para todos.'); }}>💬 {cc.show ? 'Quitar subtítulos' : 'Subtítulos'}</button>}
         {mod && !group && <button className={btn(panel === 'host')} onClick={() => toggle('host')} data-testid="boton-anfitrion">🛡 Anfitrión</button>}
         {mod && !group && !guest && <button className={btn(panel === 'groups')} onClick={() => toggle('groups')} data-testid="boton-grupos">👥 Grupos</button>}
+        <button className={btn(['tools', 'notes', 'qa', 'apps', 'attendance', 'roomcfg', 'mysettings'].includes(panel ?? ''))} onClick={() => toggle('tools')} data-testid="boton-herramientas">🧰 Herramientas{tools.qa.some((q) => !q.answered) && <span className="ml-1 rounded-full bg-blue-500 px-1.5 text-xs">{tools.qa.filter((q) => !q.answered).length}</span>}</button>
         <button className="lk-button" onClick={() => setLayout(layout === 'grid' ? 'speaker' : 'grid')} title="Cambiar vista">{layout === 'grid' ? '🗣 Vista orador' : '▦ Vista galería'}</button>
         {mod && recording && !guest && <Recorder sessionId={sessionId} title={title} say={say} broadcast={(on) => { sendRec(enc.encode(on ? '1' : '0'), { reliable: true }); setRecBy(on ? (localParticipant.name ?? 'Usted') : null); }} />}
         <button className="lk-button" onClick={() => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {})}>⛶ Pantalla completa</button>
@@ -388,17 +435,17 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
           <button className={btn(panel === 'people')} onClick={() => toggle('people')} aria-label="Personas">👥{hands.length > 0 && <span className="ml-1 rounded-full bg-amber-500 px-1.5 text-xs">{hands.length}</span>}</button>
           <button className={btn(more)} onClick={() => setMore((v) => !v)} aria-expanded={more} data-testid="boton-mas">⋯ Más</button>
         </>) : (<>
-        {canShare && <ShareButton say={say} />}
+        {canShare && <ShareButton say={say} onFail={() => isMobile && setShareHelp(true)} onCamOff={() => { restoreCam.current = true; }} />}
         {sharePerm && !canShare && <button className="lk-button" onClick={() => setShareHelp(true)} data-testid="compartir-celular">📲 Compartir pantalla</button>}
         {(isMobile || !canDisplayCapture()) && <button className="lk-button" onClick={flipCamera} title="Cambiar entre cámara frontal y trasera">🔄 Cámara</button>}
         <button className={btn(panel === 'effects')} onClick={() => toggle('effects')} title="Desenfoque y fondos virtuales">🖼 Fondo</button>
-        <span className="relative">
+        {tools.can('reactions') && <span className="relative">
           <button className="lk-button" onClick={() => setShowReactions((v) => !v)} title="Reacciones">😀 Reaccionar</button>
           {showReactions && (
             <span className="absolute bottom-12 left-1/2 z-20 flex -translate-x-1/2 gap-1 rounded-xl bg-[#222] p-2 shadow-xl">
               {REACTIONS.map((e) => <button key={e} className="rounded p-1 text-2xl hover:bg-white/10" onClick={() => react(e)} aria-label={`Reaccionar ${e}`}>{e}</button>)}
             </span>)}
-        </span>
+        </span>}
         <button className={btn(hand)} onClick={toggleHand}>{hand ? '✋ Bajar la mano' : '✋ Levantar la mano'}</button>
         <button className={btn(panel === 'chat')} onClick={() => toggle('chat')}>
           💬 Chat{unread > 0 && <span className="ml-1 rounded-full bg-red-600 px-1.5 text-xs">{unread}</span>}</button>
@@ -412,6 +459,7 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
           onClick={() => { const on = !cc.show; cc.setShow(on); cc.setMine(on); if (on) say('💬 Subtítulos activados: lo que usted diga aparecerá escrito para todos.'); }}>💬 {cc.show ? 'Quitar subtítulos' : 'Subtítulos'}</button>}
         {mod && !group && <button className={btn(panel === 'host')} onClick={() => toggle('host')} data-testid="boton-anfitrion">🛡 Anfitrión</button>}
         {mod && !group && !guest && <button className={btn(panel === 'groups')} onClick={() => toggle('groups')} data-testid="boton-grupos">👥 Grupos</button>}
+        <button className={btn(['tools', 'notes', 'qa', 'apps', 'attendance', 'roomcfg', 'mysettings'].includes(panel ?? ''))} onClick={() => toggle('tools')} data-testid="boton-herramientas">🧰 Herramientas{tools.qa.some((q) => !q.answered) && <span className="ml-1 rounded-full bg-blue-500 px-1.5 text-xs">{tools.qa.filter((q) => !q.answered).length}</span>}</button>
         <button className="lk-button" onClick={() => setLayout(layout === 'grid' ? 'speaker' : 'grid')} title="Cambiar vista">{layout === 'grid' ? '🗣 Vista orador' : '▦ Vista galería'}</button>
         {mod && recording && !guest && <Recorder sessionId={sessionId} title={title} say={say} broadcast={(on) => { sendRec(enc.encode(on ? '1' : '0'), { reliable: true }); setRecBy(on ? (localParticipant.name ?? 'Usted') : null); }} />}
         <button className="lk-button" onClick={() => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {})}>⛶ Pantalla completa</button>
@@ -427,12 +475,13 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
 }
 
 /** 🖥 Compartir pantalla con calidad a elección, audio y mensajes claros si el sistema bloquea el permiso. */
-function ShareButton({ say }: { say: (m: string) => void }) {
+function ShareButton({ say, onFail, onCamOff }: { say: (m: string) => void; onFail?: () => void; onCamOff?: () => void }) {
   const { localParticipant } = useLocalParticipant();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<'detail' | 'motion'>('detail');
   const [audio, setAudio] = useState(true);
   const [whole, setWhole] = useState(true);
+  const [camOff, setCamOff] = useState(false);
   const [busy, setBusy] = useState(false);
   const sharing = localParticipant.isScreenShareEnabled;
   const share = async () => {
@@ -445,6 +494,7 @@ function ShareButton({ say }: { say: (m: string) => void }) {
         // Toda la pantalla: el navegador abre directo en «Pantalla completa» y puede moverse por todo su equipo
         video: whole ? { displaySurface: 'monitor' } : true, monitorTypeSurfaces: 'include',
       } as any, { screenShareEncoding: preset.encoding, simulcast: false });
+      if (camOff && localParticipant.isCameraEnabled) { await localParticipant.setCameraEnabled(false).catch(() => {}); onCamOff?.(); }
       say('🟢 Compartiendo su pantalla con todos.');
     } catch (e) {
       const n = (e as DOMException)?.name;
@@ -452,6 +502,7 @@ function ShareButton({ say }: { say: (m: string) => void }) {
         : n === 'NotReadableError' ? 'El sistema bloqueó la captura de pantalla. En Windows/Mac, permita a Chrome grabar la pantalla y vuelva a intentar.'
         : n === 'NotFoundError' ? 'No se encontró una pantalla para compartir.'
         : `No se pudo compartir la pantalla (${(e as Error)?.message ?? n}).`);
+      if (n === 'NotAllowedError' || n === 'NotSupportedError' || n === 'InvalidStateError') onFail?.();
     } finally { setBusy(false); }
   };
   if (sharing) return <button className="lk-button lk-button-active" onClick={() => localParticipant.setScreenShareEnabled(false)} data-testid="dejar-compartir">⏹ Dejar de compartir</button>;
@@ -475,6 +526,7 @@ function ShareButton({ say }: { say: (m: string) => void }) {
             <input type="radio" name="calidad" checked={mode === 'motion'} onChange={() => setMode('motion')} className="mt-1" />
             <span><span className="font-semibold">🎞 Video fluido</span><span className="block text-xs opacity-70">Videos y movimientos (1080p, 30 cuadros por segundo).</span></span></label>
           <label className="mt-2 flex items-center gap-2 text-xs"><input type="checkbox" checked={audio} onChange={(e) => setAudio(e.target.checked)} /> Compartir también el audio (videos, música)</label>
+          <label className="mt-1 flex items-center gap-2 text-xs"><input type="checkbox" checked={camOff} onChange={(e) => setCamOff(e.target.checked)} data-testid="ocultar-mi-video" /> Ocultar mi video mientras comparto (vuelve al terminar)</label>
           <span className="mt-3 flex gap-2">
             <button className="rounded-lg bg-blue-600 px-3 py-2 font-semibold" onClick={share}>Elegir qué compartir →</button>
             <button className="rounded-lg px-3 py-2 opacity-70" onClick={() => setOpen(false)}>Cancelar</button>
@@ -542,7 +594,8 @@ function ChatPanel({ enabled, chat, orgId, sectionId, say, attachments = true }:
   );
 }
 
-function PeoplePanel({ mod, me, participants, moderate, spot, onSpot }: { mod: boolean; me: string; participants: Participant[]; moderate: (a: string, id?: string) => void; spot?: string | null; onSpot?: (id: string | null) => void }) {
+function PeoplePanel({ mod, me, participants, moderate, spot, onSpot, tools, say }: { mod: boolean; me: string; participants: Participant[]; moderate: (a: string, id?: string) => void; spot?: string | null; onSpot?: (id: string | null) => void; tools: Tools; say: (m: string) => void }) {
+  const [dmTo, setDmTo] = useState<string | null>(null); const [dmText, setDmText] = useState('');
   return (
     <div className="flex-1 overflow-y-auto p-2 text-sm" data-testid="personas">
       {mod && <button className="mb-2 w-full rounded-lg bg-white/10 py-2 text-xs hover:bg-white/20" onClick={() => moderate('mute_all')}>🔇 Silenciar a todos</button>}
@@ -556,6 +609,11 @@ function PeoplePanel({ mod, me, participants, moderate, spot, onSpot }: { mod: b
                 <span className="min-w-0 truncate">{p.attributes?.hand && '✋ '}{p.name || 'Participante'}{isMe && ' (usted)'}<span className="block text-[11px] opacity-60">{CONF_ROLES[role] ?? role}{extra && ` · ${extra}`}</span></span>
                 <span className="shrink-0 text-xs">{p.isMicrophoneEnabled ? '🎙' : '🔇'} {p.isCameraEnabled ? '📷' : ''} {p.isScreenShareEnabled ? '🖥' : ''}</span>
               </div>
+              {!isMe && (mod || tools.can('private_chat') || isModP(p)) && (dmTo === p.identity ? (
+                <form className="mt-1 flex gap-1" onSubmit={(e) => { e.preventDefault(); if (dmText.trim()) { tools.sendDM(p, dmText); setDmText(''); setDmTo(null); say(`✉ Mensaje privado enviado a ${p.name}.`); } }}>
+                  <input autoFocus value={dmText} onChange={(e) => setDmText(e.target.value)} maxLength={1000} placeholder={`Privado para ${p.name}`} className="min-w-0 flex-1 rounded bg-white/10 px-2 py-1 text-xs" data-testid="privado-texto" />
+                  <button className="rounded bg-purple-600 px-2 text-xs">Enviar</button></form>)
+                : <button className="mt-1 mr-1 rounded bg-purple-600/40 px-2 py-0.5 text-[11px] hover:bg-purple-600/70" onClick={() => setDmTo(p.identity)} data-testid="privado">✉ Privado</button>)}
               {mod && onSpot && (
                 <button className="mt-1 rounded bg-amber-500/30 px-2 py-0.5 text-[11px] hover:bg-amber-500/50" data-testid="destacar"
                   onClick={() => onSpot(spot === p.identity ? null : p.identity)}>{spot === p.identity ? '⭐ Quitar destacado' : '⭐ Destacar para todos'}</button>)}

@@ -21,7 +21,8 @@ const csp = [
   `media-src ${list("'self'", 'blob:', supabase)}`,
   "worker-src 'self' blob:",
   "manifest-src 'self'",
-  "frame-src 'self'",
+  // 📱 Apps dentro del aula virtual (solo servicios educativos conocidos)
+  "frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com https://player.vimeo.com https://docs.google.com https://drive.google.com https://www.canva.com https://view.genial.ly https://*.genial.ly https://www.geogebra.org https://www.desmos.com https://phet.colorado.edu https://padlet.com https://*.padlet.com https://forms.office.com https://onedrive.live.com https://www.mentimeter.com https://www.menti.com https://wordwall.net https://scratch.mit.edu https://www.loom.com https://www.figma.com https://embed.figma.com",
   "object-src 'none'",
   "base-uri 'self'",
   `form-action ${list("'self'", payForms)}`,

@@ -78,3 +78,6 @@ html[data-motion="reduce"] *, html[data-motion="reduce"] *::before, html[data-mo
 /* Lista compacta (preferencia personal) */
 main[data-density='compacta'] .table td, main[data-density='compacta'] .table th { padding-top: .25rem; padding-bottom: .25rem; }
 main[data-density='compacta'] .card-pad { padding: .9rem; }
+
+/* Aula: «Ver mi cámara como espejo» desactivado (solo cambia mi propia vista) */
+.sin-espejo [data-lk-local-participant=true][data-lk-source=camera] { transform: none !important; }
