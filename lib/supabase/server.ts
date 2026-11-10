@@ -13,8 +13,12 @@ const actionId = cache(() => crypto.randomUUID());
 /** Cliente con la sesión del usuario: todas las consultas pasan por RLS. */
 export async function createClient() {
   const cookieStore = await cookies();
+  // 🏢 Sucursal elegida en el sistema: la base de datos la valida (si no tiene acceso, usa la suya)
+  const branch = cookieStore.get('sematec-sucursal')?.value ?? '';
+  const headers: Record<string, string> = { 'x-sematec-action': actionId() };
+  if (/^[0-9a-f-]{36}$/i.test(branch)) headers['x-sucursal'] = branch;
   return createServerClient(env.supabaseUrl(), env.supabaseAnonKey(), {
-    global: { headers: { 'x-sematec-action': actionId() } },
+    global: { headers },
     cookies: {
       getAll: () => cookieStore.getAll(),
       setAll: (list) => {

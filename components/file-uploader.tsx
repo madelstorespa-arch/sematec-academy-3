@@ -46,7 +46,7 @@ function putWithProgress(path: string, token: string, file: Blob, mime: string, 
 }
 
 /** Sube fotos, videos y documentos directo al almacenamiento privado (sin pasar por el servidor). */
-export async function uploadUserFile(org: string, original: File, opts: { visibility?: string; section?: string; description?: string } = {},
+export async function uploadUserFile(org: string, original: File, opts: { visibility?: string; section?: string; description?: string; folder?: string } = {},
   onProgress?: (pct: number) => void) {
   const file = await shrinkPhoto(original);
   const mime = guessMime(file);
@@ -61,7 +61,7 @@ export async function uploadUserFile(org: string, original: File, opts: { visibi
   return j2.id as string;
 }
 
-export function FileUploader({ org, sections }: { org: string; sections: Opt[] }) {
+export function FileUploader({ org, sections, folder, folderName }: { org: string; sections: Opt[]; folder?: string; folderName?: string }) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [vis, setVis] = useState('private');
@@ -78,7 +78,7 @@ export function FileUploader({ org, sections }: { org: string; sections: Opt[] }
     for (const f of files) {
       setLog([...out, { ok: true, text: `Subiendo «${f.name}» (${fmtSize(f.size)})…` }]);
       try {
-        await uploadUserFile(org, f, { visibility: vis, section: vis === 'section' ? section : undefined, description: desc },
+        await uploadUserFile(org, f, { visibility: vis, section: vis === 'section' ? section : undefined, description: desc, folder },
           (pct) => setLog([...out, { ok: true, text: `Subiendo «${f.name}» (${fmtSize(f.size)})… ${pct} %` }]));
         out.push({ ok: true, text: `✓ «${f.name}» guardado` });
       }
@@ -93,6 +93,7 @@ export function FileUploader({ org, sections }: { org: string; sections: Opt[] }
 
   return (
     <div className="space-y-3" data-testid="subir-archivos">
+      {folderName && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">📂 Se guardarán en la carpeta <b>{folderName}</b></p>}
       <label className="block"><span className="label">Fotos, videos, audio o documentos (máx. {FILE_MAX_LABEL} c/u; las fotos grandes se achican solas)</span>
         <input ref={input} type="file" multiple accept={FILE_ACCEPT} className="block w-full text-sm" /></label>
       <div className="grid gap-3 sm:grid-cols-2">

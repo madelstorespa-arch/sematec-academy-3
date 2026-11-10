@@ -1,5 +1,6 @@
 'use server';
 import { revalidatePath } from 'next/cache';
+import { emailReceipt } from '@/lib/receipt-access';
 import { getContext } from '@/lib/context';
 import { fail, guard, num, ok, reqStr, str, ValidationError, type ActionResult } from '@/lib/actions';
 
@@ -40,7 +41,9 @@ export async function registerPayment(fd: FormData): Promise<ActionResult> {
     if (error) return fail(error);
     const { data: p } = await ctx.supabase.from('payments').select('receipt_number').eq('id', data).single();
     refresh();
-    return ok(`Pago registrado. Comprobante N° ${p?.receipt_number}: en la lista, toque 🧾 para descargarlo, enviarlo o guardarlo.`);
+    // 🧾 La boleta le llega sola al estudiante por correo (si el correo está configurado y no se desmarcó)
+    const mail = fd.has('send_receipt') && !fd.getAll('send_receipt').includes('on') ? null : await emailReceipt(String(data));
+    return ok(`Pago registrado. Comprobante N° ${p?.receipt_number} (boleta)${mail ? (mail.ok ? ` ${mail.text}` : ` (no se envió por correo: ${mail.text})`) : ''}. En la lista, toque 🧾 para verla, descargarla o reenviarla.`);
   });
 }
 

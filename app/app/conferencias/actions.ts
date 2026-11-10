@@ -1,5 +1,6 @@
 'use server';
 import { revalidatePath } from 'next/cache';
+import { prefsOf } from '@/lib/prefs';
 import { getContext } from '@/lib/context';
 import { fail, guard, num, ok, reqStr, str, type ActionResult } from '@/lib/actions';
 import { tzOffset } from '@/lib/format';
@@ -25,14 +26,18 @@ export async function createSession(fd: FormData): Promise<ActionResult> {
     const tz = reqStr(fd, 'timezone', 'Zona horaria');
     const date = reqStr(fd, 'date', 'Fecha');
     const at = (t: string) => `${date}T${t}:00${tzOffset(tz, new Date(`${date}T12:00:00Z`))}`;
-    const { error } = await ctx.supabase.rpc('create_conference_session', {
+    const { data: newId, error } = await ctx.supabase.rpc('create_conference_session', {
       p_room: reqStr(fd, 'room_id', 'Sala'), p_title: reqStr(fd, 'title', 'Título'), p_type: reqStr(fd, 'session_type', 'Tipo'),
       p_start: at(reqStr(fd, 'start', 'Inicio')), p_end: at(reqStr(fd, 'end', 'Término')), p_timezone: tz,
       p_recording: fd.get('recording') === 'on', p_class_session: str(fd, 'class_session_id'),
     });
     if (error) return fail(error);
+    // Preferencias del profesor: sala de espera y pantalla compartida por defecto (si fallan, la sesión igual queda creada)
+    const tp = prefsOf(ctx.profile).teaching;
+    if (newId && tp?.waiting_room) await ctx.supabase.rpc('conference_set_controls', { p_session: newId, p_waiting: true, p_locked: null }).then(() => {}, () => {});
+    if (newId && tp?.students_share) await ctx.supabase.from('conference_sessions').update({ students_can_share: true }).eq('id', newId).then(() => {}, () => {});
     refresh();
-    return ok('Sesión programada.');
+    return ok(tp?.waiting_room ? 'Sesión programada (con sala de espera, según su configuración).' : 'Sesión programada.');
   });
 }
 

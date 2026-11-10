@@ -12,9 +12,9 @@ export default async function Page() {
   if (!can(ctx, 'store.view') && !can(ctx, 'store.create')) redirect('/app');
   const orgId = requireOrg(ctx);
   const [{ data: products }, { data: rows }] = await Promise.all([
-    ctx.supabase.from('products').select('id, sku, name, cost, unit, track_expiry').eq('organization_id', orgId).eq('active', true).order('name').limit(3000),
+    ctx.supabase.from('products').select('id, sku, name, cost, unit, track_expiry').eq('organization_id', orgId).eq('active', true).or(ctx.campusId ? `campus_id.eq.${ctx.campusId},campus_id.is.null` : 'id.not.is.null').order('name').limit(3000),
     ctx.supabase.from('purchases').select('id, supplier, document_number, purchased_on, total, currency, expense_id, purchase_items(qty, unit_cost, expires_on, products(name))')
-      .eq('organization_id', orgId).order('created_at', { ascending: false }).limit(100),
+      .eq('organization_id', orgId).match(ctx.campusId ? { campus_id: ctx.campusId } : {}).order('created_at', { ascending: false }).limit(100),
   ]);
   return (
     <>

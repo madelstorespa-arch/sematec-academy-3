@@ -25,7 +25,7 @@ export default async function Page() {
   const [{ data: promos }, { data: coupons }, { data: products }] = await Promise.all([
     ctx.supabase.from('store_promotions').select('*').eq('organization_id', orgId).order('created_at', { ascending: false }),
     ctx.supabase.from('store_coupons').select('*').eq('organization_id', orgId).order('created_at', { ascending: false }),
-    ctx.supabase.from('products').select('id, name, sku, category, kind, price').eq('organization_id', orgId).eq('active', true).order('name').limit(3000),
+    ctx.supabase.from('products').select('id, name, sku, category, kind, price').eq('organization_id', orgId).eq('active', true).or(ctx.campusId ? `campus_id.eq.${ctx.campusId},campus_id.is.null` : 'id.not.is.null').order('name').limit(3000),
   ]);
   const edit = can(ctx, 'store.edit');
   const names = new Map((products ?? []).map((p: any) => [p.id, p.name]));

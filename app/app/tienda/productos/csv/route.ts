@@ -7,7 +7,7 @@ export async function GET() {
   const ctx = await getContext();
   if (!ctx.orgId || !(can(ctx, 'store.view') || can(ctx, 'store.create'))) return new NextResponse('No autorizado', { status: 403 });
   const { data } = await ctx.supabase.from('products').select('sku, barcode, name, kind, category, brand, unit, price, cost, stock, min_stock, online, active')
-    .eq('organization_id', ctx.orgId).order('name');
+    .eq('organization_id', ctx.orgId).or(ctx.campusId ? `campus_id.eq.${ctx.campusId},campus_id.is.null` : 'id.not.is.null').order('name');
   const q = (s: unknown) => `"${String(s ?? '').replace(/"/g, '""')}"`;
   const n = (x: unknown) => String(Number(x ?? 0)).replace('.', ',');
   const lines = ['Código;Código de barras;Producto;Tipo;Categoría;Marca;Unidad;Precio venta;Costo;Stock;Stock mínimo;Valor a costo;En web;Activo'];

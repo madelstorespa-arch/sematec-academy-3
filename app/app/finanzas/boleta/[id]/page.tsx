@@ -4,7 +4,7 @@ import { getContext, can } from '@/lib/context';
 import { Card, StatusBadge } from '@/components/ui';
 import { ActionForm } from '@/components/forms';
 import { PrintButton } from '@/components/print-button';
-import { loadReceipt } from '@/lib/receipt';
+import { loadReceiptFor } from '@/lib/receipt-access';
 import { mailEnabled } from '@/lib/mailer';
 import { env } from '@/lib/env';
 import { fmtDateTime, fmtMoney } from '@/lib/format';
@@ -15,7 +15,7 @@ export const metadata = { title: 'Comprobante de pago' };
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const ctx = await getContext();
-  const r = await loadReceipt(ctx.supabase, id);
+  const r = await loadReceiptFor(ctx.supabase, ctx.user.id, id);
   if (!r) notFound();
   const staff = can(ctx, 'finance.view');
   const url = `${env.siteUrl()}/app/finanzas/boleta/${r.id}`;
@@ -23,7 +23,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   return (
     <>
       <div className="mb-4 flex flex-wrap items-center gap-2 print:hidden">
-        <Link className="btn-secondary" href={staff ? `/app/finanzas/cuenta/${r.student.id}` : '/app/mi'}>← Volver</Link>
+        <Link className="btn-secondary" href={staff ? `/app/finanzas/cuenta/${r.student.id}` : '/app/boletas'}>← Volver</Link>
         <a className="btn-primary" href={`/app/finanzas/boleta/${r.id}/pdf`} data-testid="descargar-boleta">⬇ Descargar PDF</a>
         <a className="btn-secondary" href={`/app/finanzas/boleta/${r.id}/pdf?ver=1`} target="_blank" rel="noopener noreferrer">👁 Ver PDF</a>
         <PrintButton />
@@ -80,6 +80,12 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
               <p className="text-xs text-slate-500">El comprobante siempre queda registrado en el sistema; esto guarda además el PDF en «📁 Archivos».</p>
             </ActionForm>
           </Card>
+        </div>)}
+      {!staff && (
+        <div className="mx-auto mt-6 flex max-w-3xl flex-wrap gap-3 print:hidden" data-testid="acciones-boleta-estudiante">
+          {mailEnabled() && ctx.user.email && <ActionForm action={sendReceipt} inline submitLabel={`✉ Enviármela a ${ctx.user.email}`} submitClass="btn-secondary" resetOnSuccess={false}>
+            <input type="hidden" name="id" value={r.id} /></ActionForm>}
+          <ActionForm action={saveReceipt} inline submitLabel="💾 Guardar en Mis archivos" submitClass="btn-secondary" resetOnSuccess={false}><input type="hidden" name="id" value={r.id} /></ActionForm>
         </div>)}
     </>
   );

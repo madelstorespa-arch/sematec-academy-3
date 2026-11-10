@@ -49,7 +49,7 @@ export default async function Page() {
           <Card title="Estado de cuenta">
             {balance?.length ? balance.map((b: any) => <p key={b.account_id} className="text-sm">Saldo: <b>{fmtMoney(b.outstanding, b.currency)}</b>{Number(b.overdue) > 0 && <> · <span className="text-red-600">vencido {fmtMoney(b.overdue, b.currency)}</span></>}</p>) : <p className="text-sm text-slate-500">Sin deuda.</p>}
             {!!inst?.length && <PayInstallments studentId={sid} items={inst as any[]} providers={availableProviders(inst[0].currency)} action={payInstallments} />}
-            <Link className="link mt-3 inline-block text-sm" href={`/app/finanzas/cuenta/${sid}`}>Ver detalle, pagos y comprobantes 🧾 →</Link>
+            <span className="mt-3 flex flex-wrap gap-3 text-sm"><Link className="link" href={`/app/finanzas/cuenta/${sid}`}>Ver detalle y cuotas →</Link><Link className="link" href="/app/boletas" data-testid="link-mis-boletas">🧾 Mis boletas →</Link></span>
           </Card>
           <Card title="Clases virtuales">
             {confs?.length ? <ul className="space-y-2 text-sm">{confs.map((c: any) => <li key={c.id} className="flex items-center justify-between gap-2"><span>{c.title}<br /><span className="text-xs text-slate-500">{fmtDateTime(c.scheduled_start, c.timezone)}</span></span><Link className="btn-primary btn-sm" href={`/app/conferencias/sala/${c.id}`}>Entrar</Link></li>)}</ul> : <p className="text-sm text-slate-500">Sin clases programadas.</p>}

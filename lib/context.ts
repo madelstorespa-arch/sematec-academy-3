@@ -26,14 +26,17 @@ export const getContext = cache(async () => {
   let teacherId: string | null = null;
   let isEmployee = false;
   let isGuardian = false;
+  let campuses: { id: string; code: string; name: string; city: string | null; fixed: boolean }[] = [];
   if (org) {
-    const [p, s, t, e, g] = await Promise.all([
+    const [p, s, t, e, g, cmp] = await Promise.all([
       supabase.rpc('my_permissions', { p_org: org.organization_id }),
       supabase.from('students').select('id').eq('organization_id', org.organization_id).eq('user_id', user.id).maybeSingle(),
       supabase.from('teachers').select('id').eq('organization_id', org.organization_id).eq('user_id', user.id).maybeSingle(),
       supabase.from('employees').select('id').eq('organization_id', org.organization_id).eq('user_id', user.id).maybeSingle(),
       supabase.from('guardian_links').select('id').eq('organization_id', org.organization_id).eq('guardian_id', user.id).eq('status', 'activo').limit(1),
+      supabase.rpc('my_campuses', { p_org: org.organization_id }),
     ]);
+    campuses = (cmp.data ?? []) as typeof campuses;
     isGuardian = !!g.data?.length;
     isEmployee = !!e.data;
     perms = (p.data ?? []) as string[];
@@ -41,7 +44,15 @@ export const getContext = cache(async () => {
     teacherId = t.data?.id ?? null;
   }
   const isPlatformAdmin = !!profile?.is_platform_admin;
+  // 🏢 Sucursal activa: la fija de la persona, o la que eligió (si tiene acceso); vacío = todas
+  const fixedCampus = campuses.length === 1 && campuses[0].fixed ? campuses[0].id : null;
+  const chosenCampus = (await cookies()).get('sematec-sucursal')?.value;
+  const campusId = fixedCampus ?? (campuses.some((c) => c.id === chosenCampus) ? chosenCampus! : null);
   return {
+    campuses,
+    campusId,
+    campusFixed: !!fixedCampus,
+    campusName: campuses.find((c) => c.id === campusId)?.name ?? null,
     supabase,
     user,
     profile,

@@ -4,7 +4,10 @@ import { SiteLogo } from '@/components/site-chrome';
 import { brandStyle } from '@/lib/site';
 import { Nav } from '@/components/nav';
 import { buildNav } from '@/lib/nav-items';
-import { switchOrg } from './actions';
+import { switchOrg, switchBranch, setMyLocale } from './actions';
+import { PageTranslator } from '@/components/page-translator';
+import { prefsOf } from '@/lib/prefs';
+import { BranchSelect } from '@/components/branch-select';
 import { MobileMenu } from '@/components/mobile-menu';
 import { OfflineBar, LogoutButton } from '@/components/offline-bar';
 import { UndoBar } from '@/components/undo-bar';
@@ -21,6 +24,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (ctx.profile && ctx.profile.status !== 'active') redirect('/login');
 
   const items = await buildNav(ctx);
+  const locale = prefsOf(ctx.profile).locale ?? 'es';
   const { data: site } = ctx.orgId
     ? await ctx.supabase.from('site_settings').select('site_name, tagline, logo_asset_id, primary_color, accent_color').eq('organization_id', ctx.orgId).maybeSingle()
     : { data: null };
@@ -41,6 +45,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             {ctx.orgs.length > 1 && <button className="mt-1 text-xs text-sky-200 hover:underline">Cambiar</button>}
           </form>
         )}
+        {ctx.orgId && <BranchSelect action={switchBranch} campuses={ctx.campuses} current={ctx.campusId} fixed={ctx.campusFixed} />}
         <div className="mt-5 flex-1 lg:overflow-y-auto"><Nav items={items} /></div>
         <div className="mt-4 border-t border-white/10 px-2 pt-4 text-xs text-sky-100/70">
           <div className="flex items-center gap-2">
@@ -56,8 +61,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
         </MobileMenu>
       </aside>
-      <main className="app-main min-w-0 flex-1 px-3 pb-16 pt-4 lg:ml-64 lg:px-8 lg:pt-5">
-        <WindowBar items={items} />
+      <main data-density={(ctx.profile?.preferences as { density?: string } | null)?.density === 'compacta' ? 'compacta' : undefined} className="app-main min-w-0 flex-1 px-3 pb-16 pt-4 lg:ml-64 lg:px-8 lg:pt-5">
+        <PageTranslator locale={locale} />
+        <WindowBar items={items} locale={locale} setLocale={setMyLocale} />
         <OfflineBar userId={ctx.user.id} warmUrls={items.map((i) => i.href)} />
         <VersionWatcher />
         {ctx.orgId && <UndoBar />}

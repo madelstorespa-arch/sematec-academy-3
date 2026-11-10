@@ -69,11 +69,13 @@ async function fulfill(orderId: string) {
   }
   if (o.kind === 'installments') {
     // Pago de cuotas desde el portal: se abona a la cuenta del estudiante
-    const { error } = await admin.rpc('fulfill_installments_order', { p_order: orderId });
+    const { data: payId, error } = await admin.rpc('fulfill_installments_order', { p_order: orderId });
     if (error) {
       await admin.from('system_events').insert({ event_type: 'installment_payment_fulfill_failed', severity: 'critical', details: { order: orderId, error: error.message } });
       throw new Error(error.message);
     }
+    // 🧾 Boleta automática al correo del estudiante (si falla el correo, el pago igual queda registrado)
+    if (payId) { const { emailReceipt } = await import('@/lib/receipt-access'); await emailReceipt(String(payId), o.buyer_email); }
     return;
   }
   let userId: string | null = null;

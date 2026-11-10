@@ -1,7 +1,8 @@
 'use server';
 import { getContext, can } from '@/lib/context';
 import { fail, guard, ok, reqStr, str, type ActionResult } from '@/lib/actions';
-import { loadReceipt, receiptFilename, receiptPdf } from '@/lib/receipt';
+import { receiptFilename, receiptPdf } from '@/lib/receipt';
+import { loadReceiptFor } from '@/lib/receipt-access';
 import { mailEnabled, mailLayout, sendMail } from '@/lib/mailer';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { env } from '@/lib/env';
@@ -9,8 +10,8 @@ import { fmtMoney } from '@/lib/format';
 
 async function receiptFor(fd: FormData) {
   const ctx = await getContext();
-  if (!can(ctx, 'finance.view')) throw new Error('Solo el personal de finanzas puede enviar o guardar comprobantes.');
-  const r = await loadReceipt(ctx.supabase, reqStr(fd, 'id', 'id'));
+  // Finanzas, el propio estudiante o su apoderado (cada uno solo las boletas que puede ver)
+  const r = await loadReceiptFor(ctx.supabase, ctx.user.id, reqStr(fd, 'id', 'id'));
   if (!r) throw new Error('Comprobante no encontrado.');
   const url = `${env.siteUrl()}/app/finanzas/boleta/${r.id}`;
   return { ctx, r, url, pdf: await receiptPdf(r, url) };
@@ -22,7 +23,8 @@ export async function sendReceipt(fd: FormData): Promise<ActionResult> {
     try {
       if (!mailEnabled()) return fail('El envío de correos no está configurado (variables SMTP_* en Vercel). Descargue el PDF y envíelo usted.');
       const { ctx, r, url, pdf } = await receiptFor(fd);
-      const to = (str(fd, 'email') ?? r.student.email ?? '').trim().toLowerCase();
+      // El estudiante o apoderado solo puede enviársela a su propio correo
+      const to = (can(ctx, 'finance.view') ? (str(fd, 'email') ?? r.student.email ?? '') : (ctx.user.email ?? '')).trim().toLowerCase();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return fail('Ingrese un correo válido.');
       const title = `Comprobante de ${r.kind === 'refund' ? 'reembolso' : 'pago'} N° ${r.number}`;
       const body = `<p>Hola ${r.student.name}:</p><p>Adjuntamos su ${title.toLowerCase()} por <b>${fmtMoney(r.amount, r.currency)}</b>.</p>
@@ -48,7 +50,7 @@ export async function saveReceipt(fd: FormData): Promise<ActionResult> {
       if (upErr) return fail(`No se pudo guardar el archivo: ${upErr.message}`);
       const { data: fileId, error } = await ctx.supabase.rpc('register_user_file', {
         p_org: r.org.id, p_name: receiptFilename(r), p_mime: 'application/pdf', p_size: pdf.byteLength, p_path: path,
-        p_visibility: fd.get('staff') === 'on' ? 'staff' : 'private', p_section: null, p_description: `Comprobante N° ${r.number} · ${r.student.name}`,
+        p_visibility: fd.get('staff') === 'on' && can(ctx, 'finance.view') ? 'staff' : 'private', p_section: null, p_description: `Comprobante N° ${r.number} · ${r.student.name}`,
       });
       if (error) return fail(error);
       return ok('Copia guardada en «Archivos».', { href: `/app/archivos/ver/${fileId}` });

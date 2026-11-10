@@ -18,6 +18,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
   const sp = await searchParams;
   let q = ctx.supabase.from('products').select('id, sku, barcode, name, kind, category, brand, unit, price, cost, stock, min_stock, track_stock, online, active, image_asset_id')
     .eq('organization_id', orgId).order('name').limit(1000);
+  if (ctx.campusId) q = q.or(`campus_id.eq.${ctx.campusId},campus_id.is.null`); // 🏢 sucursal elegida + catálogo general
   if (sp.tipo) q = q.eq('kind', sp.tipo);
   if (sp.ver !== 'todos') q = q.eq('active', true);
   if (sp.ver === 'bajo') q = q.eq('track_stock', true);

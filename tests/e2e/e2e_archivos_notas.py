@@ -180,9 +180,10 @@ with sync_playwright() as pw:
     mc.add_init_script("try { Object.defineProperty(MediaDevices.prototype, 'getDisplayMedia', { value: undefined, configurable: true }); delete MediaDevices.prototype.getDisplayMedia; } catch (e) {}")
     mob = login(mc, 'estudiante2.a@demo.sematec.test')
     go(mob, f'{BASE}/app/conferencias/sala/{sess}'); mob.click('button:has-text("Entrar a la sala")'); mob.wait_for_selector('.lk-video-conference', timeout=30000)
+    mob.locator('[data-testid=boton-mas]').click()  # en el celular, las opciones extra están en «⋯ Más»
+    check(mob.locator('[data-testid=mas-opciones] button:has-text("Cámara")').count() >= 1, 'Celular: botón 🔄 para cambiar a la cámara trasera')
     mob.locator('[data-testid=compartir-celular]').click()
     check(mob.locator('[data-testid=ayuda-compartir]').count() == 1 and mob.locator('button:has-text("Mostrar con la cámara trasera")').count() == 1, 'Celular: «Compartir pantalla» ofrece cámara trasera y enviar archivos')
-    check(mob.locator('button:has-text("Cámara")').count() >= 2, 'Celular: botón 🔄 para cambiar a la cámara trasera')
     mob.locator('button:has-text("Enviar foto, video o archivo al chat")').click()
     mob.locator('[data-testid=adjuntar-chat]').set_input_files(f'{MEDIA}/foto.png')
     t.click('footer button:has-text("Chat")')

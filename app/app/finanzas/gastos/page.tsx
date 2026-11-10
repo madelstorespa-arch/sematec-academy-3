@@ -36,6 +36,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ m
   const r = monthRange(sp.mes, sp.mes);
   let q = ctx.supabase.from('expenses').select('*, programs(name), sections(code, courses(name))').eq('organization_id', orgId)
     .gte('spent_on', r.start).lte('spent_on', r.end).order('spent_on', { ascending: false }).limit(1000);
+  if (ctx.campusId) q = q.eq('campus_id', ctx.campusId);
   if (sp.cat) q = q.eq('category', sp.cat);
   const [{ data: rows }, programs, campuses, { data: secs }, { data: org }] = await Promise.all([
     q, programOptions(ctx), campusOptions(ctx),

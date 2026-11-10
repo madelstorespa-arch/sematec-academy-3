@@ -1,4 +1,5 @@
 'use client';
+import { LOCALES } from '@/lib/i18n';
 import { IconMin, IconMax, IconRestore } from './win-icons';
 import { useCallback, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
@@ -21,7 +22,7 @@ function apply(a: A11y) {
  * Barra de ventana de cada página: minimizar (queda en la barra de tareas de abajo), maximizar
  * (oculta el menú y usa toda la pantalla), ✕ cerrar (vuelve atrás) y ♿ accesibilidad (letra, modo oscuro, contraste…).
  */
-export function WindowBar({ items }: { items: NavItem[] }) {
+export function WindowBar({ items, locale = 'es', setLocale }: { items: NavItem[]; locale?: string; setLocale?: (fd: FormData) => Promise<void> }) {
   const path = usePathname();
   const router = useRouter();
   const [a11y, setA11y] = useState<A11y>(DEFAULT);
@@ -85,6 +86,14 @@ export function WindowBar({ items }: { items: NavItem[] }) {
       <div className="mb-4 flex items-center gap-2 rounded-xl border border-slate-200 bg-white/80 px-3 py-1.5 shadow-sm backdrop-blur" data-testid="barra-ventana" onDoubleClick={toggleMax}>
         <span className="text-lg" aria-hidden>{item?.icon ?? '📄'}</span>
         <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-700">{title || item?.label}</span>
+        {setLocale && (
+          <form action={setLocale} className="notranslate" translate="no" data-testid="idioma">
+            <label className="sr-only" htmlFor="idioma-usuario">Idioma</label>
+            <select id="idioma-usuario" name="locale" defaultValue={locale} onChange={(e) => e.currentTarget.form?.requestSubmit()} title="🌐 Idioma de la plataforma (solo para usted)"
+              className="h-8 max-w-[7.5rem] rounded-lg border border-slate-200 bg-white px-1 text-xs text-slate-600">
+              {LOCALES.map(([c, n, f]) => <option key={c} value={c}>{f} {n}</option>)}
+            </select>
+          </form>)}
         <span className="relative">
           <button className={btn} onClick={() => setMenu((v) => !v)} title="Accesibilidad: tamaño de letra, modo oscuro, contraste" aria-label="Accesibilidad" aria-expanded={menu} data-testid="accesibilidad">♿</button>
           {menu && (

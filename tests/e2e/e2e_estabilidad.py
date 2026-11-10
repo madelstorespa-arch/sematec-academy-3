@@ -52,7 +52,7 @@ with sync_playwright() as pw:
 
     # --- Correo y enlaces
     oc = b.new_context(viewport={'width': 1440, 'height': 900}); o = login(oc, 'propietario.a@demo.sematec.test', mfa=True)
-    go(o, f'{BASE}/app/configuracion')
+    go(o, f'{BASE}/app/configuracion?t=institucion')
     est = o.locator('[data-testid=estado-correo]').inner_text()
     check('Servidor' in est and 'SMTP_PASS' in est and '••••' not in est or 'configurada' in est, '📧 El propietario ve el estado del correo (sin mostrar la clave)')
     check('localhost' not in est.split('Enlaces de los correos')[-1] or 'localhost:3000' in BASE, '📧 Muestra a qué dirección apuntan los enlaces')

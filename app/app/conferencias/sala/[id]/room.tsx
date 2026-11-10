@@ -202,6 +202,7 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
   const sharePerm = !!perms?.canPublishSources?.some((x) => Number(x) === 3);
   const canShare = sharePerm && canDisplayCapture();
   const [shareHelp, setShareHelp] = useState(false);
+  useEffect(() => { if (shareHelp) setMore(false); }, [shareHelp]);
   const [facing, setFacing] = useState<'user' | 'environment'>('user');
   const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
   /** Cambia entre cámara frontal y trasera (en el celular sirve para mostrar un cuaderno, pizarra o documento). */

@@ -13,12 +13,12 @@ const money = (n: number, c: string) => new Intl.NumberFormat('es-CL', { style: 
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 /** 🧾 Punto de venta: lector de código de barras (o cámara), carrito, descuentos, efectivo con vuelto y comprobante. */
-export function Pos({ products: initial, currency, promos = [] }: { products: P[]; currency: string; promos?: Promo[] }) {
+export function Pos({ products: initial, currency, promos = [], prefs }: { products: P[]; currency: string; promos?: Promo[]; prefs?: { method?: string; auto_print?: boolean } }) {
   const [products, setProducts] = useState(initial);
   const [q, setQ] = useState('');
   const [kind, setKind] = useState('');
   const [cart, setCart] = useState<Line[]>([]);
-  const [method, setMethod] = useState('cash');
+  const [method, setMethod] = useState(prefs?.method ?? 'cash');
   const [cash, setCash] = useState('');
   const [discount, setDiscount] = useState('');
   const [customer, setCustomer] = useState({ name: '', doc_type: 'RUN', doc_number: '', email: '' });
@@ -93,6 +93,7 @@ export function Pos({ products: initial, currency, promos = [] }: { products: P[
     if (!r.ok) { setMsg({ ok: false, text: r.error ?? 'No se pudo registrar la venta.' }); return; }
     const d = r.data as { id: string; number: number; code?: string; total: number; change: number | null };
     setProducts((ps) => ps.map((p) => { const l = cart.find((x) => x.p.id === p.id); return l ? { ...p, stock: Number(p.stock) - l.qty } : p; }));
+    if (prefs?.auto_print) window.open(`/app/tienda/ventas/${d.id}/pdf?ver=1`, '_blank', 'noopener');
     notifyChanged(); setDone(d); setCart([]); setCash(''); setDiscount(''); setCoupon(null); setCouponText(''); setCustomer({ name: '', doc_type: 'RUN', doc_number: '', email: '' });
   });
 

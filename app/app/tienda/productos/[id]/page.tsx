@@ -8,7 +8,7 @@ import { MOVE_LABEL, kindIcon, kindLabel, qtyFmt } from '@/lib/store';
 import { StoreTabs } from '../../tabs';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { ProductFields } from '../../product-form';
-import { adjustStock, deleteProduct, updateProduct } from '../../actions';
+import { adjustStock, deleteProduct, updateProduct, transferStock } from '../../actions';
 
 export const metadata = { title: 'Producto' };
 
@@ -55,6 +55,17 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
                 {p.track_expiry && <><Field label="Vence el (si suma)" name="expires" type="date" /><Field label="Lote" name="lot" /></>}
               </Grid>
               <p className="text-xs text-slate-500">Para mercadería comprada use «📥 Compras»: además registra el gasto.</p>
+            </ActionForm>)}
+          {edit && ctx.campuses.filter((c) => c.id !== p.campus_id).length > 0 && (
+            <ActionForm action={transferStock} submitLabel="🔁 Trasladar" className="mt-5 border-t border-slate-100 pt-4">
+              <p className="text-sm font-semibold">🔁 Trasladar a otra sucursal</p>
+              <p className="text-xs text-slate-500">Está en: <b>{ctx.campuses.find((c) => c.id === p.campus_id)?.name ?? 'Sin sucursal (general)'}</b>. Si el producto no existe en el destino, se crea solo.</p>
+              <input type="hidden" name="id" value={p.id} />
+              <Grid cols={2}>
+                <SelectField label="Sucursal de destino" name="to" required options={ctx.campuses.filter((c) => c.id !== p.campus_id).map((c) => ({ value: c.id, label: c.name }))} />
+                <Field label="Cantidad" name="qty" type="number" step="any" min={0.001} required />
+              </Grid>
+              <Field label="Nota" name="note" placeholder="Ej.: reposición semanal" />
             </ActionForm>)}
         </Card>
         <Card title="✏ Datos del producto" className="lg:col-span-2">

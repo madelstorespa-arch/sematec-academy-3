@@ -1,0 +1,160 @@
+"""Etapa B: boletas para estudiantes y apoderados, carpetas, evaluaciones con enlace (Drive/Forms) y configuración por rol."""
+import re, sys, os, time, glob, subprocess
+from datetime import datetime, timedelta
+sys.path.insert(0, os.path.dirname(__file__))
+from e2e import BASE, CHROME, sql, check, shot, login, status_msg, go, results
+from playwright.sync_api import sync_playwright
+
+ORG = '0a000000-0000-4000-8000-000000000001'
+SEC = '0a000000-0000-4000-8000-00000000ad01'
+MAT = '00000000-0000-4000-8000-000000000016'
+S1, S2 = '0a000000-0000-4000-8000-00000000a501', '0a000000-0000-4000-8000-00000000a502'
+U_E1, U_E2, U_P2 = '00000000-0000-4000-8000-000000000030', '00000000-0000-4000-8000-000000000031', '00000000-0000-4000-8000-000000000021'
+
+def asu(uid, q):
+    return subprocess.run(['bash', '/tmp/asu.sh', uid, q], capture_output=True, text=True)
+
+sql(f"insert into section_enrollments (organization_id, section_id, student_id, enrollment_id) select '{ORG}', '{SEC}', e.student_id, e.id from enrollments e join students s on s.id = e.student_id where s.organization_id = '{ORG}' and s.user_id is not null on conflict do nothing")
+sql(f"""set request.jwt.claims = '{{"sub":"{MAT}","role":"authenticated"}}'; select create_charge('{S1}', 'tuition', 300000, 'CLP', 3, current_date, null, null, 'Arancel E2E boletas')""")
+os.makedirs('/tmp/media', exist_ok=True)
+with open('/tmp/media/guia.pdf', 'wb') as f:
+    f.write(b'%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n')
+for f in glob.glob('/tmp/mails/*.eml'): os.remove(f)
+
+with sync_playwright() as pw:
+    b = pw.chromium.launch(executable_path=CHROME, headless=True, args=['--no-sandbox'])
+    new = lambda: b.new_context(viewport={'width': 1366, 'height': 900}, accept_downloads=True)
+
+    # ================= 🧾 Boletas =================
+    mc = new(); m = login(mc, 'matriculas.a@demo.sematec.test')
+    go(m, f'{BASE}/app/finanzas/pagos')
+    m.select_option('select[name=student_id]', S1); m.fill('input[name=amount]', '100000'); m.select_option('select[name=method]', 'bank_transfer')
+    m.fill('input[name=external_reference]', 'E2E-BOLETA-1')
+    check(m.locator('[data-testid=enviar-boleta]').is_checked(), '🧾 «Enviar la boleta al correo» viene marcado')
+    m.click('button:has-text("Registrar pago")'); msg = status_msg(m)
+    check('enviada a estudiante1.a@demo.sematec.test' in msg, f'🧾 Al registrar el pago, la boleta se envía sola al estudiante ({msg[:110]})')
+    time.sleep(1)
+    mails = [open(f, encoding='utf-8', errors='ignore').read() for f in glob.glob('/tmp/mails/*.eml')]
+    check(any('estudiante1.a@demo.sematec.test' in x and 'application/pdf' in x for x in mails), '📧 El correo llega con la boleta en PDF adjunta')
+    pay = sql("select id from payments where external_reference = 'E2E-BOLETA-1'")
+    mc.close()
+
+    ec = new(); e = login(ec, 'estudiante1.a@demo.sematec.test')
+    check(e.locator('nav a[href="/app/boletas"]').count() >= 1, '🧾 El estudiante tiene «Mis boletas» en su menú')
+    go(e, f'{BASE}/app/boletas')
+    check(e.locator('[data-testid=mis-boletas] tbody tr').count() >= 1 and '100.000' in e.locator('[data-testid=mis-boletas]').inner_text(), '🧾 Ve la lista de sus boletas con el monto')
+    with e.expect_download() as d: e.locator('[data-testid=descargar-mi-boleta]').first.click()
+    path = d.value.path(); check(open(path, 'rb').read(4) == b'%PDF', '⬇ Descarga su boleta en PDF')
+    go(e, f'{BASE}/app/finanzas/boleta/{pay}')
+    for f in glob.glob('/tmp/mails/*.eml'): os.remove(f)
+    e.click('button:has-text("Enviármela")'); msg = status_msg(e)
+    check('enviado' in msg.lower(), f'✉ El estudiante se envía la boleta a su correo ({msg[:80]})')
+    e.click('button:has-text("Guardar en Mis archivos")')
+    e.wait_for_selector('[role=status]:has-text("Archivos"), [role=status]:has-text("✕")', timeout=20000)
+    msg = e.locator('[role=status]').last.inner_text()
+    check('Archivos' in msg and sql(f"select count(*) from user_files where owner_id = '{U_E1}' and mime_type = 'application/pdf'") != '0', '💾 Y la guarda en «Mis archivos»')
+    ec.close()
+
+    e2c = new(); e2 = login(e2c, 'estudiante2.a@demo.sematec.test')
+    check(e2.request.get(f'{BASE}/app/finanzas/boleta/{pay}/pdf').status == 404, '🔒 Otro estudiante NO puede ver ni descargar esa boleta')
+    e2c.close()
+    sql(f"insert into guardian_links (organization_id, student_id, guardian_id, relationship) values ('{ORG}', '{S1}', '{U_P2}', 'tutor') on conflict do nothing")
+    gc = new(); g = login(gc, 'profesor2.a@demo.sematec.test')
+    go(g, f'{BASE}/app/boletas')
+    check('100.000' in g.locator('[data-testid=mis-boletas]').inner_text(), '👪 El apoderado ve las boletas de su pupilo')
+    check(g.request.get(f'{BASE}/app/finanzas/boleta/{pay}/pdf').headers.get('content-type') == 'application/pdf', '👪 Y puede descargarlas')
+    gc.close()
+
+    # ================= 📂 Carpetas =================
+    pc = new(); p = login(pc, 'profesor1.a@demo.sematec.test')
+    go(p, f'{BASE}/app/archivos')
+    p.click('[data-testid=nueva-carpeta] summary'); p.fill('[data-testid=nueva-carpeta] input[name=name]', 'Material 2026'); p.click('[data-testid=nueva-carpeta] button:has-text("Crear")'); status_msg(p)
+    go(p, f'{BASE}/app/archivos')
+    p.click('[data-testid=carpeta] a:has-text("Material 2026")'); p.wait_for_selector('[data-testid=ruta-carpeta] >> text=Material 2026')
+    check(True, '📂 Crea una carpeta y entra en ella')
+    p.click('[data-testid=nueva-carpeta] summary'); p.fill('[data-testid=nueva-carpeta] input[name=name]', 'Unidad 1'); p.click('[data-testid=nueva-carpeta] button:has-text("Crear")'); status_msg(p)
+    p.reload(); p.click('[data-testid=carpeta] a:has-text("Unidad 1")'); p.wait_for_selector('[data-testid=ruta-carpeta] >> text=Unidad 1')
+    check('Material 2026' in p.locator('[data-testid=ruta-carpeta]').inner_text(), '📂 Subcarpetas con ruta «Mis archivos / Material 2026 / Unidad 1»')
+    up = p.locator('[data-testid=subir-archivos]'); up.locator('input[type=file]').set_input_files('/tmp/media/guia.pdf'); up.locator('button:has-text("Subir archivos")').click()
+    p.wait_for_selector('text=«guia.pdf» guardado', timeout=20000)
+    fid = sql("select f.id from user_files f join file_folders d on d.id = f.folder_id where d.name = 'Unidad 1' and f.name = 'guia.pdf'")
+    check(fid != '', '⬆ El archivo subido dentro de la carpeta queda guardado ahí')
+    go(p, f'{BASE}/app/archivos')
+    check(p.locator('[data-testid=archivo]:has-text("guia.pdf")').count() == 0, '📂 En «Mis archivos» no aparece suelto (está ordenado en su carpeta)')
+    go(p, f'{BASE}/app/archivos?q=guia')
+    check(p.locator('[data-testid=archivo]:has-text("guia.pdf")').count() == 1 and 'Unidad 1' in p.locator('[data-testid=archivo]').first.inner_text(), '🔍 La búsqueda lo encuentra y muestra en qué carpeta está')
+    card = p.locator('[data-testid=archivo]:has-text("guia.pdf")').first
+    card.locator('[data-testid=opciones-archivo]').click()
+    card.locator('input[aria-label="Nuevo nombre del archivo"]').fill('Guía unidad 1.pdf'); card.locator('button:has-text("Renombrar")').click(); status_msg(p)
+    check(sql(f"select name from user_files where id = '{fid}'") == 'Guía unidad 1.pdf', '✏ Renombra el archivo')
+    go(p, f'{BASE}/app/archivos?q=Guía')
+    card = p.locator('[data-testid=archivo]').first; card.locator('[data-testid=opciones-archivo]').click()
+    card.locator('select[name=folder_id]').select_option(label='📁 Material 2026'); card.locator('button:has-text("Mover")').click(); status_msg(p)
+    check(sql(f"select d.name from user_files f join file_folders d on d.id = f.folder_id where f.id = '{fid}'") == 'Material 2026', '📂 Mueve el archivo a otra carpeta')
+    go(p, f'{BASE}/app/archivos')
+    p.locator('[data-testid=carpeta]:has-text("Material 2026") summary').click()
+    p.once('dialog', lambda d: d.accept())
+    p.locator('[data-testid=carpeta]:has-text("Material 2026") button:has-text("Eliminar carpeta")').click(); status_msg(p)
+    check(sql(f"select folder_id is null and deleted_at is null from user_files where id = '{fid}'") == 't', '🗑 Al eliminar la carpeta, sus archivos NO se borran: vuelven a «Mis archivos»')
+    r = asu(U_E1, f"insert into file_folders (organization_id, owner_id, name) values ('{ORG}', '00000000-0000-4000-8000-000000000020', 'Ajena')")
+    check(r.returncode != 0, '🔒 Nadie puede crear carpetas a nombre de otra persona')
+
+    # ================= 🔗 Evaluación con enlace (Google Forms / Drive) =================
+    go(p, f'{BASE}/app/aula/{SEC}?t=examenes')
+    p.click('[data-testid=nueva-evaluacion-externa] summary')
+    f = p.locator('[data-testid=nueva-evaluacion-externa] form')
+    f.locator('input[name=title]').fill('Prueba 1 en Google Forms'); f.locator('input[name=url]').fill('forms.gle/AbCdEf12345')
+    now = datetime.now()
+    f.locator('input[name=opens_at]').fill((now - timedelta(days=1)).strftime('%Y-%m-%dT%H:%M')); f.locator('input[name=closes_at]').fill((now + timedelta(days=1)).strftime('%Y-%m-%dT%H:%M'))
+    f.locator('button:has-text("Crear evaluación")').click(); msg = status_msg(p)
+    ev = sql("select id || '|' || provider || '|' || url from external_evaluations where title = 'Prueba 1 en Google Forms'")
+    check(ev.endswith('|google_forms|https://forms.gle/AbCdEf12345'), f'🔗 El profesor crea la evaluación con el enlace de Google Forms ({ev[37:]})')
+    eid = ev.split('|')[0]
+    ec = new(); e = login(ec, 'estudiante1.a@demo.sematec.test')
+    go(e, f'{BASE}/app/aula/{SEC}?t=examenes')
+    check(e.locator('[data-testid=evaluacion-externa] >> text=Entrar a la evaluación').count() == 1, '🎓 El estudiante ve el botón «Entrar a la evaluación»')
+    check('forms.gle' not in e.content(), '🔒 El enlace no aparece en la página del estudiante')
+    r = e.request.get(f'{BASE}/app/aula/evaluacion/{eid}', max_redirects=0)
+    check(r.status in (302, 303, 307) and r.headers['location'] == 'https://forms.gle/AbCdEf12345', '▶ Al entrar, el sistema lo lleva a la evaluación')
+    check(sql(f"select times from external_evaluation_access where evaluation_id = '{eid}'") == '1', '📋 Queda registrado que el estudiante entró')
+    r = asu(U_E1, "select url from external_evaluations")
+    check(r.returncode != 0 and 'permission denied' in r.stderr, '🔒 El estudiante no puede leer el enlace directamente de la base de datos')
+    go(p, f'{BASE}/app/aula/{SEC}?t=examenes')
+    check('1 estudiante(s) entraron' in p.locator('[data-testid=ingresos]').inner_text(), '👥 El profesor ve quién entró')
+    sql(f"update external_evaluations set opens_at = now() - interval '2 days', closes_at = now() - interval '1 hour' where id = '{eid}'")
+    r = e.request.get(f'{BASE}/app/aula/evaluacion/{eid}', max_redirects=0)
+    check('forms.gle' not in r.headers.get('location', '') and 'aviso' in r.headers.get('location', ''), '⏰ Cerrada la evaluación, el estudiante ya no puede entrar')
+    go(e, f'{BASE}/app/aula/evaluacion/{eid}')
+    check('ya cerró' in e.locator('[data-testid=aviso-aula]').inner_text(), '⏰ Y ve un aviso claro: «La evaluación ya cerró»')
+
+    # ================= ⚙ Configuración por rol =================
+    go(e, f'{BASE}/app/configuracion')
+    tabs = e.locator('nav.mb-5').first.inner_text()
+    check('Mi configuración' in tabs and 'Todo el sistema' not in tabs and 'Caja' not in tabs, '⚙ El estudiante solo ve «Mi configuración»')
+    go(e, f'{BASE}/app/configuracion?t=institucion')
+    check(e.locator('[data-testid=estado-correo]').count() == 0 and e.locator('[data-testid=config-personal]').count() == 1, '🔒 No puede abrir la configuración de todo el sistema')
+    e.select_option('select[name=home]', '/app/boletas'); e.click('button:has-text("Guardar")'); msg = status_msg(e)
+    check('solo le afecta a usted' in msg, '⚙ Guarda su página de inicio (solo para él)')
+    ec.close(); ec = new(); e = login(ec, 'estudiante1.a@demo.sematec.test')
+    e.wait_for_url(re.compile('/app/boletas'), timeout=15000); check(True, '⚙ Al entrar de nuevo, llega a su página de inicio elegida')
+    ec.close()
+    go(p, f'{BASE}/app/configuracion?t=docencia')
+    p.check('input[name=waiting_room][type=checkbox]'); p.click('button:has-text("Guardar")'); status_msg(p)
+    check(sql(f"select preferences->'teaching'->>'waiting_room' from profiles where id = '00000000-0000-4000-8000-000000000020'") == 'true', '🧑‍🏫 El profesor configura sus clases (sala de espera por defecto)')
+    pc.close()
+    sql("update profiles set id_document_type = 'RUN', id_document_number = '17.654.321-3' where email = 'secretaria.a@demo.sematec.test' and id_document_number is null")
+    sc = new(); s = login(sc, 'secretaria.a@demo.sematec.test')
+    go(s, f'{BASE}/app/configuracion?t=caja')
+    s.select_option('select[name=method]', 'card'); s.click('button:has-text("Guardar")'); status_msg(s)
+    go(s, f'{BASE}/app/tienda/caja')
+    check('bg-brand-600' in (s.locator('button:has-text("Tarjeta")').first.get_attribute('class') or ''), '🛒 La caja abre con su medio de pago preferido')
+    check(sql(f"select preferences->'pos' from profiles where id = '{U_E1}'") in ('', None), '🛒 La configuración de una persona no cambia la de otra')
+    r = s.request.get(f'{BASE}/app/configuracion?t=institucion')
+    check('Todo el sistema' not in r.text(), '🔒 La secretaria tampoco ve la configuración de todo el sistema')
+    sc.close()
+    oc = new(); o = login(oc, 'propietario.a@demo.sematec.test', mfa=True)
+    go(o, f'{BASE}/app/configuracion?t=institucion')
+    check(o.locator('[data-testid=estado-correo]').count() == 1 and o.locator('text=Datos de la institución').count() == 1, '🏛 El propietario configura todo el sistema')
+    oc.close()
+
+ok = sum(1 for r in results if r[0]); print(f'\n{ok}/{len(results)} verificaciones OK')

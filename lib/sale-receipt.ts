@@ -13,14 +13,16 @@ export type Sale = {
   customer: { name: string | null; doc: string | null; email: string | null; phone: string | null };
   items: { name: string; qty: number; unitPrice: number; discount: number; total: number; taxRate: number; serial: string | null; warranty: string | null; unit: string; promo: string | null; promoDiscount: number }[];
   org: { id: string; name: string; legal: string | null; taxId: string | null; address: string | null; phone: string | null };
+  branch?: { name: string; address: string | null; phone: string | null; footer: string | null } | null;
 };
 
 async function build(s: any, admin = createAdminClient()): Promise<Sale> {
-  const [{ data: org }, { data: site }, { data: items }, { data: seller }] = await Promise.all([
+  const [{ data: org }, { data: site }, { data: items }, { data: seller }, { data: branch }] = await Promise.all([
     admin.from('organizations').select('id, display_name, legal_name, tax_id').eq('id', s.organization_id).maybeSingle(),
     admin.from('site_settings').select('address, contact_phone').eq('organization_id', s.organization_id).maybeSingle(),
     admin.from('sale_items').select('name, qty, unit_price, discount, total, tax_rate, serial, warranty_until, promo_label, promo_discount, products(unit)').eq('sale_id', s.id).order('id'),
     s.seller_id ? admin.from('profiles').select('full_name, id_document_number, user_code').eq('id', s.seller_id).maybeSingle() : Promise.resolve({ data: null }),
+    s.campus_id ? admin.from('campuses').select('name, address, phone, receipt_footer').eq('id', s.campus_id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
   return {
     id: s.id, number: s.number, code: s.code ?? `VENT${String(s.number).padStart(6, '0')}`, channel: s.channel,
@@ -33,6 +35,7 @@ async function build(s: any, admin = createAdminClient()): Promise<Sale> {
     items: (items ?? []).map((i: any) => ({ name: i.name, qty: Number(i.qty), unitPrice: Number(i.unit_price), discount: Number(i.discount), total: Number(i.total),
       taxRate: Number(i.tax_rate), serial: i.serial, warranty: i.warranty_until, unit: i.products?.unit ?? 'unidad', promo: i.promo_label ?? null, promoDiscount: Number(i.promo_discount ?? 0) })),
     org: { id: s.organization_id, name: org?.display_name ?? '', legal: org?.legal_name ?? null, taxId: org?.tax_id ?? null, address: site?.address ?? null, phone: site?.contact_phone ?? null },
+    branch: branch ? { name: (branch as any).name, address: (branch as any).address ?? null, phone: (branch as any).phone ?? null, footer: (branch as any).receipt_footer ?? null } : null,
   };
 }
 
@@ -77,7 +80,8 @@ export async function salePdf(s: Sale): Promise<Uint8Array> {
   add(s.org.name, 11, bold, 'c');
   if (s.org.legal && s.org.legal !== s.org.name) add(s.org.legal, 7, reg, 'c');
   if (s.org.taxId) add(`RUT ${s.org.taxId}`, 7, reg, 'c');
-  if (s.org.address) add(s.org.address, 7, reg, 'c');
+  if (s.branch) { add(`Sucursal ${s.branch.name}`, 8, bold, 'c'); if (s.branch.address) add(s.branch.address, 7, reg, 'c'); if (s.branch.phone) add(`Tel. ${s.branch.phone}`, 7, reg, 'c'); }
+  else if (s.org.address) add(s.org.address, 7, reg, 'c');
   sep();
   add(`BOLETA ${s.code}`, 10, bold, 'c');
   add(fmtDateTime(s.paidAt ?? s.createdAt), 7, reg, 'c');
@@ -110,6 +114,7 @@ export async function salePdf(s: Sale): Promise<Uint8Array> {
   sep();
   if (ahorro > 0) add(`¡Usted ahorró ${fmtMoney(ahorro, s.currency)}!`, 8, bold, 'c');
   add('¡Gracias por su compra!', 8, bold, 'c');
+  if (s.branch?.footer) add(s.branch.footer, 7, reg, 'c');
   add('Documento interno. No reemplaza la boleta electrónica del SII.', 6, reg, 'c');
   if (s.status === 'anulada') add(`ANULADO: ${s.cancelReason ?? ''}`, 9, bold, 'c', undefined, rgb(0.8, 0.1, 0.1));
   void lines;

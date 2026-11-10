@@ -74,3 +74,7 @@ html[data-motion="reduce"] *, html[data-motion="reduce"] *::before, html[data-mo
   animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important;
 }
 :focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
+
+/* Lista compacta (preferencia personal) */
+main[data-density='compacta'] .table td, main[data-density='compacta'] .table th { padding-top: .25rem; padding-bottom: .25rem; }
+main[data-density='compacta'] .card-pad { padding: .9rem; }

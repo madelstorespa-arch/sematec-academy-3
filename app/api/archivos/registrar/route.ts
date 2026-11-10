@@ -6,7 +6,7 @@ import { FILE_TYPES } from '@/lib/user-files';
 /** Registra el archivo ya subido (verifica que exista y que sea del usuario). */
 export async function POST(request: NextRequest) {
   const b = await request.json().catch(() => ({}));
-  const { org, path, name, size, mime, visibility, section, description } = b ?? {};
+  const { org, path, name, size, mime, visibility, section, description, folder } = b ?? {};
   if (typeof org !== 'string' || typeof path !== 'string' || typeof name !== 'string') return NextResponse.json({ error: 'Solicitud inválida' }, { status: 400 });
   const type = String(mime ?? '').split(';')[0].toLowerCase();
   if (!FILE_TYPES[type]) return NextResponse.json({ error: 'Tipo no permitido' }, { status: 415 });
@@ -25,5 +25,7 @@ export async function POST(request: NextRequest) {
     await createAdminClient().storage.from('user-files').remove([path]); // no deja archivos huérfanos
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+  // 📂 Si se subió dentro de una carpeta, queda guardado ahí
+  if (typeof folder === 'string' && /^[0-9a-f-]{36}$/i.test(folder)) await supabase.rpc('move_user_file', { p_id: data, p_folder: folder });
   return NextResponse.json({ id: data });
 }

@@ -4,7 +4,8 @@ import { PageHeader, Card, Empty } from '@/components/ui';
 
 export const metadata = { title: 'Aula de aprendizaje' };
 
-export default async function Page() {
+export default async function Page({ searchParams }: { searchParams: Promise<{ aviso?: string }> }) {
+  const aviso = String((await searchParams).aviso ?? '').slice(0, 200);
   const ctx = await getContext();
   const orgId = requireOrg(ctx);
   let q = ctx.supabase.from('sections').select('id, code, courses(code, name), academic_periods(name), teachers(first_names, last_names)').eq('organization_id', orgId).limit(300);
@@ -16,6 +17,7 @@ export default async function Page() {
   return (
     <>
       <PageHeader title="Aula de aprendizaje" subtitle="Contenidos, tareas, exámenes en línea y foros de cada curso" />
+      {aviso && <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900" role="alert" data-testid="aviso-aula">⚠ {aviso}</p>}
       {sections?.length ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {sections.map((s: any) => (

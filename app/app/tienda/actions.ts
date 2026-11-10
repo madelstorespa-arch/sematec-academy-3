@@ -284,3 +284,43 @@ export async function checkCoupon(code: string, total: number): Promise<{ valid:
   const { data } = await ctx.supabase.rpc('store_coupon_check', { p_org: ctx.orgId, p_code: code, p_total: total, p_channel: 'caja' });
   return (data ?? { valid: false }) as { valid: boolean; discount?: number; code?: string };
 }
+
+// ---------- 💵 Apertura y cierre de caja ----------
+export async function openCash(fd: FormData): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getContext();
+    const amount = num(fd, 'amount');
+    if (amount === null || amount < 0) throw new ValidationError('Indique el dinero con que abre la caja (0 o más).');
+    const { error } = await ctx.supabase.rpc('cash_open', { p_org: ctx.orgId, p_amount: amount, p_notes: str(fd, 'notes') });
+    if (error) return fail(error);
+    refresh();
+    return ok(`Caja abierta con ${fmtMoney(amount)}${ctx.campusName ? ` en ${ctx.campusName}` : ''}.`);
+  });
+}
+
+export async function closeCash(fd: FormData): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getContext();
+    const counted = num(fd, 'counted');
+    if (counted === null || counted < 0) throw new ValidationError('Cuente el dinero de la caja e ingréselo (0 o más).');
+    const { data, error } = await ctx.supabase.rpc('cash_close', { p_session: reqStr(fd, 'id', 'caja'), p_counted: counted, p_notes: str(fd, 'notes') });
+    if (error) return fail(error);
+    const r = data as { expected: number; counted: number; difference: number; count: number; total: number };
+    refresh();
+    const diff = Number(r.difference);
+    return ok(`Caja cerrada: ${r.count} venta(s) por ${fmtMoney(r.total)}. Esperado en efectivo ${fmtMoney(r.expected)}, contado ${fmtMoney(r.counted)}: ${diff === 0 ? 'cuadra perfecto ✓' : diff > 0 ? `sobran ${fmtMoney(diff)}` : `faltan ${fmtMoney(-diff)}`}.`);
+  });
+}
+
+/** 🔁 Traslado de stock a otra sucursal. */
+export async function transferStock(fd: FormData): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getContext();
+    const qty = num(fd, 'qty');
+    if (qty === null || qty <= 0) throw new ValidationError('Indique cuántas unidades traslada.');
+    const { error } = await ctx.supabase.rpc('store_transfer', { p_product: reqStr(fd, 'id', 'producto'), p_to_campus: reqStr(fd, 'to', 'Sucursal de destino'), p_qty: qty, p_note: str(fd, 'note') });
+    if (error) return fail(error);
+    refresh();
+    return ok(`Trasladadas ${qty} unidad(es) a ${ctx.campuses.find((c) => c.id === fd.get('to'))?.name ?? 'la otra sucursal'}.`);
+  });
+}

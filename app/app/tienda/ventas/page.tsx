@@ -17,6 +17,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ d
   const day = /^\d{4}-\d{2}-\d{2}$/.test(sp.dia ?? '') ? sp.dia! : new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
   let q = ctx.supabase.from('sales').select('id, number, code, channel, status, customer_name, payment_method, total, cost_total, created_at, paid_at, seller_id, coupon_code, sale_items(count)')
     .eq('organization_id', orgId).gte('created_at', `${day}T00:00:00${tzOffset('America/Santiago', new Date(`${day}T12:00:00Z`))}`).lte('created_at', `${day}T23:59:59.999${tzOffset('America/Santiago', new Date(`${day}T12:00:00Z`))}`).order('created_at', { ascending: false }).limit(1000);
+  if (ctx.campusId) q = q.or(`campus_id.eq.${ctx.campusId},campus_id.is.null`);
   if (sp.canal) q = q.eq('channel', sp.canal);
   const { data: rows } = await q;
   const sellerIds = [...new Set((rows ?? []).map((r: any) => r.seller_id).filter(Boolean))];

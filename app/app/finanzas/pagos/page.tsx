@@ -6,6 +6,7 @@ import { studentOptions } from '@/lib/options';
 import { fmtDateTime, fmtMoney, PAY_METHODS } from '@/lib/format';
 import { FinanceTabs } from '../tabs';
 import { registerPayment } from '../actions';
+import { prefsOf } from '@/lib/prefs';
 
 export const metadata = { title: 'Pagos' };
 
@@ -35,6 +36,7 @@ export default async function Page() {
               <Field label="N° de operación" name="external_reference" placeholder="Evita registrar dos veces" />
               <Field label="Observación" name="notes" />
             </Grid>
+            <label className="flex items-center gap-2 text-sm"><input type="hidden" name="send_receipt" value="off" /><input type="checkbox" name="send_receipt" value="on" defaultChecked={prefsOf(ctx.profile).finance?.send_receipt ?? true} data-testid="enviar-boleta" /> 🧾 Enviar la boleta al correo del estudiante (PDF adjunto)</label>
             <p className="text-xs text-slate-500">El pago se imputa automáticamente a las cuotas con vencimiento más antiguo. No se aceptan montos mayores a la deuda.</p>
           </ActionForm>
         </Card>

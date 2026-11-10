@@ -203,7 +203,8 @@ with sync_playwright() as pw:
     # Editar el módulo: no disponible
     o.locator('[data-testid=modulo]:has-text("Préstamo de equipos") summary:has-text("Editar módulo")').click()
     ef = o.locator('[data-testid=modulo]:has-text("Préstamo de equipos") form:has(button:has-text("Guardar cambios"))')
-    ef.locator('input[name=active][type=checkbox]').uncheck(); ef.locator('button:has-text("Guardar cambios")').click(); status_msg(o)
+    ef.locator('input[name=active][type=checkbox]').uncheck(); ef.locator('button:has-text("Guardar cambios")').click()
+    until(lambda: sql("select active from custom_modules where slug = 'prestamo-de-equipos'") == 'f', msg='módulo no disponible')
     check(sql("select active from custom_modules where slug = 'prestamo-de-equipos'") == 'f', '🧩 El propietario marca el módulo como «No disponible»')
     pc = new(); p = login(pc, 'profesor1.a@demo.sematec.test')
     check(p.locator('nav a[href="/app/m/prestamo-de-equipos"]').count() == 0, '🔒 Un módulo no disponible desaparece para los demás')

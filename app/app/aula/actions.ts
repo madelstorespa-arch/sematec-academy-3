@@ -189,3 +189,43 @@ export async function moderateThread(fd: FormData): Promise<ActionResult> {
     back(reqStr(fd, 'section_id', 'sección')); return ok('Actualizado.');
   });
 }
+
+/** Proveedor del enlace (para mostrar el ícono correcto). */
+function providerOf(url: string) {
+  const h = new URL(url).hostname.toLowerCase();
+  if (/(^|\.)forms\.gle$/.test(h) || (/docs\.google\.com$/.test(h) && url.includes('/forms/'))) return 'google_forms';
+  if (/(drive|docs)\.google\.com$/.test(h)) return 'google_drive';
+  if (/forms\.(office|microsoft)\.com$/.test(h)) return 'microsoft_forms';
+  if (/(onedrive\.live\.com|1drv\.ms|sharepoint\.com)$/.test(h)) return 'onedrive';
+  return 'otro';
+}
+
+/** 🔗 Evaluación con enlace externo (Google Forms, Drive, Microsoft Forms…): el enlace se entrega solo mientras está abierta. */
+export async function createExternalEval(fd: FormData): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getContext(); const section = reqStr(fd, 'section_id', 'sección');
+    let url = reqStr(fd, 'url', 'Enlace').trim();
+    if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+    url = url.replace(/^http:\/\//i, 'https://');
+    try { const u = new URL(url); if (!u.hostname.includes('.')) throw new Error(); } catch { return fail('El enlace no es válido. Copie el enlace completo (https://…).'); }
+    if (url.length > 2000 || /[\s<>"]/.test(url)) return fail('El enlace no es válido.');
+    const opens = localToIso(reqStr(fd, 'opens_at', 'Apertura')), closes = localToIso(reqStr(fd, 'closes_at', 'Cierre'));
+    if (new Date(closes) <= new Date(opens)) return fail('La fecha de cierre debe ser posterior a la de apertura.');
+    const { error } = await ctx.supabase.from('external_evaluations').insert({
+      organization_id: ctx.orgId, section_id: section, title: reqStr(fd, 'title', 'Título').slice(0, 160), instructions: str(fd, 'instructions')?.slice(0, 4000) ?? null,
+      url, provider: providerOf(url), opens_at: opens, closes_at: closes, assessment_id: str(fd, 'assessment_id'),
+    });
+    if (error) return fail(error);
+    back(section); return ok('Evaluación creada. Los estudiantes verán el botón «Entrar» solo mientras esté abierta.');
+  });
+}
+
+export async function deleteExternalEval(fd: FormData): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getContext(); const section = reqStr(fd, 'section_id', 'sección');
+    const { data, error } = await ctx.supabase.from('external_evaluations').delete().eq('id', reqStr(fd, 'id', 'evaluación')).select('id');
+    if (error) return fail(error);
+    if (!data?.length) return fail('No tiene permiso para eliminarla.');
+    back(section); return ok('Evaluación eliminada (puede deshacerlo con ↶).');
+  });
+}

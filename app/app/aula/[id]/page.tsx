@@ -6,7 +6,7 @@ import { PageHeader, Card, Badge, Empty, Tabs } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField, TextArea } from '@/components/forms';
 import { fmtDateTime } from '@/lib/format';
 import { ACCEPT } from '@/lib/lms';
-import { addContent, addUnit, createAssignment, createQuiz, createThread, deleteContent, submitAssignment } from '../actions';
+import { addContent, addUnit, createAssignment, createQuiz, createThread, deleteContent, submitAssignment, createExternalEval, deleteExternalEval } from '../actions';
 
 export const metadata = { title: 'Curso' };
 const KIND: Record<string, string> = { texto: '📝', video: '🎬', enlace: '🔗', archivo: '📎' };
@@ -119,6 +119,9 @@ export default async function Page({ params, searchParams }: { params: Promise<{
 
   if (tab === 'examenes') {
     const { data: quizzes } = await ctx.supabase.from('quizzes').select('*').eq('section_id', id).order('opens_at');
+    const { data: exts } = await ctx.supabase.from('external_evaluations').select('id, title, instructions, provider, opens_at, closes_at, published, assessment_id').eq('section_id', id).order('opens_at');
+    const { data: acc } = (exts?.length ? await ctx.supabase.from('external_evaluation_access').select('evaluation_id, student_id, first_opened, last_opened, times, students(first_names, last_names)').in('evaluation_id', exts.map((x: any) => x.id)) : { data: [] }) as { data: any[] | null };
+    const PROV: Record<string, string> = { google_forms: '📝 Google Forms', google_drive: '📂 Google Drive', microsoft_forms: '📋 Microsoft Forms', onedrive: '☁ OneDrive', otro: '🔗 Enlace' };
     const { data: att } = student ? await ctx.supabase.from('quiz_attempts').select('quiz_id, submitted_at, score, max_score, grade').eq('student_id', ctx.studentId!) : { data: [] as any[] };
     const now = new Date().toISOString();
     body = (
@@ -132,6 +135,38 @@ export default async function Page({ params, searchParams }: { params: Promise<{
               <Grid><Field label="Intentos permitidos" name="max_attempts" type="number" defaultValue="1" /><SelectField label="Nota oficial (evaluación del libro)" name="assessment_id" placeholder="No pasa al libro" options={assessOpts} /></Grid>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="show_results" defaultChecked /> Mostrar puntaje al alumno (y la revisión cuando cierre)</label>
             </ActionForm></div></details>)}
+        <h2 className="mb-3 mt-2 text-lg font-bold">🔗 Evaluaciones con enlace (Google Forms, Drive, Microsoft Forms…)</h2>
+        {manager && (
+          <details className="card mb-4" data-testid="nueva-evaluacion-externa"><summary className="cursor-pointer px-5 py-3 text-sm font-bold text-brand-700">+ Nueva evaluación con enlace</summary>
+            <div className="border-t border-slate-100 p-5"><ActionForm action={createExternalEval} submitLabel="Crear evaluación">{hidden}
+              <Field label="Título" name="title" required placeholder="Ej.: Prueba 1 — Unidad de redes" />
+              <Field label="Enlace de la evaluación (Google Forms, Drive, Microsoft Forms…)" name="url" required placeholder="https://forms.gle/…" />
+              <TextArea label="Instrucciones" name="instructions" />
+              <Grid cols={3}><Field label="Abre" name="opens_at" type="datetime-local" required /><Field label="Cierra" name="closes_at" type="datetime-local" required />
+                <SelectField label="Nota oficial (evaluación del libro)" name="assessment_id" placeholder="No pasa al libro" options={assessOpts} /></Grid>
+              <p className="text-xs text-slate-500">🔒 Los estudiantes no ven el enlace: solo un botón «Entrar» que funciona entre la apertura y el cierre. Usted ve quién entró y cuándo. En Google Forms active «Recopilar correos» para identificar las respuestas.</p>
+            </ActionForm></div></details>)}
+        <div className="mb-8 space-y-3">{exts?.length ? exts.map((x: any) => {
+          const open = x.opens_at <= now && x.closes_at > now;
+          const who = (acc ?? []).filter((a: any) => a.evaluation_id === x.id);
+          const mine = who.find((a: any) => a.student_id === ctx.studentId);
+          return (
+            <Card key={x.id} title={x.title} actions={open ? <Badge color="green">Abierta</Badge> : x.closes_at <= now ? <Badge color="gray">Cerrada</Badge> : <Badge color="blue">Próxima</Badge>}>
+              <div data-testid="evaluacion-externa">
+                <p className="text-sm text-slate-600">{PROV[x.provider] ?? PROV.otro} · {fmtDateTime(x.opens_at)} → {fmtDateTime(x.closes_at)}</p>
+                {x.instructions && <p className="mt-2 whitespace-pre-line text-sm">{x.instructions}</p>}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {(manager || open) && <a className={manager ? 'btn-secondary btn-sm' : 'btn-primary btn-sm'} href={`/app/aula/evaluacion/${x.id}`} target="_blank" rel="noopener noreferrer" data-testid="entrar-evaluacion">{manager ? '👁 Abrir enlace' : '▶ Entrar a la evaluación'}</a>}
+                  {student && !open && x.opens_at > now && <span className="text-sm text-slate-500">Abre el {fmtDateTime(x.opens_at)}</span>}
+                  {student && mine && <span className="text-xs text-emerald-700">✓ Usted entró el {fmtDateTime(mine.first_opened)}</span>}
+                  {manager && <ActionForm action={deleteExternalEval} inline submitLabel="🗑" submitClass="text-xs text-red-600 hover:underline" confirm={`¿Eliminar «${x.title}»?`}>{hidden}<input type="hidden" name="id" value={x.id} /></ActionForm>}
+                </div>
+                {manager && <details className="mt-2 text-sm"><summary className="cursor-pointer text-slate-500" data-testid="ingresos">👥 {who.length} estudiante(s) entraron</summary>
+                  <ul className="mt-1 space-y-0.5 text-xs">{who.map((a: any) => <li key={a.student_id}>{a.students ? `${a.students.last_names}, ${a.students.first_names}` : a.student_id} · {fmtDateTime(a.first_opened)}{a.times > 1 ? ` (${a.times} veces)` : ''}</li>)}</ul></details>}
+              </div>
+            </Card>);
+        }) : <Card><Empty>No hay evaluaciones con enlace.</Empty></Card>}</div>
+        <h2 className="mb-3 text-lg font-bold">✅ Exámenes en línea de la plataforma</h2>
         <div className="space-y-4">{quizzes?.length ? quizzes.map((q: any) => {
           const mine = (att ?? []).filter((t: any) => t.quiz_id === q.id);
           const done = mine.filter((t: any) => t.submitted_at);

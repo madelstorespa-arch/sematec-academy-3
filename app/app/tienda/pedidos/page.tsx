@@ -17,6 +17,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ v
   const sp = await searchParams;
   let q = ctx.supabase.from('sales').select('id, number, status, customer_name, customer_email, customer_phone, delivery, address, payment_method, total, created_at, paid_at, notes, sale_items(name, qty)')
     .eq('organization_id', orgId).eq('channel', 'web').order('created_at', { ascending: false }).limit(300);
+  if (ctx.campusId) q = q.or(`campus_id.eq.${ctx.campusId},campus_id.is.null`); // pedidos de la sucursal + del catálogo general
   if (sp.ver !== 'todos') q = q.in('status', ['pendiente_pago', 'pagada', 'lista']);
   const { data: rows } = await q;
   const act = can(ctx, 'store.create');

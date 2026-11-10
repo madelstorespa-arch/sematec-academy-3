@@ -62,12 +62,14 @@ export async function signIn(fd: FormData): Promise<ActionResult> {
     if (fails >= 3) return { ok: false, error: `Correo o contraseña incorrectos. Le quedan ${Math.max(1, 5 - fails)} intento(s) antes de un bloqueo de 15 minutos. Si no la recuerda, use «¿Olvidó su contraseña?».` };
     return { ok: false, error: 'Correo o contraseña incorrectos.' };
   }
-  const { data: profile } = await supabase.from('profiles').select('status').eq('id', data.user.id).maybeSingle();
+  const { data: profile } = await supabase.from('profiles').select('status, preferences').eq('id', data.user.id).maybeSingle();
   if (profile && profile.status !== 'active') {
     await supabase.auth.signOut();
     return { ok: false, error: 'La cuenta está bloqueada o suspendida. Contacte a la administración de su institución.' };
   }
-  redirect(next);
+  // Página de inicio elegida por la persona en «Mi configuración»
+  const home = (profile?.preferences as { home?: string } | null)?.home;
+  redirect(next === '/app' && typeof home === 'string' && /^\/app(\/[a-z0-9/_-]*)?$/.test(home) ? home : next);
 }
 
 export async function requestReset(fd: FormData): Promise<ActionResult> {
