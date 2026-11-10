@@ -4,10 +4,11 @@ import { ActionForm, Field, Grid, SelectField } from '@/components/forms';
 import { campusOptions } from '@/lib/options';
 import { fmtDate } from '@/lib/format';
 import { grantRole, revokeRole, setAccountStatus, createRole } from './actions';
+import { AccessDiagnosis } from './diagnostico';
 
 export const metadata = { title: 'Usuarios y roles' };
 
-export default async function Page({ searchParams }: { searchParams: Promise<{ q?: string; rol?: string; estado?: string }> }) {
+export default async function Page({ searchParams }: { searchParams: Promise<{ q?: string; rol?: string; estado?: string; revisar?: string }> }) {
   const sp = await searchParams;
   const ctx = await getContext();
   requirePerm(ctx, 'users.view');
@@ -33,6 +34,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
   return (
     <>
       <PageHeader title="Usuarios y roles" subtitle="Acceso por institución, sede y rol. Los roles administrativos exigen MFA." />
+      <AccessDiagnosis ctx={ctx} email={sp.revisar?.trim().toLowerCase().slice(0, 254)} />
       {admin && (
         <Card title="Asignar rol a un usuario" className="mb-6">
           {ctx.aal !== 'aal2' ? <p className="text-sm text-amber-700">Para administrar roles debe iniciar sesión con MFA.</p> : (

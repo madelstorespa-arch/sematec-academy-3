@@ -238,6 +238,7 @@ function ShareButton({ say }: { say: (m: string) => void }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<'detail' | 'motion'>('detail');
   const [audio, setAudio] = useState(true);
+  const [whole, setWhole] = useState(true);
   const [busy, setBusy] = useState(false);
   const sharing = localParticipant.isScreenShareEnabled;
   const share = async () => {
@@ -247,6 +248,8 @@ function ShareButton({ say }: { say: (m: string) => void }) {
       await localParticipant.setScreenShareEnabled(true, {
         audio, resolution: preset.resolution, contentHint: mode, selfBrowserSurface: 'include', surfaceSwitching: 'include',
         systemAudio: audio ? 'include' : 'exclude',
+        // Toda la pantalla: el navegador abre directo en «Pantalla completa» y puede moverse por todo su equipo
+        video: whole ? { displaySurface: 'monitor' } : true, monitorTypeSurfaces: 'include',
       } as any, { screenShareEncoding: preset.encoding, simulcast: false });
       say('🟢 Compartiendo su pantalla con todos.');
     } catch (e) {
@@ -263,7 +266,14 @@ function ShareButton({ say }: { say: (m: string) => void }) {
       <button className="lk-button" disabled={busy} onClick={() => setOpen((v) => !v)}>🖥 Compartir pantalla</button>
       {open && (
         <span className="absolute bottom-12 left-1/2 z-30 block w-[min(92vw,22rem)] -translate-x-1/2 rounded-xl bg-[#222] p-4 text-left text-sm shadow-2xl" data-testid="opciones-compartir">
-          <b>Compartir pantalla</b>
+          <b>¿Qué quiere compartir?</b>
+          <label className={`mt-2 flex cursor-pointer gap-2 rounded-lg p-2 ${whole ? 'bg-emerald-600/30' : 'hover:bg-white/5'}`}>
+            <input type="radio" name="superficie" checked={whole} onChange={() => setWhole(true)} className="mt-1" />
+            <span><span className="font-semibold">🖥 Toda la pantalla</span><span className="block text-xs opacity-70">Puede navegar por todo su equipo (programas, carpetas, otras páginas) y todos ven lo que hace.</span></span></label>
+          <label className={`mt-1 flex cursor-pointer gap-2 rounded-lg p-2 ${!whole ? 'bg-emerald-600/30' : 'hover:bg-white/5'}`}>
+            <input type="radio" name="superficie" checked={!whole} onChange={() => setWhole(false)} className="mt-1" />
+            <span><span className="font-semibold">🪟 Solo una ventana o pestaña</span><span className="block text-xs opacity-70">Los demás ven únicamente esa ventana.</span></span></label>
+          <b className="mt-3 block">Calidad</b>
           <label className={`mt-2 flex cursor-pointer gap-2 rounded-lg p-2 ${mode === 'detail' ? 'bg-blue-600/30' : 'hover:bg-white/5'}`}>
             <input type="radio" name="calidad" checked={mode === 'detail'} onChange={() => setMode('detail')} className="mt-1" />
             <span><span className="font-semibold">📄 Texto nítido</span><span className="block text-xs opacity-70">Documentos, presentaciones, código (1080p).</span></span></label>
@@ -275,7 +285,7 @@ function ShareButton({ say }: { say: (m: string) => void }) {
             <button className="rounded-lg bg-blue-600 px-3 py-2 font-semibold" onClick={share}>Elegir qué compartir →</button>
             <button className="rounded-lg px-3 py-2 opacity-70" onClick={() => setOpen(false)}>Cancelar</button>
           </span>
-          <span className="mt-2 block text-xs opacity-60">Podrá elegir una pestaña, una ventana o toda la pantalla. Para que no se vea «en espejo», comparta otra ventana o pestaña, no esta.</span>
+          <span className="mt-2 block text-xs opacity-60">En la ventana del navegador elija «Pantalla completa» / «Toda la pantalla» y toque «Compartir». Mientras comparte puede minimizar esta sala y trabajar normalmente: la clase sigue viendo su pantalla.</span>
         </span>)}
     </span>
   );
