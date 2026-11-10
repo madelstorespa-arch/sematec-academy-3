@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import { KINDS, kindIcon, SALE_METHODS } from '@/lib/store';
+import { KINDS, kindIcon, SALE_METHODS, bestPromo, type Promo } from '@/lib/store';
 import { DOC_TYPES } from '@/lib/identity';
-import { sell, type CartLine } from '../actions';
+import { checkCoupon, sell, type CartLine } from '../actions';
 
 type P = { id: string; sku: string; barcode: string | null; name: string; kind: string; category: string | null; unit: string; price: number; stock: number;
   track_stock: boolean; requires_serial: boolean; warranty_months: number | null; tax_rate: number; image_asset_id: string | null };
@@ -12,7 +12,7 @@ const money = (n: number, c: string) => new Intl.NumberFormat('es-CL', { style: 
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 /** 🧾 Punto de venta: lector de código de barras (o cámara), carrito, descuentos, efectivo con vuelto y comprobante. */
-export function Pos({ products: initial, currency }: { products: P[]; currency: string }) {
+export function Pos({ products: initial, currency, promos = [] }: { products: P[]; currency: string; promos?: Promo[] }) {
   const [products, setProducts] = useState(initial);
   const [q, setQ] = useState('');
   const [kind, setKind] = useState('');
@@ -22,7 +22,11 @@ export function Pos({ products: initial, currency }: { products: P[]; currency: 
   const [discount, setDiscount] = useState('');
   const [customer, setCustomer] = useState({ name: '', doc_type: 'RUN', doc_number: '', email: '' });
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [done, setDone] = useState<{ id: string; number: number; total: number; change: number | null } | null>(null);
+  const [done, setDone] = useState<{ id: string; number: number; code?: string; total: number; change: number | null } | null>(null);
+  const [couponText, setCouponText] = useState('');
+  const [coupon, setCoupon] = useState<{ code: string; discount: number } | null>(null);
+  const promoOf = (l: Line) => bestPromo(promos, { ...l.p, currency }, l.qty, 'caja');
+  const lineTotal = (l: Line) => Math.max(0, Math.round(l.p.price * l.qty - (promoOf(l)?.discount ?? 0) - l.discount));
   const [pending, start] = useTransition();
   const [scan, setScan] = useState(false);
   const search = useRef<HTMLInputElement>(null);
@@ -72,9 +76,11 @@ export function Pos({ products: initial, currency }: { products: P[]; currency: 
     return () => { stop = true; clearInterval(timer); stream?.getTracks().forEach((t) => t.stop()); };
   }, [scan]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const subtotal = cart.reduce((t, l) => t + Math.max(0, Math.round(l.p.price * l.qty - l.discount)), 0);
+  const subtotal = cart.reduce((t, l) => t + lineTotal(l), 0);
   const disc = Math.min(Math.max(0, Number(discount) || 0), subtotal);
-  const total = subtotal - disc;
+  const couponD = coupon ? Math.min(coupon.discount, subtotal - disc) : 0;
+  const total = subtotal - disc - couponD;
+  const saved = cart.reduce((t, l) => t + (promoOf(l)?.discount ?? 0), 0);
   const cashN = Number(cash) || 0;
   const change = method === 'cash' ? cashN - total : 0;
   const canPay = cart.length > 0 && !pending && (method !== 'cash' || cashN >= total) && cart.every((l) => !l.p.requires_serial || l.serial.trim());
@@ -82,11 +88,11 @@ export function Pos({ products: initial, currency }: { products: P[]; currency: 
   const pay = () => start(async () => {
     setMsg(null);
     const items: CartLine[] = cart.map((l) => ({ product: l.p.id, qty: l.qty, discount: l.discount || 0, serial: l.serial || undefined }));
-    const r = await sell({ items, method, discount: disc, cash: method === 'cash' ? cashN : null, customer: customer.name || customer.doc_number || customer.email ? customer : {} });
+    const r = await sell({ items, method, discount: disc, cash: method === 'cash' ? cashN : null, customer: customer.name || customer.doc_number || customer.email ? customer : {}, coupon: coupon?.code });
     if (!r.ok) { setMsg({ ok: false, text: r.error ?? 'No se pudo registrar la venta.' }); return; }
-    const d = r.data as { id: string; number: number; total: number; change: number | null };
+    const d = r.data as { id: string; number: number; code?: string; total: number; change: number | null };
     setProducts((ps) => ps.map((p) => { const l = cart.find((x) => x.p.id === p.id); return l ? { ...p, stock: Number(p.stock) - l.qty } : p; }));
-    setDone(d); setCart([]); setCash(''); setDiscount(''); setCustomer({ name: '', doc_type: 'RUN', doc_number: '', email: '' });
+    setDone(d); setCart([]); setCash(''); setDiscount(''); setCoupon(null); setCouponText(''); setCustomer({ name: '', doc_type: 'RUN', doc_number: '', email: '' });
   });
 
   return (
@@ -134,8 +140,10 @@ export function Pos({ products: initial, currency }: { products: P[]; currency: 
                   onChange={(e) => { const v = Number(e.target.value.replace(',', '.')); if (v > 0) setCart((c) => c.map((x, j) => (j === i ? { ...x, qty: l.p.unit === 'unidad' ? Math.round(v) || 1 : v } : x))); }} />
                 <button className="h-7 w-7 rounded bg-white ring-1 ring-slate-200" onClick={() => add(l.p)}>+</button>
                 <span className="text-xs text-slate-500">{l.p.unit === 'unidad' ? '' : l.p.unit} × {money(l.p.price, currency)}</span>
-                <b className="ml-auto">{money(Math.max(0, Math.round(l.p.price * l.qty - l.discount)), currency)}</b>
+                <b className="ml-auto">{money(lineTotal(l), currency)}</b>
               </div>
+              {promoOf(l) && promoOf(l)!.discount > 0 && <p className="mt-1 text-xs font-semibold text-red-600" data-testid="oferta-linea">🏷 {promoOf(l)!.label}: −{money(promoOf(l)!.discount, currency)}</p>}
+              {promoOf(l) && promoOf(l)!.discount === 0 && promoOf(l)!.promo.kind === 'nxm' && <p className="mt-1 text-xs text-slate-500">🏷 {promoOf(l)!.label}</p>}
               <div className="mt-1 flex gap-1 text-xs">
                 <input value={l.discount || ''} inputMode="numeric" placeholder="Descuento $" className="w-24 rounded border border-slate-200 px-1 py-0.5"
                   onChange={(e) => setCart((c) => c.map((x, j) => (j === i ? { ...x, discount: Math.max(0, Number(e.target.value) || 0) } : x)))} />
@@ -149,6 +157,14 @@ export function Pos({ products: initial, currency }: { products: P[]; currency: 
           <div className="flex justify-between"><span>Subtotal</span><span>{money(subtotal, currency)}</span></div>
           <div className="flex items-center justify-between gap-2"><span>Descuento general</span>
             <input value={discount} onChange={(e) => setDiscount(e.target.value)} inputMode="numeric" placeholder="0" className="w-24 rounded border border-slate-200 px-2 py-0.5 text-right" /></div>
+          {saved > 0 && <div className="flex justify-between text-red-600"><span>🏷 Ahorro por ofertas</span><span>−{money(saved, currency)}</span></div>}
+          <div className="flex items-center justify-between gap-2"><span>🎟 Cupón</span>
+            {coupon ? <span className="text-red-600">{coupon.code} −{money(couponD, currency)} <button className="text-xs text-slate-400" onClick={() => setCoupon(null)}>✕</button></span>
+              : <span className="flex gap-1"><input value={couponText} onChange={(e) => setCouponText(e.target.value.toUpperCase())} placeholder="CÓDIGO" className="w-28 rounded border border-slate-200 px-2 py-0.5 text-right uppercase" data-testid="caja-cupon" />
+                <button type="button" className="rounded bg-slate-100 px-2 text-xs" data-testid="aplicar-cupon" onClick={async () => {
+                  const r = await checkCoupon(couponText, subtotal - disc);
+                  if (r.valid) { setCoupon({ code: r.code ?? couponText, discount: Number(r.discount ?? 0) }); setMsg(null); } else setMsg({ ok: false, text: 'Cupón no válido, vencido o sin compra mínima.' });
+                }}>Aplicar</button></span>}</div>
           <div className="flex justify-between text-2xl font-black"><span>Total</span><span data-testid="caja-total">{money(total, currency)}</span></div>
           <p className="text-right text-[11px] text-slate-500">IVA incluido</p>
         </div>
@@ -182,7 +198,7 @@ export function Pos({ products: initial, currency }: { products: P[]; currency: 
         <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-900/50 p-4" role="dialog">
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl" data-testid="venta-lista">
             <p className="text-4xl">✅</p>
-            <h2 className="mt-2 text-xl font-bold">Venta N° {done.number}</h2>
+            <h2 className="mt-2 text-xl font-bold">Boleta {done.code ?? `N° ${done.number}`}</h2>
             <p className="mt-1 text-2xl font-black">{money(Number(done.total), currency)}</p>
             {done.change !== null && <p className="mt-2 rounded-lg bg-emerald-50 p-3 text-lg font-bold text-emerald-800">Vuelto: {money(Number(done.change), currency)}</p>}
             <div className="mt-5 grid gap-2">

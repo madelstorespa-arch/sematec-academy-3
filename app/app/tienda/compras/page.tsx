@@ -18,7 +18,7 @@ export default async function Page() {
   ]);
   return (
     <>
-      <PageHeader title="Tienda" subtitle="Ingreso de mercadería: suma stock (con lote y vencimiento) y registra el gasto" />
+      <PageHeader title="SEMATEC VENTA" subtitle="Ingreso de mercadería: suma stock (con lote y vencimiento) y registra el gasto" />
       <StoreTabs current="compras" />
       {can(ctx, 'store.edit') && <Card title="📥 Registrar compra a proveedor" className="mb-6"><PurchaseForm products={(products ?? []) as any[]} /></Card>}
       <Card title="Compras registradas">

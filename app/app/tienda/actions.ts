@@ -17,7 +17,7 @@ function productRow(fd: FormData) {
   const kind = reqStr(fd, 'kind', 'Tipo');
   const barcode = (str(fd, 'barcode') ?? '').replace(/\s+/g, '');
   return {
-    sku: reqStr(fd, 'sku', 'Código interno').toUpperCase().slice(0, 40), barcode: barcode || null, name: reqStr(fd, 'name', 'Nombre'),
+    sku: (str(fd, 'sku') ?? '').toUpperCase().replace(/\s+/g, '').slice(0, 40) || null, barcode: barcode || null, name: reqStr(fd, 'name', 'Nombre'),
     description: str(fd, 'description'), kind, category: str(fd, 'category'), brand: str(fd, 'brand'), unit: str(fd, 'unit') ?? 'unidad',
     price, cost: num(fd, 'cost') ?? 0, tax_rate: fd.get('exento') === 'on' ? 0 : 19, min_stock: num(fd, 'min_stock') ?? 0,
     track_stock: fd.get('track_stock') !== 'off', track_expiry: fd.get('track_expiry') === 'on',
@@ -60,7 +60,8 @@ export async function updateProduct(fd: FormData): Promise<ActionResult> {
     if (!ctx.orgId) return fail('Seleccione una institución.');
     const id = reqStr(fd, 'id', 'id');
     const image = await maybeImage(fd, ctx.orgId, ctx.user.id);
-    const { error, count } = await ctx.supabase.from('products').update({ ...productRow(fd), ...(image ? { image_asset_id: image } : {}) }, { count: 'exact' }).eq('id', id);
+    const { sku, ...rest } = productRow(fd);
+    const { error, count } = await ctx.supabase.from('products').update({ ...rest, ...(sku ? { sku } : {}), ...(image ? { image_asset_id: image } : {}) }, { count: 'exact' }).eq('id', id);
     if (error) return fail(error);
     if (!count) return fail('No tiene permiso para editar productos.');
     refresh();
@@ -126,7 +127,7 @@ export async function registerPurchase(fd: FormData): Promise<ActionResult> {
 export type CartLine = { product: string; qty: number; discount?: number; serial?: string };
 
 /** 🧾 Cobra una venta en caja. */
-export async function sell(input: { items: CartLine[]; method: string; discount: number; cash: number | null; customer: Record<string, string>; notes?: string }): Promise<ActionResult> {
+export async function sell(input: { items: CartLine[]; method: string; discount: number; cash: number | null; customer: Record<string, string>; notes?: string; coupon?: string }): Promise<ActionResult> {
   return guard(async () => {
     const ctx = await getContext();
     if (!ctx.orgId) return fail('Seleccione una institución.');
@@ -138,11 +139,11 @@ export async function sell(input: { items: CartLine[]; method: string; discount:
     }
     const { data, error } = await ctx.supabase.rpc('store_sell', {
       p_org: ctx.orgId, p_items: (input.items ?? []).slice(0, 200), p_payment_method: input.method, p_customer: c,
-      p_discount: Math.max(0, Number(input.discount) || 0), p_cash: input.cash, p_notes: input.notes ?? null,
+      p_discount: Math.max(0, Number(input.discount) || 0), p_cash: input.cash, p_notes: input.notes ?? null, p_coupon: input.coupon?.trim() || null,
     });
     if (error) return fail(error);
     refresh();
-    return ok(`Venta N° ${(data as any).number} registrada.`, data);
+    return ok(`Boleta ${(data as any).code} registrada.`, data);
   });
 }
 
@@ -178,11 +179,108 @@ export async function sendSaleReceipt(fd: FormData): Promise<ActionResult> {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return fail('Ingrese un correo válido.');
     const url = `${env.siteUrl()}/tienda/pedido/${s.tracking ?? ''}`;
     try {
-      await sendMail(to, `${s.org.name}: comprobante de compra N° ${s.number}`,
-        mailLayout(s.org.name, `Comprobante de compra N° ${s.number}`, `<p>Gracias por su compra.</p><p>Total: <b>${fmtMoney(s.total, s.currency)}</b>. Adjuntamos el comprobante en PDF.</p>`),
-        `Comprobante de compra N° ${s.number} por ${fmtMoney(s.total, s.currency)}.${s.tracking ? ` ${url}` : ''}`,
+      await sendMail(to, `${s.org.name}: boleta ${s.code}`,
+        mailLayout(s.org.name, `Boleta ${s.code}`, `<p>Gracias por su compra.</p><p>Total: <b>${fmtMoney(s.total, s.currency)}</b>. Adjuntamos el comprobante en PDF.</p>`),
+        `Boleta ${s.code} por ${fmtMoney(s.total, s.currency)}.${s.tracking ? ` ${url}` : ''}`,
         [{ filename: saleFilename(s), content: await salePdf(s), contentType: 'application/pdf' }]);
     } catch (e) { return fail((e as Error).message); }
     return ok(`Comprobante enviado a ${to}.`);
   });
+}
+
+function promoRow(fd: FormData) {
+  const kind = reqStr(fd, 'kind', 'Tipo de oferta');
+  const scope = reqStr(fd, 'scope', 'Aplica a');
+  const value = num(fd, 'value') ?? 0;
+  if (kind !== 'nxm' && value <= 0) throw new ValidationError('Ingrese el valor de la oferta.');
+  if (kind === 'percent' && value > 100) throw new ValidationError('El porcentaje no puede superar 100.');
+  const products = fd.getAll('product_ids').map(String).filter((x) => /^[0-9a-f-]{36}$/.test(x));
+  if (scope === 'products' && !products.length) throw new ValidationError('Elija al menos un producto.');
+  return {
+    name: reqStr(fd, 'name', 'Nombre'), kind, value: kind === 'nxm' ? 0 : value,
+    buy_qty: kind === 'nxm' ? num(fd, 'buy_qty') : null, pay_qty: kind === 'nxm' ? num(fd, 'pay_qty') : null,
+    scope, scope_kind: scope === 'kind' ? str(fd, 'scope_kind') : null, scope_category: scope === 'category' ? str(fd, 'scope_category') : null,
+    product_ids: scope === 'products' ? products : [], channel: str(fd, 'channel') ?? 'ambos',
+    starts_at: str(fd, 'starts_at') ? new Date(`${str(fd, 'starts_at')}T00:00:00-03:00`).toISOString() : null,
+    ends_at: str(fd, 'ends_at') ? new Date(`${str(fd, 'ends_at')}T23:59:59-03:00`).toISOString() : null,
+    badge: str(fd, 'badge'), active: fd.get('active') !== 'off',
+  };
+}
+
+/** 🏷 Crea o edita una oferta / promoción. */
+export async function savePromotion(fd: FormData): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getContext();
+    if (!ctx.orgId) return fail('Seleccione una institución.');
+    const id = str(fd, 'id');
+    const row = promoRow(fd);
+    const { error, count } = id
+      ? await ctx.supabase.from('store_promotions').update(row, { count: 'exact' }).eq('id', id)
+      : await ctx.supabase.from('store_promotions').insert({ ...row, organization_id: ctx.orgId }, { count: 'exact' });
+    if (error) return fail(error);
+    if (!count) return fail('No tiene permiso para administrar ofertas.');
+    refresh();
+    return ok(id ? 'Oferta actualizada.' : `Oferta «${row.name}» creada: ya se aplica en la caja y en la tienda web.`);
+  });
+}
+
+export async function deletePromotion(fd: FormData): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getContext();
+    const { error, count } = await ctx.supabase.from('store_promotions').delete({ count: 'exact' }).eq('id', reqStr(fd, 'id', 'id'));
+    if (error) return fail(error);
+    if (!count) return fail('No tiene permiso.');
+    refresh(); return ok('Oferta eliminada.');
+  });
+}
+
+/** 🎟 Cupón de descuento (código que el cliente escribe en la caja o en la web). */
+export async function saveCoupon(fd: FormData): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getContext();
+    if (!ctx.orgId) return fail('Seleccione una institución.');
+    const code = reqStr(fd, 'code', 'Código').toUpperCase().replace(/\s+/g, '');
+    if (!/^[A-Z0-9-]{4,20}$/.test(code)) return fail('El código debe tener entre 4 y 20 letras o números (sin espacios).');
+    const value = num(fd, 'value') ?? 0;
+    const row = {
+      code, kind: reqStr(fd, 'kind', 'Tipo'), value, min_total: num(fd, 'min_total') ?? 0, max_uses: num(fd, 'max_uses') || null, channel: str(fd, 'channel') ?? 'ambos',
+      ends_at: str(fd, 'ends_at') ? new Date(`${str(fd, 'ends_at')}T23:59:59-03:00`).toISOString() : null, active: fd.get('active') !== 'off',
+    };
+    const id = str(fd, 'id');
+    const { error, count } = id ? await ctx.supabase.from('store_coupons').update(row, { count: 'exact' }).eq('id', id)
+      : await ctx.supabase.from('store_coupons').insert({ ...row, organization_id: ctx.orgId }, { count: 'exact' });
+    if (error) return fail(error.code === '23505' ? 'Ya existe un cupón con ese código.' : error);
+    if (!count) return fail('No tiene permiso.');
+    refresh(); return ok(`Cupón ${code} guardado.`);
+  });
+}
+
+export async function deleteCoupon(fd: FormData): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getContext();
+    const { error, count } = await ctx.supabase.from('store_coupons').delete({ count: 'exact' }).eq('id', reqStr(fd, 'id', 'id'));
+    if (error) return fail(error);
+    if (!count) return fail('No tiene permiso.');
+    refresh(); return ok('Cupón eliminado.');
+  });
+}
+
+/** Nombre de la tienda (por defecto SEMATEC VENTA). */
+export async function saveStoreName(fd: FormData): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getContext();
+    if (!ctx.orgId || !can(ctx, 'store.admin')) return fail('Solo el propietario puede cambiar el nombre de la tienda.');
+    const { error } = await ctx.supabase.from('site_settings').update({ store_name: reqStr(fd, 'store_name', 'Nombre').slice(0, 60) }).eq('organization_id', ctx.orgId);
+    if (error) return fail(error);
+    refresh(); revalidatePath('/', 'layout');
+    return ok('Nombre de la tienda actualizado.');
+  });
+}
+
+/** Vista previa de un cupón en la caja. */
+export async function checkCoupon(code: string, total: number): Promise<{ valid: boolean; discount?: number; code?: string }> {
+  const ctx = await getContext();
+  if (!ctx.orgId) return { valid: false };
+  const { data } = await ctx.supabase.rpc('store_coupon_check', { p_org: ctx.orgId, p_code: code, p_total: total, p_channel: 'caja' });
+  return (data ?? { valid: false }) as { valid: boolean; discount?: number; code?: string };
 }

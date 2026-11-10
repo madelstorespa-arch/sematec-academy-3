@@ -4,6 +4,7 @@ import { getPublicSite, anonClient, mediaUrl } from '@/lib/site';
 import { MODALITY } from '@/components/course-card';
 import { fmtDate } from '@/lib/format';
 import { PriceTag } from '@/components/price-tag';
+import { AVAIL_TEXT, offeringAvailability } from '@/lib/availability';
 
 export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -11,6 +12,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
   if (!site) notFound();
   const { data: c } = await anonClient().from('catalog_offerings').select('*').eq('organization_id', site.organization_id).eq('slug', slug).eq('is_published', true).maybeSingle();
   if (!c) notFound();
+  const av = (await offeringAvailability(site.organization_id)).get(c.id);
   const img = mediaUrl(c.image_asset_id);
   return (
     <main className="mx-auto grid max-w-6xl gap-10 px-4 py-12 lg:grid-cols-3">
@@ -33,7 +35,10 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
           {c.starts_on && <div className="flex justify-between"><dt className="text-slate-500">Inicio</dt><dd className="font-semibold">{fmtDate(c.starts_on)}</dd></div>}
           <div className="flex justify-between"><dt className="text-slate-500">Ingreso</dt><dd className="font-semibold">{c.admission_mode === 'application' ? 'Con postulación' : 'Inscripción inmediata'}</dd></div>
         </dl>
-        <Link href={`/cursos/${c.slug}/inscripcion`} className="btn-primary mt-6 w-full">{c.admission_mode === 'application' ? 'Postular' : 'Inscribirme y pagar'}</Link>
+        {av && <p className={`mt-4 text-sm font-semibold ${AVAIL_TEXT[av.status][1]}`} data-testid="cupos">{AVAIL_TEXT[av.status][0]}{av.capacity && av.status !== 'cerrado' ? ` · quedan ${Math.max(0, av.capacity - av.taken)} de ${av.capacity} cupos` : ''}</p>}
+        {av && (av.status === 'agotado' || av.status === 'cerrado')
+          ? <p className="mt-4 rounded-lg bg-slate-100 p-3 text-center text-sm font-semibold text-slate-600" data-testid="no-disponible">No disponible por ahora. Escríbanos para avisarle cuando abra un nuevo grupo.</p>
+          : <Link href={`/cursos/${c.slug}/inscripcion`} className="btn-primary mt-6 w-full">{c.admission_mode === 'application' ? 'Postular' : 'Inscribirme y pagar'}</Link>}
         <p className="mt-3 text-center text-xs text-slate-500">{c.admission_mode === 'application' ? 'Revisaremos su postulación y le avisaremos para pagar.' : 'Acceso a la plataforma inmediatamente después del pago.'}</p>
         <Link href={`/contacto?curso=${c.id}`} className="mt-4 block text-center text-sm link">¿Dudas? Escríbanos</Link>
       </aside>

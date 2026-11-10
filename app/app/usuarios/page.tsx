@@ -15,7 +15,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
   const orgId = requireOrg(ctx);
   const sb = ctx.supabase;
   const [{ data: members }, { data: roles }, campuses, { data: perms }] = await Promise.all([
-    sb.from('memberships').select('id, status, valid_until, created_at, campus_id, campuses(name), roles(code, name, requires_mfa), profiles!memberships_user_id_fkey(id, full_name, email, status)')
+    sb.from('memberships').select('id, status, valid_until, created_at, campus_id, campuses(name), roles(code, name, requires_mfa), profiles!memberships_user_id_fkey(id, full_name, email, status, user_code, id_document_number)')
       .eq('organization_id', orgId).order('created_at', { ascending: false }),
     sb.from('roles').select('code, name, requires_mfa, organization_id').order('name'),
     campusOptions(ctx),
@@ -26,7 +26,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
   const modules = [...new Set((perms ?? []).map((p: any) => p.module))];
   const q = (sp.q ?? '').trim().toLowerCase();
   const shown = (members ?? []).filter((m: any) =>
-    (!q || `${m.profiles?.full_name ?? ''} ${m.profiles?.email ?? ''}`.toLowerCase().includes(q))
+    (!q || `${m.profiles?.full_name ?? ''} ${m.profiles?.email ?? ''} ${m.profiles?.user_code ?? ''} ${m.profiles?.id_document_number ?? ''}`.toLowerCase().includes(q))
     && (!sp.rol || m.roles?.code === sp.rol)
     && (!sp.estado || (sp.estado === 'suspendida' ? m.profiles?.status !== 'active' : sp.estado === 'revocado' ? m.status !== 'active' : m.status === 'active' && m.profiles?.status === 'active')));
   const usedRoles = [...new Map((members ?? []).map((m: any) => [m.roles?.code, m.roles?.name])).entries()].filter(([c]) => c);
@@ -66,7 +66,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
         {shown.length ? <div className="overflow-x-auto"><table className="table">
           <thead><tr><th>Usuario</th><th>Rol</th><th>Sede</th><th>Desde</th><th>Estado</th><th>Cuenta</th>{admin && <th>Acciones</th>}</tr></thead>
           <tbody>{shown.map((m: any) => (
-            <tr key={m.id}><td>{m.profiles?.full_name || '—'}<br /><span className="text-xs text-slate-500">{m.profiles?.email}</span></td>
+            <tr key={m.id}><td>{m.profiles?.full_name || '—'}{m.profiles?.user_code && <span className="ml-2 rounded bg-slate-100 px-1.5 font-mono text-[11px]" data-testid="codigo-usuario">{m.profiles.user_code}</span>}<br /><span className="text-xs text-slate-500">{m.profiles?.email}{m.profiles?.id_document_number && ` · ${m.profiles.id_document_number}`}</span></td>
               <td>{m.roles?.name} {m.roles?.requires_mfa && <Badge color="blue">MFA</Badge>}</td><td>{m.campuses?.name ?? 'Todas'}</td>
               <td>{fmtDate(m.created_at)}{m.valid_until && <><br /><span className="text-xs">hasta {fmtDate(m.valid_until)}</span></>}</td>
               <td><StatusBadge status={m.status} /></td><td><StatusBadge status={m.profiles?.status} /></td>

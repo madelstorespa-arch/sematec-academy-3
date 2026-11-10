@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getPublicSite, anonClient, mediaUrl } from '@/lib/site';
+import { offeringAvailability } from '@/lib/availability';
 import { CourseCard } from '@/components/course-card';
 
 export default async function Home() {
@@ -15,6 +16,7 @@ export default async function Home() {
   }
   const { data: courses } = await anonClient().from('catalog_offerings').select('*').eq('organization_id', site.organization_id)
     .eq('is_published', true).order('sort_order').order('created_at').limit(6);
+  const avail = await offeringAvailability(site.organization_id);
   const hero = mediaUrl(site.hero_asset_id);
   return (
     <main>
@@ -44,7 +46,7 @@ export default async function Home() {
       )}
       <section className="mx-auto max-w-6xl px-4 py-10">
         <div className="mb-6 flex items-end justify-between"><h2 className="text-2xl font-bold">Cursos y programas</h2><Link className="link" href="/cursos">Ver todos →</Link></div>
-        {courses?.length ? <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">{courses.map((c: any) => <CourseCard key={c.id} c={c} />)}</div>
+        {courses?.length ? <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">{courses.map((c: any) => <CourseCard key={c.id} c={c} avail={avail.get(c.id)} />)}</div>
           : <p className="text-slate-500">Pronto publicaremos nuestra oferta.</p>}
       </section>
       {site.about_text && (

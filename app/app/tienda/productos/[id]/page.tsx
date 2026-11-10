@@ -6,6 +6,7 @@ import { ActionForm, Field, Grid, SelectField } from '@/components/forms';
 import { fmtDate, fmtDateTime, fmtMoney } from '@/lib/format';
 import { MOVE_LABEL, kindIcon, kindLabel, qtyFmt } from '@/lib/store';
 import { StoreTabs } from '../../tabs';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { ProductFields } from '../../product-form';
 import { adjustStock, deleteProduct, updateProduct } from '../../actions';
 
@@ -20,10 +21,13 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   if (!p) notFound();
   const [{ data: lots }, { data: moves }, { data: cats }] = await Promise.all([
     ctx.supabase.from('product_lots').select('*').eq('product_id', id).gt('qty_remaining', 0).order('expires_on', { nullsFirst: false }),
-    ctx.supabase.from('stock_movements').select('kind, qty, unit_cost, note, created_at, sale_id, purchase_id, sales(number)').eq('product_id', id).order('created_at', { ascending: false }).limit(100),
+    ctx.supabase.from('stock_movements').select('kind, qty, unit_cost, note, created_at, created_by, sale_id, purchase_id, sales(number, code)').eq('product_id', id).order('created_at', { ascending: false }).limit(100),
     ctx.supabase.from('products').select('category').eq('organization_id', orgId).not('category', 'is', null),
   ]);
   const edit = can(ctx, 'store.edit');
+  const uids = [...new Set((moves ?? []).map((m: any) => m.created_by).filter(Boolean))];
+  const { data: who } = uids.length ? await createAdminClient().from('profiles').select('id, full_name, id_document_number').in('id', uids) : { data: [] };
+  const whoOf = new Map((who ?? []).map((p: any) => [p.id, `${p.full_name ?? ''}${p.id_document_number ? ` · ${p.id_document_number}` : ''}`]));
   const today = new Date().toISOString().slice(0, 10);
   return (
     <>
@@ -67,11 +71,12 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         </Card>
         <Card title="Movimientos de inventario" className="lg:col-span-3">
           {moves?.length ? <div className="overflow-x-auto"><table className="table" data-testid="movimientos">
-            <thead><tr><th>Fecha</th><th>Movimiento</th><th className="text-right">Cantidad</th><th>Detalle</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Movimiento</th><th className="text-right">Cantidad</th><th>Detalle</th><th>Quién (nombre · RUT)</th></tr></thead>
             <tbody>{moves.map((m: any, i: number) => (
               <tr key={i}><td className="text-xs">{fmtDateTime(m.created_at)}</td><td>{MOVE_LABEL[m.kind] ?? m.kind}</td>
                 <td className={`text-right font-semibold ${Number(m.qty) < 0 ? 'text-red-600' : 'text-emerald-700'}`}>{Number(m.qty) > 0 ? '+' : ''}{Number(m.qty)}</td>
-                <td className="text-xs">{m.sale_id ? <Link className="link" href={`/app/tienda/ventas/${m.sale_id}`}>Venta N° {m.sales?.number}</Link> : m.note ?? ''}</td></tr>))}</tbody></table></div>
+                <td className="text-xs">{m.sale_id ? <Link className="link" href={`/app/tienda/ventas/${m.sale_id}`}>Boleta {m.sales?.code}</Link> : m.note ?? ''}</td>
+                <td className="text-xs">{whoOf.get(m.created_by) ?? 'Tienda web'}</td></tr>))}</tbody></table></div>
             : <Empty>Sin movimientos.</Empty>}
         </Card>
       </div>

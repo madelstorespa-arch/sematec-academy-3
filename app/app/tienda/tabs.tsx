@@ -4,6 +4,7 @@ export function StoreTabs({ current }: { current: string }) {
     { key: 'resumen', label: '📊 Resumen', href: '/app/tienda' },
     { key: 'caja', label: '🧾 Caja', href: '/app/tienda/caja' },
     { key: 'productos', label: '📦 Productos', href: '/app/tienda/productos' },
+    { key: 'ofertas', label: '🏷 Ofertas y cupones', href: '/app/tienda/ofertas' },
     { key: 'pedidos', label: '🛍 Pedidos web', href: '/app/tienda/pedidos' },
     { key: 'ventas', label: '💰 Ventas', href: '/app/tienda/ventas' },
     { key: 'compras', label: '📥 Compras', href: '/app/tienda/compras' },

@@ -7,28 +7,31 @@ import { docLabel } from '@/lib/identity';
 import { methodLabel, SALE_STATUS } from '@/lib/store';
 
 export type Sale = {
-  id: string; number: number; channel: string; status: string; currency: string; createdAt: string; paidAt: string | null;
+  id: string; number: number; code: string; seller: { name: string; doc: string | null; code: string | null } | null; coupon: { code: string; discount: number } | null; channel: string; status: string; currency: string; createdAt: string; paidAt: string | null;
   subtotal: number; discount: number; total: number; tax: number; cash: number | null; change: number | null; method: string | null;
   delivery: string; address: string | null; tracking: string | null; cancelReason: string | null; notes: string | null;
   customer: { name: string | null; doc: string | null; email: string | null; phone: string | null };
-  items: { name: string; qty: number; unitPrice: number; discount: number; total: number; taxRate: number; serial: string | null; warranty: string | null; unit: string }[];
+  items: { name: string; qty: number; unitPrice: number; discount: number; total: number; taxRate: number; serial: string | null; warranty: string | null; unit: string; promo: string | null; promoDiscount: number }[];
   org: { id: string; name: string; legal: string | null; taxId: string | null; address: string | null; phone: string | null };
 };
 
 async function build(s: any, admin = createAdminClient()): Promise<Sale> {
-  const [{ data: org }, { data: site }, { data: items }] = await Promise.all([
+  const [{ data: org }, { data: site }, { data: items }, { data: seller }] = await Promise.all([
     admin.from('organizations').select('id, display_name, legal_name, tax_id').eq('id', s.organization_id).maybeSingle(),
     admin.from('site_settings').select('address, contact_phone').eq('organization_id', s.organization_id).maybeSingle(),
-    admin.from('sale_items').select('name, qty, unit_price, discount, total, tax_rate, serial, warranty_until, products(unit)').eq('sale_id', s.id).order('id'),
+    admin.from('sale_items').select('name, qty, unit_price, discount, total, tax_rate, serial, warranty_until, promo_label, promo_discount, products(unit)').eq('sale_id', s.id).order('id'),
+    s.seller_id ? admin.from('profiles').select('full_name, id_document_number, user_code').eq('id', s.seller_id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
   return {
-    id: s.id, number: s.number, channel: s.channel, status: s.status, currency: s.currency, createdAt: s.created_at, paidAt: s.paid_at,
+    id: s.id, number: s.number, code: s.code ?? `VENT${String(s.number).padStart(6, '0')}`, channel: s.channel,
+    seller: seller ? { name: (seller as any).full_name ?? '', doc: (seller as any).id_document_number ?? null, code: (seller as any).user_code ?? null } : null,
+    coupon: s.coupon_code ? { code: s.coupon_code, discount: Number(s.coupon_discount) } : null, status: s.status, currency: s.currency, createdAt: s.created_at, paidAt: s.paid_at,
     subtotal: Number(s.subtotal), discount: Number(s.discount), total: Number(s.total), tax: Number(s.tax),
     cash: s.cash_received === null ? null : Number(s.cash_received), change: s.change_given === null ? null : Number(s.change_given),
     method: s.payment_method, delivery: s.delivery, address: s.address, tracking: s.tracking_code, cancelReason: s.cancel_reason, notes: s.notes,
     customer: { name: s.customer_name, doc: s.customer_doc_number ? `${docLabel(s.customer_doc_type).split(' ')[0]} ${s.customer_doc_number}` : null, email: s.customer_email, phone: s.customer_phone },
     items: (items ?? []).map((i: any) => ({ name: i.name, qty: Number(i.qty), unitPrice: Number(i.unit_price), discount: Number(i.discount), total: Number(i.total),
-      taxRate: Number(i.tax_rate), serial: i.serial, warranty: i.warranty_until, unit: i.products?.unit ?? 'unidad' })),
+      taxRate: Number(i.tax_rate), serial: i.serial, warranty: i.warranty_until, unit: i.products?.unit ?? 'unidad', promo: i.promo_label ?? null, promoDiscount: Number(i.promo_discount ?? 0) })),
     org: { id: s.organization_id, name: org?.display_name ?? '', legal: org?.legal_name ?? null, taxId: org?.tax_id ?? null, address: site?.address ?? null, phone: site?.contact_phone ?? null },
   };
 }
@@ -76,21 +79,28 @@ export async function salePdf(s: Sale): Promise<Uint8Array> {
   if (s.org.taxId) add(`RUT ${s.org.taxId}`, 7, reg, 'c');
   if (s.org.address) add(s.org.address, 7, reg, 'c');
   sep();
-  add(`COMPROBANTE DE VENTA N° ${s.number}`, 9, bold, 'c');
+  add(`BOLETA ${s.code}`, 10, bold, 'c');
   add(fmtDateTime(s.paidAt ?? s.createdAt), 7, reg, 'c');
   add(s.channel === 'web' ? `Pedido web · ${s.delivery === 'despacho' ? 'Despacho' : 'Retiro en tienda'}` : 'Venta en caja', 7, reg, 'c');
+  if (s.seller) add(`Atendido por: ${s.seller.name}${s.seller.doc ? ` · RUT ${s.seller.doc}` : ''}`, 7);
   if (s.customer.name) add(`Cliente: ${s.customer.name}`, 7);
   if (s.customer.doc) add(s.customer.doc, 7);
   sep();
   for (const i of s.items) {
     add(i.name, 8, bold);
     add(`  ${Number.isInteger(i.qty) ? i.qty : i.qty.toFixed(3)} ${i.unit === 'unidad' ? 'x' : `${i.unit} x`} ${fmtMoney(i.unitPrice, s.currency)}${i.taxRate === 0 ? ' (exento)' : ''}`, 7, reg, 'lr', fmtMoney(i.total, s.currency));
-    if (i.discount > 0) add(`  Descuento -${fmtMoney(i.discount, s.currency)}`, 7);
+    if (i.promoDiscount > 0) add(`  Oferta ${i.promo ?? ''} -${fmtMoney(i.promoDiscount, s.currency)}`, 7);
+    if (i.discount - i.promoDiscount > 0) add(`  Descuento -${fmtMoney(i.discount - i.promoDiscount, s.currency)}`, 7);
     if (i.serial) add(`  N° serie: ${i.serial}`, 7);
     if (i.warranty) add(`  Garantía hasta ${fmtDate(i.warranty)}`, 7);
   }
   sep();
-  if (s.discount > 0) { add('Subtotal', 8, reg, 'lr', fmtMoney(s.subtotal, s.currency)); add('Descuento', 8, reg, 'lr', `-${fmtMoney(s.discount, s.currency)}`); }
+  if (s.discount > 0) {
+    add('Subtotal', 8, reg, 'lr', fmtMoney(s.subtotal, s.currency));
+    if (s.discount - (s.coupon?.discount ?? 0) > 0) add('Descuento', 8, reg, 'lr', `-${fmtMoney(s.discount - (s.coupon?.discount ?? 0), s.currency)}`);
+    if (s.coupon) add(`Cupón ${s.coupon.code}`, 8, reg, 'lr', `-${fmtMoney(s.coupon.discount, s.currency)}`);
+  }
+  const ahorro = s.items.reduce((t, i) => t + i.promoDiscount, 0) + (s.coupon?.discount ?? 0);
   const neto = s.total - s.tax;
   add('Neto', 8, reg, 'lr', fmtMoney(neto, s.currency)); add('IVA (19%)', 8, reg, 'lr', fmtMoney(s.tax, s.currency));
   add('TOTAL', 12, bold, 'lr', fmtMoney(s.total, s.currency));
@@ -98,6 +108,7 @@ export async function salePdf(s: Sale): Promise<Uint8Array> {
   if (s.cash !== null) { add('Efectivo recibido', 8, reg, 'lr', fmtMoney(s.cash, s.currency)); add('Vuelto', 8, bold, 'lr', fmtMoney(s.change ?? 0, s.currency)); }
   if (s.tracking) add(`Código de seguimiento: ${s.tracking}`, 7);
   sep();
+  if (ahorro > 0) add(`¡Usted ahorró ${fmtMoney(ahorro, s.currency)}!`, 8, bold, 'c');
   add('¡Gracias por su compra!', 8, bold, 'c');
   add('Documento interno. No reemplaza la boleta electrónica del SII.', 6, reg, 'c');
   if (s.status === 'anulada') add(`ANULADO: ${s.cancelReason ?? ''}`, 9, bold, 'c', undefined, rgb(0.8, 0.1, 0.1));
@@ -116,5 +127,5 @@ export async function salePdf(s: Sale): Promise<Uint8Array> {
   return pdf.save();
 }
 
-export const saleFilename = (s: Sale) => `Comprobante-venta-${s.number}.pdf`;
+export const saleFilename = (s: Sale) => `Boleta-${s.code}.pdf`;
 export const saleStatusLabel = (st: string) => SALE_STATUS[st]?.[0] ?? st;

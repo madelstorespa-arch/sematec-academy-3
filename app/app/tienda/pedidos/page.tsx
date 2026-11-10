@@ -22,7 +22,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ v
   const act = can(ctx, 'store.create');
   return (
     <>
-      <PageHeader title="Tienda" subtitle="Pedidos de la tienda web: confirme el pago, prepare y entregue" actions={<a className="btn-secondary" href="/tienda" target="_blank" rel="noopener noreferrer">🌐 Ver tienda web</a>} />
+      <PageHeader title="SEMATEC VENTA" subtitle="Pedidos de la tienda web: confirme el pago, prepare y entregue" actions={<a className="btn-secondary" href="/tienda" target="_blank" rel="noopener noreferrer">🌐 Ver tienda web</a>} />
       <StoreTabs current="pedidos" />
       <p className="mb-4 text-sm"><Link className="link" href={sp.ver === 'todos' ? '/app/tienda/pedidos' : '/app/tienda/pedidos?ver=todos'}>{sp.ver === 'todos' ? 'Ver solo los por atender' : 'Ver también entregados y anulados'}</Link></p>
       {rows?.length ? <div className="grid gap-4 lg:grid-cols-2" data-testid="pedidos">{rows.map((o: any) => (

@@ -23,7 +23,7 @@ export function ProductFields({ d = {}, isNew = false, categories = [] }: { d?: 
       {KIND_HINTS[kind] && <p className="text-xs text-slate-500">{KIND_HINTS[kind]}</p>}
       <div className="grid gap-3 md:grid-cols-4">
         <L label="Nombre *" className="md:col-span-2"><input name="name" required defaultValue={d.name} className="input" placeholder={perishable ? 'Ej.: Leche entera 1 L' : elec ? 'Ej.: Audífonos Bluetooth X1' : 'Ej.: Detergente líquido 3 L'} /></L>
-        <L label="Código interno (SKU) *"><input name="sku" required defaultValue={d.sku} className="input uppercase" placeholder="Ej.: DET-3L" /></L>
+        <L label="Código (automático si lo deja vacío)"><input name="sku" defaultValue={d.sku} className="input uppercase" placeholder={`${({ aseo: 'ASEO', comestible: 'COME', bebestible: 'BEBE', electronica: 'ELEC' } as Record<string, string>)[kind] ?? 'OTRO'}000001`} /></L>
         <L label="Código de barras"><input name="barcode" defaultValue={d.barcode ?? ''} className="input" placeholder="Escanee o escriba" inputMode="numeric" /></L>
         <L label="Precio de venta (IVA incluido) *"><input name="price" type="number" min={0} step="1" required defaultValue={d.price} className="input" /></L>
         <L label="Costo unitario"><input name="cost" type="number" min={0} step="0.01" defaultValue={d.cost ?? 0} className="input" /></L>

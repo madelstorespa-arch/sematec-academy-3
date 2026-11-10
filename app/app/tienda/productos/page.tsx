@@ -29,7 +29,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
 
   return (
     <>
-      <PageHeader title="Tienda" subtitle="Productos, precios, stock y publicación en la tienda web"
+      <PageHeader title="SEMATEC VENTA" subtitle="Productos, precios, stock y publicación en la tienda web"
         actions={<a className="btn-secondary" href="/app/tienda/productos/csv">⬇ Inventario (Excel)</a>} />
       <StoreTabs current="productos" />
       {edit && (

@@ -18,7 +18,15 @@ sql("delete from system_events where event_type like 'rate:%'")
 sql(f"update site_settings set is_published = true where organization_id = '{ORG}'")
 for t in ['sale_items', 'stock_movements', 'purchase_items', 'product_lots']: sql(f"delete from {t} where organization_id = '{ORG}'")
 sql(f"delete from sales where organization_id = '{ORG}' and id not in (select sale_id from checkout_orders where sale_id is not null)"); sql(f"delete from purchases where organization_id = '{ORG}'")
-sql(f"delete from expenses where organization_id = '{ORG}' and category = 'mercaderia'"); sql(f"delete from products where organization_id = '{ORG}'")
+sql(f"delete from expenses where organization_id = '{ORG}' and category = 'mercaderia'"); sql(f"delete from store_promotions where organization_id = '{ORG}'")
+sql(f"delete from store_coupons where organization_id = '{ORG}'"); sql(f"delete from products where organization_id = '{ORG}'")
+sql("update profiles set id_document_type = null, id_document_number = null where email in ('tesoreria.a@demo.sematec.test', 'secretaria.a@demo.sematec.test')")
+
+def set_identity(page, name, rut):
+    go(page, f'{BASE}/app/perfil')
+    f = page.locator('form:has(input[name=id_document_number])')
+    f.locator('input[name=full_name]').fill(name); f.locator('input[name=id_document_number]').fill(rut)
+    f.locator('button:has-text("Guardar")').click(); return form_status(f)
 
 def new_product(p, kind, name, sku, price, cost, initial, barcode='', minimum='0', expires=None, lot=None, warranty=None, serial=False):
     det = p.locator('details:has-text("Nuevo producto")')
@@ -38,10 +46,19 @@ with sync_playwright() as pw:
     b = pw.chromium.launch(executable_path=CHROME, headless=True, args=['--no-sandbox'])
     tc = b.new_context(viewport={'width': 1366, 'height': 900}); t = login(tc, 'tesoreria.a@demo.sematec.test', mfa=True); t.on('dialog', lambda d: d.accept())
 
-    # ================= 1. Productos =================
+    # ================= 1. Identidad y productos =================
     go(t, f'{BASE}/app/tienda/productos')
-    check(t.locator('nav a:has-text("Tienda y caja")').count() == 1, '🛒 Menú «Tienda y caja» para tesorería')
+    check(t.locator('nav a:has-text("SEMATEC VENTA")').count() == 1, '🛒 Menú «SEMATEC VENTA» para tesorería')
+    msg = new_product(t, 'aseo', 'Sin identidad', '', 100, 50, 0)
+    check('nombre y RUT' in msg, '🪪 Sin nombre y RUT en su cuenta no puede crear productos en SEMATEC VENTA')
+    check('ya puede entrar' in set_identity(t, 'Tesorera Demo', '123456785').lower(), '🪪 Registra su nombre y RUT en «Mi cuenta»')
+    check(sql("select id_document_number from profiles where email = 'tesoreria.a@demo.sematec.test'") == '12.345.678-5', '🪪 El RUT queda guardado con formato')
+    go(t, f'{BASE}/app/tienda/productos')
     new_product(t, 'aseo', 'Detergente líquido 3 L E2E', 'DET-E2E', 4990, 3000, 20, barcode='7800000000017', minimum='5')
+    go(t, f'{BASE}/app/tienda/productos')
+    new_product(t, 'aseo', 'Esponja E2E', '', 590, 200, 30)
+    esku = sql("select sku from products where name = 'Esponja E2E'") or ''
+    check(re.match(r'^ASEO\d{6}$', esku) is not None, f'🔢 Código automático del producto: 4 letras + 6 números ({esku})')
     go(t, f'{BASE}/app/tienda/productos')
     new_product(t, 'comestible', 'Galletas de avena E2E', 'GAL-E2E', 1290, 700, 10, barcode='7800000000024', minimum='3', expires=d10, lot='L1')
     go(t, f'{BASE}/app/tienda/productos')
@@ -66,7 +83,11 @@ with sync_playwright() as pw:
 
     # ================= 3. Caja =================
     sc = b.new_context(viewport={'width': 1366, 'height': 900}); s = login(sc, 'secretaria.a@demo.sematec.test')
+    go(s, f'{BASE}/app/tienda/caja')
+    check(s.locator('[data-testid=caja-sin-identidad]').count() == 1, '🪪 La caja pide nombre y RUT antes de vender')
+    set_identity(s, 'Cajera Demo', '11.111.111-1')
     go(s, f'{BASE}/app/tienda/caja'); s.wait_for_selector('[data-testid=caja-buscar]')
+    check('Cajera Demo · 11.111.111-1' in s.locator('h1, header, main').first.inner_text() or 'Cajera Demo · 11.111.111-1' in s.content(), '🧾 La caja muestra quién atiende (nombre y RUT)')
     s.fill('[data-testid=caja-buscar]', '7800000000017'); s.keyboard.press('Enter')
     check('Detergente' in s.locator('[data-testid=carrito]').inner_text(), '🔎 El lector de código de barras agrega el producto (código + Enter)')
     s.locator('[data-testid=caja-producto]:has-text("Galletas")').click(); s.locator('[data-testid=caja-producto]:has-text("Galletas")').click()
@@ -93,6 +114,7 @@ with sync_playwright() as pw:
     go(s, f'{BASE}/app/tienda/ventas/{sale}')
     txt = s.locator('[data-testid=comprobante-venta]').inner_text()
     check('SN-ABC-123' in txt and 'Garantía hasta' in txt and 'IVA' in txt and 'Vuelto' in txt, '🧾 Comprobante con N° de serie, garantía, IVA y vuelto')
+    check(re.search(r'BOLETA VENT\d{6}', txt) is not None and 'Cajera Demo · RUT 11.111.111-1' in txt, '🧾 Boleta con código automático (VENT + 6 números) y nombre y RUT de quien atendió')
     r = sc.request.get(f'{BASE}/app/tienda/ventas/{sale}/pdf')
     check(r.status == 200 and r.body()[:4] == b'%PDF', '🖨 Ticket en PDF (80 mm) para imprimir o enviar')
     check(s.locator('text=Anular venta').count() == 0, '🔒 La secretaria (caja) no puede anular ventas')
@@ -109,13 +131,40 @@ with sync_playwright() as pw:
         time.sleep(0.5)
     check(stock('DET-E2E') == 19 and sql(f"select status from sales where id = '{sale2}'") == 'anulada', '↩ Tesorería anula la venta y el producto vuelve al stock')
 
+    # ================= 3b. Ofertas y cupones =================
+    go(t, f'{BASE}/app/tienda/ofertas')
+    pf = t.locator('form:has(select[name=scope])').first
+    pf.locator('input[name=name]').fill('Galletas 3x2 E2E'); pf.locator('select[name=kind]').select_option('nxm')
+    pf.locator('[data-testid=productos-oferta] label:has-text("Galletas") input').check(); pf.locator('button:has-text("Crear oferta")').click(); form_status(pf)
+    cf = t.locator('form:has(input[name=code])').first
+    cf.locator('input[name=code]').fill('BIENVENIDA10'); cf.locator('input[name=value]').fill('10'); cf.locator('button:has-text("Crear cupón")').click(); form_status(cf)
+    check(sql(f"select count(*) from store_promotions where organization_id = '{ORG}'") == '1' and sql(f"select count(*) from store_coupons where organization_id = '{ORG}'") == '1',
+          '🏷 Crea una oferta «Lleva 3 paga 2» y un cupón de 10%')
+    go(s, f'{BASE}/app/tienda/caja'); s.wait_for_selector('[data-testid=caja-buscar]')
+    for _ in range(3): s.locator('[data-testid=caja-producto]:has-text("Galletas")').click()
+    check('Lleva 3 paga 2' in s.locator('[data-testid=oferta-linea]').inner_text() and '2.580' in s.locator('[data-testid=caja-total]').inner_text(),
+          '🏷 La caja aplica sola la oferta 3x2 (3 × 1.290 → 2.580)')
+    s.fill('[data-testid=caja-cupon]', 'bienvenida10'); s.click('[data-testid=aplicar-cupon]')
+    s.wait_for_selector('text=BIENVENIDA10')
+    check('2.322' in s.locator('[data-testid=caja-total]').inner_text(), '🎟 El cupón de 10% descuenta del total (2.580 → 2.322)')
+    s.locator('button:has-text("Tarjeta")').click(); s.click('[data-testid=cobrar]'); s.wait_for_selector('[data-testid=venta-lista]')
+    psale = sql(f"select id from sales where organization_id = '{ORG}' order by created_at desc limit 1")
+    check(sql(f"select total::int || '|' || coupon_code || '|' || coupon_discount::int from sales where id = '{psale}'") == '2322|BIENVENIDA10|258', '🧮 El servidor confirma: oferta + cupón = 2.322')
+    go(s, f'{BASE}/app/tienda/ventas/{psale}')
+    check('Oferta Lleva 3 paga 2' in s.locator('[data-testid=comprobante-venta]').inner_text() and 'Cupón BIENVENIDA10' in s.locator('[data-testid=comprobante-venta]').inner_text(),
+          '🧾 La boleta detalla la oferta y el cupón')
+
     # ================= 4. Tienda web =================
     wc = b.new_context(viewport={'width': 1366, 'height': 900}); w = wc.new_page()
     go(w, f'{BASE}/tienda'); w.wait_for_selector('[data-testid=catalogo]')
-    check(w.locator('[data-testid=producto-web]').count() == 3, '🌐 La tienda web muestra los productos publicados')
-    w.locator('[data-testid=producto-web]:has-text("Galletas") [data-testid=agregar]').click()
-    w.locator('[data-testid=producto-web]:has-text("Galletas") button[aria-label="Agregar uno"]').click()
-    w.locator('[data-testid=producto-web]:has-text("Detergente") [data-testid=agregar]').click()
+    check(w.locator('[data-testid=catalogo] [data-testid=producto-web]').count() == 4, '🌐 La tienda web muestra los productos publicados')
+    check('SEMATEC VENTA' in w.locator('[data-testid=nombre-tienda]').inner_text(), '🛒 La tienda web se llama SEMATEC VENTA')
+    check('Lleva 3 paga 2' in w.locator('[data-testid=ofertas]').inner_text(), '🔥 Sección «Ofertas de la semana» con la etiqueta de la oferta')
+    disp = w.locator('[data-testid=catalogo] [data-testid=producto-web]:has-text("Audífonos") [data-testid=disponibilidad]').inner_text()
+    check('Últimas unidades' in disp or 'Disponible' in disp, f'📦 Muestra la disponibilidad de cada producto ({disp.strip()})')
+    w.locator('[data-testid=catalogo] [data-testid=producto-web]:has-text("Galletas") [data-testid=agregar]').click()
+    w.locator('[data-testid=catalogo] [data-testid=producto-web]:has-text("Galletas") button[aria-label="Agregar uno"]').click()
+    w.locator('[data-testid=catalogo] [data-testid=producto-web]:has-text("Detergente") [data-testid=agregar]').click()
     w.click('[data-testid=ver-carro]'); w.click('[data-testid=continuar]')
     fo = w.locator('[data-testid=form-pedido]')
     fo.locator('input[name=name]').fill('Cliente Web E2E'); fo.locator('input[name=email]').fill('cliente.web@demo.sematec.test'); fo.locator('input[name=phone]').fill('+56911112222')
@@ -124,7 +173,7 @@ with sync_playwright() as pw:
     seg = w.locator('[data-testid=seguimiento]').inner_text()
     check('Pedido N°' in seg and 'transferencia' in seg and '7.570' in seg, '🛍 El cliente hace el pedido (sin cuenta) y ve su seguimiento con instrucciones de pago')
     web = sql(f"select id from sales where organization_id = '{ORG}' and channel = 'web' order by created_at desc limit 1")
-    check(stock('GAL-E2E') == 18 and stock('DET-E2E') == 18, '📦 El pedido web reserva el stock')
+    check(stock('GAL-E2E') == 15 and stock('DET-E2E') == 18, '📦 El pedido web reserva el stock')
     track = w.url.rsplit('/', 1)[-1]
     # El precio no se puede alterar: el servidor usa el precio de la base de datos
     r = wc.request.post(f'{BASE}/api/tienda/pedido', data=json.dumps({'items': [{'product': gal, 'qty': 999, 'price': 1}], 'name': 'Truco', 'email': 'truco@x.cl', 'delivery': 'retiro', 'payment': 'cash'}), headers={'Content-Type': 'application/json'})
@@ -142,16 +191,20 @@ with sync_playwright() as pw:
     check(r.status == 200 and r.body()[:4] == b'%PDF', '⬇ El cliente descarga su comprobante')
 
     # Pago en línea (simulador de Webpay)
-    go(w, f'{BASE}/tienda'); w.locator('[data-testid=producto-web]:has-text("Audífonos") [data-testid=agregar]').click()
-    w.click('[data-testid=ver-carro]'); w.click('[data-testid=continuar]'); fo = w.locator('[data-testid=form-pedido]')
+    go(w, f'{BASE}/tienda'); w.locator('[data-testid=catalogo] [data-testid=producto-web]:has-text("Audífonos") [data-testid=agregar]').click()
+    w.click('[data-testid=ver-carro]')
+    w.fill('[data-testid=cupon-web]', 'BIENVENIDA10'); w.click('[data-testid=carro] button:has-text("Aplicar")'); w.wait_for_selector('text=Cupón BIENVENIDA10')
+    check('17.991' in w.locator('[data-testid=total-carro]').inner_text(), '🎟 El cupón también funciona en la tienda web (19.990 − 10%)')
+    w.click('[data-testid=continuar]'); fo = w.locator('[data-testid=form-pedido]')
     fo.locator('input[name=name]').fill('Comprador Online E2E'); fo.locator('input[name=email]').fill('online.tienda@demo.sematec.test')
     fo.locator('input[name=payment][value="online:webpay"]').check(); fo.locator('[data-testid=confirmar-pedido]').click()
     w.wait_for_selector('#provider', timeout=20000); w.click('#approve')
     w.wait_for_url(re.compile(r'/pago/resultado/'), timeout=30000)
     try: w.wait_for_selector('text=Estamos preparando tu pedido', timeout=20000)
     except Exception: pass
-    onl = sql(f"select status || '|' || payment_method from sales where organization_id = '{ORG}' and customer_email = 'online.tienda@demo.sematec.test'")
+    onl = sql(f"select status || '|' || payment_method from sales where organization_id = '{ORG}' and customer_email = 'online.tienda@demo.sematec.test' order by created_at desc limit 1")
     check(onl == 'pagada|payment_gateway', f'💳 Pago en línea aprobado: el pedido queda pagado ({onl})')
+    check(sql(f"select total::int from sales where organization_id = '{ORG}' and customer_email = 'online.tienda@demo.sematec.test' order by created_at desc limit 1") == '17991', '🎟 El servidor aplicó el cupón al pedido web')
 
     # ================= 5. Resumen, alertas, finanzas y búsqueda =================
     go(t, f'{BASE}/app/tienda')
@@ -167,6 +220,22 @@ with sync_playwright() as pw:
     check(r.status == 200 and 'Galletas de avena E2E' in r.text(), '⬇ Inventario descargable para Excel')
     go(t, f'{BASE}/app/tienda/productos/{gal}')
     check(t.locator('[data-testid=movimientos] tbody tr').count() >= 4, '📜 Historial de movimientos del producto (compra, ventas, pedido web)')
+    for por, txt in [('day', 'Día a día'), ('week', 'Semana a semana'), ('semester', 'Por semestre'), ('year', 'Año a año')]:
+        go(t, f'{BASE}/app/finanzas/balance?desde=2026-01-01&hasta=2026-12-31&por={por}')
+        assert txt in t.content(), por
+    check(True, '📅 Ingresos y egresos por día, semana, mes, semestre y año')
+    go(t, f'{BASE}/app/finanzas/balance?desde=2026-01-01&hasta=2026-12-31&por=semester')
+    check(t.locator('[data-testid=balance-meses] tbody tr').count() == 2, '📅 Por semestre: 1er y 2do semestre')
+    # Ingreso con RUT
+    rc = b.new_context(); rp = rc.new_page(); go(rp, f'{BASE}/login')
+    rp.fill('input[name=email]', '11.111.111-1'); rp.fill('input[name=password]', 'Sematec-Demo-2026'); rp.click('button[type=submit]')
+    rp.wait_for_url(re.compile('/app'), timeout=20000)
+    check('/app' in rp.url, '🔑 Se puede entrar al sistema con el RUT en vez del correo')
+    codes = sql("select string_agg(distinct substr(user_code, 1, 4), ',' order by substr(user_code, 1, 4)) from profiles where user_code is not null")
+    check(all(x in codes for x in ['ESTU', 'PROF', 'FUNC']) and sql("select count(*) from profiles where user_code !~ '^[A-Z]{4}[0-9]{6}$'") == '0',
+          f'🔢 Cada usuario tiene su código automático: 4 letras + 6 números ({codes})')
+    go(w, f'{BASE}/cursos')
+    check(w.locator('[data-testid=cupos]').count() > 0, '🎓 Los cursos muestran si están disponibles, con últimos cupos o agotados')
     e = b.new_context(); ep = login(e, 'estudiante1.a@demo.sematec.test')
     go(ep, f'{BASE}/app/tienda/caja')
     check('/app/tienda/caja' not in ep.url, '🔒 Un estudiante no puede entrar a la caja')

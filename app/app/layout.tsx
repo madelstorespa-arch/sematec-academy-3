@@ -29,7 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (can(ctx, 'sections.view') || can(ctx, 'grades.view')) items.push({ href: '/app/secciones', label: 'Secciones y notas', icon: '📝' });
   if (can(ctx, 'enrollments.view')) items.push({ href: '/app/matriculas', label: 'Matrículas', icon: '🗂' });
   if (can(ctx, 'finance.view')) items.push({ href: '/app/finanzas', label: 'Finanzas', icon: '💳' });
-  if (can(ctx, 'store.view') || can(ctx, 'store.create')) items.push({ href: '/app/tienda', label: 'Tienda y caja', icon: '🛒' });
+  if (can(ctx, 'store.view') || can(ctx, 'store.create')) items.push({ href: '/app/tienda', label: 'SEMATEC VENTA', icon: '🛒' });
   if (can(ctx, 'certificates.view')) items.push({ href: '/app/certificados', label: 'Certificados', icon: '🏅' });
   if (ctx.teacherId || ctx.studentId || can(ctx, 'sections.view')) items.push({ href: '/app/aula', label: 'Aula de aprendizaje', icon: '📚' });
   if (can(ctx, 'conferences.view') || ctx.teacherId || ctx.studentId) items.push({ href: '/app/conferencias', label: 'Aulas virtuales', icon: '🎥' });

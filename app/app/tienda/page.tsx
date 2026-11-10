@@ -5,6 +5,8 @@ import { PageHeader, Card, Empty, Badge } from '@/components/ui';
 import { fmtDate, fmtMoney } from '@/lib/format';
 import { KINDS, methodLabel, qtyFmt } from '@/lib/store';
 import { StoreTabs } from './tabs';
+import { ActionForm } from '@/components/forms';
+import { saveStoreName } from './actions';
 
 export const metadata = { title: 'Tienda' };
 
@@ -16,11 +18,13 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ d
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
   const from = /^\d{4}-\d{2}-\d{2}$/.test(sp.desde ?? '') ? sp.desde! : `${today.slice(0, 8)}01`;
   const to = /^\d{4}-\d{2}-\d{2}$/.test(sp.hasta ?? '') ? sp.hasta! : today;
-  const [{ data: r }, { data: day }, { data: org }] = await Promise.all([
+  const [{ data: r }, { data: day }, { data: org }, { data: st }] = await Promise.all([
     ctx.supabase.rpc('store_report', { p_org: orgId, p_from: from, p_to: to }),
     ctx.supabase.rpc('store_report', { p_org: orgId, p_from: today, p_to: today }),
     ctx.supabase.from('organizations').select('base_currency').eq('id', orgId).single(),
+    ctx.supabase.from('site_settings').select('store_name').eq('organization_id', orgId).maybeSingle(),
   ]);
+  const storeName = (st as any)?.store_name ?? 'SEMATEC VENTA';
   const cur = org?.base_currency ?? 'CLP';
   const m = (n: number) => fmtMoney(n, cur);
   const rep = (r ?? {}) as any, d = (day ?? {}) as any;
@@ -28,7 +32,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ d
 
   return (
     <>
-      <PageHeader title="Tienda" subtitle="Aseo, comestibles, bebestibles, electrónica y más: caja, tienda web e inventario"
+      <PageHeader title={storeName} subtitle="Supermercado: aseo, comestibles, bebestibles, electrónica y más · caja, tienda web, ofertas e inventario"
         actions={can(ctx, 'store.create') ? <Link className="btn-primary" href="/app/tienda/caja">🧾 Abrir caja</Link> : undefined} />
       <StoreTabs current="resumen" />
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -73,6 +77,13 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ d
             : <Empty>Sin ventas en el periodo.</Empty>}
         </Card>
 
+        {can(ctx, 'store.admin') && (
+          <Card title="⚙ Nombre de la tienda" className="lg:col-span-2">
+            <ActionForm action={saveStoreName} submitLabel="Guardar nombre" resetOnSuccess={false}>
+              <input name="store_name" defaultValue={storeName} maxLength={60} required className="input max-w-sm" />
+              <p className="text-xs text-slate-500">Se muestra en la tienda web, el menú del sitio y los comprobantes.</p>
+            </ActionForm>
+          </Card>)}
         <Card title="🏆 Más vendidos" className="lg:col-span-2">
           {rep.top?.length ? <div className="overflow-x-auto"><table className="table"><thead><tr><th>Producto</th><th className="text-right">Cantidad</th><th className="text-right">Ventas</th><th className="text-right">Ganancia</th></tr></thead>
             <tbody>{rep.top.map((x: any) => <tr key={x.name}><td>{x.name}</td><td className="text-right">{Number(x.qty)}</td><td className="text-right">{m(x.total)}</td><td className="text-right text-emerald-700">{m(x.profit)}</td></tr>)}</tbody></table></div>

@@ -36,14 +36,15 @@ export async function POST(req: NextRequest) {
     p_org: site.organization_id, p_items: items,
     p_customer: { name, email, phone, doc_type: doc.type ?? '', doc_number: doc.number ?? '' },
     p_delivery: txt(b.delivery, 20), p_address: txt(b.address, 300), p_payment: provider ? 'payment_gateway' : pay, p_notes: txt(b.notes, 1000),
+    p_coupon: txt(b.coupon, 20) || null,
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  const order = o as { id: string; number: number; total: number; currency: string; tracking: string };
+  const order = o as { id: string; number: number; code: string; total: number; currency: string; tracking: string };
   const url = `${env.siteUrl()}/tienda/pedido/${order.tracking}`;
 
   if (mailEnabled()) {
-    sendMail(email, `${site.site_name}: pedido N° ${order.number} recibido`,
-      mailLayout(site.site_name, `Pedido N° ${order.number}`, `<p>Hola ${name}, recibimos su pedido por <b>${fmtMoney(order.total, order.currency)}</b>.</p><p>Código de seguimiento: <b>${order.tracking}</b></p>`, { href: url, label: 'Ver mi pedido' }),
+    sendMail(email, `${(site as any).store_name ?? site.site_name}: pedido ${order.code} recibido`,
+      mailLayout((site as any).store_name ?? site.site_name, `Pedido ${order.code}`, `<p>Hola ${name}, recibimos su pedido por <b>${fmtMoney(order.total, order.currency)}</b>.</p><p>Código de seguimiento: <b>${order.tracking}</b></p>`, { href: url, label: 'Ver mi pedido' }),
       `Recibimos su pedido N° ${order.number} por ${fmtMoney(order.total, order.currency)}. Seguimiento: ${url}`).catch((e) => console.error('[tienda] correo', e.message));
   }
 

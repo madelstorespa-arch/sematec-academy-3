@@ -16,10 +16,15 @@ async function clientIp() {
 }
 
 export async function signIn(fd: FormData): Promise<ActionResult> {
-  const email = String(fd.get('email') ?? '').trim().toLowerCase().slice(0, 254);
+  let email = String(fd.get('email') ?? '').trim().toLowerCase().slice(0, 254);
   const password = String(fd.get('password') ?? '').slice(0, 200);
   const next = safeNext(String(fd.get('next') ?? '/app'));
-  if (!email || !password) return { ok: false, error: 'Ingrese correo y contraseña.' };
+  if (!email || !password) return { ok: false, error: 'Ingrese su correo o RUT y la contraseña.' };
+  // También se puede entrar con el RUT (o pasaporte) registrado en «Mi cuenta»
+  if (!email.includes('@')) {
+    const { data: byDoc } = await createAdminClient().rpc('email_for_document', { p_doc: email.slice(0, 30) }).then((r) => r, () => ({ data: null }));
+    email = typeof byDoc === 'string' && byDoc ? byDoc : `${email.replace(/[^0-9k]/g, '') || 'x'}@rut.invalido`;
+  }
 
   const ip = await clientIp();
   try {

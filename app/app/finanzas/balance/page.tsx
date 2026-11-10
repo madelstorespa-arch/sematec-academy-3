@@ -2,45 +2,42 @@ import Link from 'next/link';
 import { getContext, requirePerm, requireOrg } from '@/lib/context';
 import { PageHeader, Card, Empty } from '@/components/ui';
 import { fmtMoney } from '@/lib/format';
-import { expenseLabel, monthName, monthRange } from '@/lib/finance';
+import { GROUPS, bucketLabel, expenseLabel, periodRange, quickRanges } from '@/lib/finance';
 import { FinanceTabs } from '../tabs';
 
 export const metadata = { title: 'Ingresos y gastos' };
 
 type Row = { id: string; code: string; name: string; students: number; income: number; expenses: number; months: Record<string, number> };
 type Report = {
-  currency: string; income: number; expenses: number; months: { m: string; income: number; expenses: number }[];
+  currency: string; income: number; expenses: number; months: { m: string; income: number; expenses: number; store?: number }[]; group?: string;
   programs: Row[]; sections: Row[]; unassigned_income: number; general_expenses: number; categories: Record<string, number>;
   tuition_income?: number; store_income?: number; store_cost?: number;
 };
 
-function ym(d: Date) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
 
-export default async function Page({ searchParams }: { searchParams: Promise<{ desde?: string; hasta?: string; moneda?: string }> }) {
+export default async function Page({ searchParams }: { searchParams: Promise<{ desde?: string; hasta?: string; moneda?: string; por?: string }> }) {
   const ctx = await getContext();
   requirePerm(ctx, 'finance.view');
   const orgId = requireOrg(ctx);
   const sp = await searchParams;
-  const r = monthRange(sp.desde, sp.hasta);
-  const { data, error } = await ctx.supabase.rpc('finance_report', { p_org: orgId, p_from: r.start, p_to: r.end, p_currency: sp.moneda || null });
+  const r = periodRange(sp.desde, sp.hasta, sp.por);
+  const { data, error } = await ctx.supabase.rpc('finance_report', { p_org: orgId, p_from: r.start, p_to: r.end, p_currency: sp.moneda || null, p_group: r.group });
+  const g = r.group;
+  const lbl = (m: string, short = false) => bucketLabel(m, g, short);
   const rep = data as Report | null;
   const cur = rep?.currency ?? 'CLP';
   const money = (n: number) => fmtMoney(n, cur);
   const net = (rep?.income ?? 0) - (rep?.expenses ?? 0);
-  const multi = (rep?.months.length ?? 0) > 1;
+  const multi = (rep?.months.length ?? 0) > 1 && (rep?.months.length ?? 0) <= 12;
   const maxBar = Math.max(1, ...(rep?.months ?? []).flatMap((m) => [m.income, m.expenses]));
-  const now = new Date(); const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const quick = [
-    ['Este mes', ym(now), ym(now)], ['Mes anterior', ym(prev), ym(prev)],
-    ['Últimos 6 meses', ym(new Date(now.getFullYear(), now.getMonth() - 5, 1)), ym(now)], ['Este año', `${now.getFullYear()}-01`, ym(now)],
-  ];
-  const csv = `/app/finanzas/balance/csv?desde=${r.from}&hasta=${r.to}${sp.moneda ? `&moneda=${sp.moneda}` : ''}`;
+  const quick = quickRanges();
+  const csv = `/app/finanzas/balance/csv?desde=${r.start}&hasta=${r.end}&por=${g}${sp.moneda ? `&moneda=${sp.moneda}` : ''}`;
 
   const Table = ({ rows, kind }: { rows: Row[]; kind: 'program' | 'section' }) => (
     <div className="overflow-x-auto"><table className="table" data-testid={kind === 'program' ? 'balance-programas' : 'balance-secciones'}>
       <thead><tr>
         <th>{kind === 'program' ? 'Programa' : 'Sección'}</th><th className="text-right">Alumnos</th>
-        {multi && rep!.months.map((m) => <th key={m.m} className="text-right">{monthName(m.m, true)}</th>)}
+        {multi && rep!.months.map((m) => <th key={m.m} className="text-right">{lbl(m.m, true)}</th>)}
         <th className="text-right">Ingresos</th><th className="text-right">Gastos</th><th className="text-right">Saldo</th>
       </tr></thead>
       <tbody>{rows.map((x) => {
@@ -63,31 +60,32 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ d
       <FinanceTabs current="balance" />
       <div className="mb-5 flex flex-wrap items-end gap-3">
         <form className="flex flex-wrap items-end gap-2 text-sm">
-          <label><span className="label">Desde</span><input type="month" name="desde" defaultValue={r.from} className="input py-1.5" /></label>
-          <label><span className="label">Hasta</span><input type="month" name="hasta" defaultValue={r.to} className="input py-1.5" /></label>
+          <label><span className="label">Desde</span><input type="date" name="desde" defaultValue={r.start} className="input py-1.5" /></label>
+          <label><span className="label">Hasta</span><input type="date" name="hasta" defaultValue={r.end} className="input py-1.5" /></label>
+          <label><span className="label">Ver por</span><select name="por" defaultValue={g} className="input py-1.5" data-testid="agrupar">{GROUPS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
           <label><span className="label">Moneda</span><input name="moneda" defaultValue={sp.moneda ?? cur} className="input w-20 py-1.5" maxLength={3} /></label>
           <button className="btn-primary">Calcular</button>
         </form>
-        <div className="flex flex-wrap gap-1">{quick.map(([l, a, b]) => <Link key={l} className="btn-secondary btn-sm" href={`/app/finanzas/balance?desde=${a}&hasta=${b}`}>{l}</Link>)}</div>
+        <div className="flex flex-wrap gap-1" data-testid="atajos">{quick.map(([l, a, b, gg]) => <Link key={l} className="btn-secondary btn-sm" href={`/app/finanzas/balance?desde=${a}&hasta=${b}&por=${gg}`}>{l}</Link>)}</div>
         <a className="btn-secondary btn-sm ml-auto" href={csv}>⬇ Descargar Excel (CSV)</a>
       </div>
       {error || !rep ? <Card><Empty>{error?.message ?? 'No se pudo calcular.'}</Empty></Card> : (
         <>
-          <p className="mb-3 text-sm text-slate-500">{r.from === r.to ? monthName(r.from) : `${monthName(r.from)} a ${monthName(r.to)}`} · {cur}</p>
+          <p className="mb-3 text-sm text-slate-500">{bucketLabel(r.start, 'day')} a {bucketLabel(r.end, 'day')} · {GROUPS.find(([v]) => v === g)?.[2]} · {cur}</p>
           <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="card card-pad"><p className="label">💰 Ingresos</p><p className="text-2xl font-bold text-emerald-700" data-testid="kpi-ingresos">{money(rep.income)}</p><p className="text-xs text-slate-500">{rep.store_income ? <>Educación {money(rep.tuition_income ?? 0)} · <span data-testid="kpi-tienda">🛒 Tienda {money(rep.store_income)}</span></> : 'Pagos recibidos menos reembolsos'}</p></div>
-            <div className="card card-pad"><p className="label">💸 Gastos</p><p className="text-2xl font-bold text-red-600" data-testid="kpi-gastos">{money(rep.expenses)}</p><p className="text-xs text-slate-500"><Link className="link" href={`/app/finanzas/gastos?mes=${r.to}`}>Registrar o ver gastos</Link></p></div>
+            <div className="card card-pad"><p className="label">💸 Gastos</p><p className="text-2xl font-bold text-red-600" data-testid="kpi-gastos">{money(rep.expenses)}</p><p className="text-xs text-slate-500"><Link className="link" href={`/app/finanzas/gastos?mes=${r.end.slice(0, 7)}`}>Registrar o ver gastos</Link></p></div>
             <div className={`card card-pad ${net < 0 ? 'ring-2 ring-red-200' : 'ring-2 ring-emerald-200'}`}><p className="label">🏦 Queda (saldo)</p><p className={`text-2xl font-bold ${net < 0 ? 'text-red-600' : ''}`} data-testid="kpi-saldo">{money(net)}</p><p className="text-xs text-slate-500">Ingresos − gastos</p></div>
             <div className="card card-pad"><p className="label">📈 Margen</p><p className="text-2xl font-bold">{rep.income > 0 ? `${Math.round((net / rep.income) * 100)}%` : '—'}</p><p className="text-xs text-slate-500">Del ingreso que queda</p></div>
           </div>
 
-          <Card title="Mes a mes" className="mb-6">
+          <Card title={GROUPS.find(([v]) => v === g)?.[2] ?? 'Mes a mes'} className="mb-6">
             <div className="overflow-x-auto"><table className="table" data-testid="balance-meses">
-              <thead><tr><th>Mes</th><th className="text-right">Ingresos</th><th className="text-right">Gastos</th><th className="text-right">Queda</th><th className="w-1/3">Comparación</th></tr></thead>
+              <thead><tr><th>{GROUPS.find(([v]) => v === g)?.[1]}</th><th className="text-right">Ingresos</th><th className="text-right">🛒 Tienda</th><th className="text-right">Gastos</th><th className="text-right">Queda</th><th className="w-1/3">Comparación</th></tr></thead>
               <tbody>{rep.months.map((m) => (
                 <tr key={m.m}>
-                  <td className="font-medium">{monthName(m.m)}</td>
-                  <td className="text-right text-emerald-700">{money(m.income)}</td><td className="text-right text-red-600">{money(m.expenses)}</td>
+                  <td className="font-medium">{lbl(m.m)}</td>
+                  <td className="text-right text-emerald-700">{money(m.income)}</td><td className="text-right text-xs">{m.store ? money(m.store) : '—'}</td><td className="text-right text-red-600">{money(m.expenses)}</td>
                   <td className={`text-right font-bold ${m.income - m.expenses < 0 ? 'text-red-600' : ''}`}>{money(m.income - m.expenses)}</td>
                   <td><div className="space-y-1" aria-hidden>
                     <div className="h-2 rounded bg-emerald-500" style={{ width: `${(Math.max(0, m.income) / maxBar) * 100}%` }} />

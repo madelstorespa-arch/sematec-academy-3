@@ -18,7 +18,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const s = await loadSale(ctx.supabase, id);
   if (!s) notFound();
   const m = (n: number) => fmtMoney(n, s.currency);
-  const wa = `https://wa.me/${(s.customer.phone ?? '').replace(/\D/g, '')}?text=${encodeURIComponent(`${s.org.name}: comprobante de compra N° ${s.number} por ${m(s.total)}. ¡Gracias por su compra!`)}`;
+  const wa = `https://wa.me/${(s.customer.phone ?? '').replace(/\D/g, '')}?text=${encodeURIComponent(`${s.org.name}: boleta ${s.code} por ${m(s.total)}. ¡Gracias por su compra!`)}`;
   return (
     <>
       <div className="mb-4 flex flex-wrap items-center gap-2 print:hidden">
@@ -31,21 +31,25 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       <article className="card mx-auto max-w-md p-6 font-mono text-sm print:shadow-none" data-testid="comprobante-venta">
         <p className="text-center text-base font-bold">{s.org.name}</p>
         {s.org.taxId && <p className="text-center text-xs">RUT {s.org.taxId}</p>}
-        <p className="mt-3 text-center font-bold">COMPROBANTE DE VENTA N° {s.number}</p>
+        <p className="mt-3 text-center font-bold" data-testid="codigo-boleta">BOLETA {s.code}</p>
         <p className="text-center text-xs">{fmtDateTime(s.paidAt ?? s.createdAt)} · {s.channel === 'web' ? 'Pedido web' : 'Caja'}</p>
         {s.status !== 'entregada' && <p className="mt-2 text-center"><Badge color={(SALE_STATUS[s.status]?.[1] ?? 'gray') as any}>{SALE_STATUS[s.status]?.[0]}</Badge></p>}
+        {s.seller && <p className="mt-2 text-xs" data-testid="vendedor">Atendido por: {s.seller.name}{s.seller.doc && ` · RUT ${s.seller.doc}`}{s.seller.code && ` · ${s.seller.code}`}</p>}
         {(s.customer.name || s.customer.doc) && <p className="mt-2 text-xs">Cliente: {[s.customer.name, s.customer.doc].filter(Boolean).join(' · ')}</p>}
         <hr className="my-3 border-dashed" />
         {s.items.map((i, k) => (
           <div key={k} className="mb-2">
             <p className="font-bold">{i.name}</p>
             <p className="flex justify-between"><span>{i.qty} {i.unit === 'unidad' ? 'x' : `${i.unit} x`} {m(i.unitPrice)}</span><span>{m(i.total)}</span></p>
-            {i.discount > 0 && <p className="text-xs">Descuento −{m(i.discount)}</p>}
+            {i.promoDiscount > 0 && <p className="text-xs font-bold text-red-600">🏷 Oferta {i.promo} −{m(i.promoDiscount)}</p>}
+            {i.discount - i.promoDiscount > 0 && <p className="text-xs">Descuento −{m(i.discount - i.promoDiscount)}</p>}
             {i.serial && <p className="text-xs">N° serie: {i.serial}</p>}
             {i.warranty && <p className="text-xs">Garantía hasta {fmtDate(i.warranty)}</p>}
           </div>))}
         <hr className="my-3 border-dashed" />
-        {s.discount > 0 && <><p className="flex justify-between"><span>Subtotal</span><span>{m(s.subtotal)}</span></p><p className="flex justify-between"><span>Descuento</span><span>−{m(s.discount)}</span></p></>}
+        {s.discount > 0 && <><p className="flex justify-between"><span>Subtotal</span><span>{m(s.subtotal)}</span></p>
+          {s.discount - (s.coupon?.discount ?? 0) > 0 && <p className="flex justify-between"><span>Descuento</span><span>−{m(s.discount - (s.coupon?.discount ?? 0))}</span></p>}
+          {s.coupon && <p className="flex justify-between"><span>🎟 Cupón {s.coupon.code}</span><span>−{m(s.coupon.discount)}</span></p>}</>}
         <p className="flex justify-between"><span>Neto</span><span>{m(s.total - s.tax)}</span></p>
         <p className="flex justify-between"><span>IVA 19%</span><span>{m(s.tax)}</span></p>
         <p className="flex justify-between text-lg font-bold"><span>TOTAL</span><span>{m(s.total)}</span></p>
