@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="marca">#1F45C8</color>
+    <color name="tinta">#0B1736</color>
+    <style name="Tema" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:colorPrimary">@color/marca</item>
+        <item name="android:colorPrimaryDark">@color/tinta</item>
+        <item name="android:colorAccent">@color/marca</item>
+        <item name="android:statusBarColor">@color/tinta</item>
+        <item name="android:navigationBarColor">@color/tinta</item>
+    </style>
+</resources>
