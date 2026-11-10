@@ -43,5 +43,5 @@ export function fmtSlot(slot: unknown): string {
 }
 
 export const CONF_ROLES: Record<string, string> = {
-  organizer: 'Organizador', presenter: 'Presentador', moderator: 'Moderador', teacher: 'Profesor', student: 'Estudiante', attendee: 'Asistente',
+  organizer: 'Organizador', presenter: 'Presentador', moderator: 'Moderador', teacher: 'Profesor', student: 'Estudiante', attendee: 'Asistente', guest: 'Invitado',
 };

@@ -1,7 +1,7 @@
 'use server';
 import { revalidatePath } from 'next/cache';
 import { getContext } from '@/lib/context';
-import { fail, guard, num, ok, reqStr, str, type ActionResult } from '@/lib/actions';
+import { fail, guard, num, ok, reqStr, str, ValidationError, type ActionResult } from '@/lib/actions';
 
 const refresh = () => revalidatePath('/app/finanzas', 'layout');
 
@@ -40,7 +40,7 @@ export async function registerPayment(fd: FormData): Promise<ActionResult> {
     if (error) return fail(error);
     const { data: p } = await ctx.supabase.from('payments').select('receipt_number').eq('id', data).single();
     refresh();
-    return ok(`Pago registrado. Recibo N° ${p?.receipt_number}.`);
+    return ok(`Pago registrado. Comprobante N° ${p?.receipt_number}: en la lista, toque 🧾 para descargarlo, enviarlo o guardarlo.`);
   });
 }
 
@@ -78,5 +78,49 @@ export async function createBenefit(fd: FormData): Promise<ActionResult> {
     if (error) return fail(error);
     refresh();
     return ok('Beneficio creado.');
+  });
+}
+
+function expenseRow(fd: FormData) {
+  const amount = num(fd, 'amount');
+  if (!amount || amount <= 0) throw new ValidationError('Ingrese un monto mayor a cero.');
+  return {
+    spent_on: reqStr(fd, 'spent_on', 'Fecha'), category: reqStr(fd, 'category', 'Categoría'), description: reqStr(fd, 'description', 'Descripción'),
+    supplier: str(fd, 'supplier'), document_number: str(fd, 'document_number'), amount, currency: reqStr(fd, 'currency', 'Moneda').toUpperCase(),
+    program_id: str(fd, 'program_id'), section_id: str(fd, 'section_id'), campus_id: str(fd, 'campus_id'), notes: str(fd, 'notes'),
+  };
+}
+
+/** 💸 Registra un gasto (sueldos, arriendo, materiales…), opcionalmente asociado a un programa o sección. */
+export async function createExpense(fd: FormData): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getContext();
+    if (!ctx.orgId) return fail('Seleccione una institución.');
+    const { error } = await ctx.supabase.from('expenses').insert({ ...expenseRow(fd), organization_id: ctx.orgId });
+    if (error) return fail(error);
+    refresh();
+    return ok('Gasto registrado.');
+  });
+}
+
+export async function updateExpense(fd: FormData): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getContext();
+    const { error, count } = await ctx.supabase.from('expenses').update(expenseRow(fd), { count: 'exact' }).eq('id', reqStr(fd, 'id', 'id'));
+    if (error) return fail(error);
+    if (!count) return fail('No tiene permiso para editar gastos.');
+    refresh();
+    return ok('Gasto actualizado.');
+  });
+}
+
+export async function deleteExpense(fd: FormData): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getContext();
+    const { error, count } = await ctx.supabase.from('expenses').delete({ count: 'exact' }).eq('id', reqStr(fd, 'id', 'id'));
+    if (error) return fail(error);
+    if (!count) return fail('No tiene permiso para eliminar gastos.');
+    refresh();
+    return ok('Gasto eliminado (puede deshacerlo con «↶ Deshacer»).');
   });
 }

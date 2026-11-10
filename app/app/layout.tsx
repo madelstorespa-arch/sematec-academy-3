@@ -8,6 +8,8 @@ import { MobileMenu } from '@/components/mobile-menu';
 import { OfflineBar, LogoutButton } from '@/components/offline-bar';
 import { UndoBar } from '@/components/undo-bar';
 import { VersionWatcher } from '@/components/version-watcher';
+import { GlobalSearch } from '@/components/global-search';
+import { ConferenceHost } from '@/components/conference/host';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,9 +67,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const avatar = ctx.profile?.avatar_asset_id ? `/media/${ctx.profile.avatar_asset_id}` : null;
 
   return (
+    <ConferenceHost>
     <div className="lg:flex" style={brandStyle(site?.primary_color, site?.accent_color)}>
       <aside className="sticky top-0 z-30 flex max-h-screen flex-col overflow-y-auto bg-ink px-4 py-3 lg:fixed lg:inset-y-0 lg:w-64 lg:py-5">
-        <MobileMenu header={<div className="px-2"><SiteLogo site={site} light /></div>}>
+        <MobileMenu header={<div className="px-2"><SiteLogo site={site} light /></div>} top={ctx.orgId ? <GlobalSearch items={items} /> : undefined}>
         {ctx.orgs.length > 0 && (
           <form action={switchOrg} className="mt-5 px-1">
             <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-sky-200/70">Institución</label>
@@ -105,5 +108,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         ) : children}
       </main>
     </div>
+    </ConferenceHost>
   );
 }

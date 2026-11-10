@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { roomService } from '@/lib/livekit';
 
 const UUID = /^[0-9a-f-]{36}$/i;
+const IDENT = /^(inv_)?[0-9a-f-]{36}$/i; // usuarios y también invitados externos (inv_…)
 const ACTIONS = new Set(['mute', 'mute_all', 'remove', 'allow_share', 'revoke_share', 'lower_hand']);
 
 /**
@@ -13,7 +14,7 @@ const ACTIONS = new Set(['mute', 'mute_all', 'remove', 'allow_share', 'revoke_sh
 export async function POST(request: NextRequest) {
   const b = await request.json().catch(() => ({}));
   const { session, action, identity } = b as { session?: string; action?: string; identity?: string };
-  if (!session || !UUID.test(session) || !action || !ACTIONS.has(action) || (action !== 'mute_all' && (!identity || !UUID.test(identity))))
+  if (!session || !UUID.test(session) || !action || !ACTIONS.has(action) || (action !== 'mute_all' && (!identity || !IDENT.test(identity))))
     return NextResponse.json({ error: 'Solicitud inválida' }, { status: 400 });
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -28,6 +29,7 @@ export async function POST(request: NextRequest) {
     if (action === 'remove') {
       if (identity === user.id) return NextResponse.json({ error: 'No puede expulsarse a sí mismo' }, { status: 400 });
       await svc.removeParticipant(room, identity!);
+      if (identity!.startsWith('inv_')) await supabase.rpc('remove_conference_guest', { p_guest: identity!.slice(4) });
     } else if (action === 'mute' || action === 'mute_all') {
       const list = action === 'mute' ? [await svc.getParticipant(room, identity!)] : (await svc.listParticipants(room)).filter((p) => p.identity !== user.id);
       for (const p of list) for (const t of p.tracks) if (t.source === TrackSource.MICROPHONE && !t.muted) await svc.mutePublishedTrack(room, p.identity, t.sid, true);

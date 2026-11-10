@@ -58,7 +58,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
           <tbody>{rows.map((e: any) => (
             <tr key={e.id}>
               <td><Link className="link" href={`/app/estudiantes/${e.students?.id}`}>{e.students?.last_names}, {e.students?.first_names}</Link></td>
-              <td>{e.programs?.code} · {e.programs?.name}</td><td>{e.campuses?.name}</td><td>{fmtDate(e.enrolled_at)}</td><td><StatusBadge status={e.status} /></td>
+              <td>{e.programs?.code} · {e.programs?.name}<Link className="link ml-2 text-xs" href={`/app/matriculas/${e.id}`} data-testid="editar-matricula">✏ Editar</Link></td><td>{e.campuses?.name}</td><td>{fmtDate(e.enrolled_at)}</td><td><StatusBadge status={e.status} /></td>
               {can(ctx, 'enrollments.approve') && <td>
                 <ActionForm action={changeStatus} inline submitLabel="Aplicar" submitClass="btn-secondary btn-sm" confirm="¿Confirmar el cambio de estado de la matrícula?">
                   <input type="hidden" name="id" value={e.id} />

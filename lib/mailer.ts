@@ -8,7 +8,7 @@ import nodemailer from 'nodemailer';
  */
 export const mailEnabled = () => !!process.env.SMTP_HOST && !!process.env.SMTP_FROM;
 
-export async function sendMail(to: string, subject: string, html: string, text: string) {
+export async function sendMail(to: string, subject: string, html: string, text: string, attachments?: { filename: string; content: Buffer | Uint8Array; contentType?: string }[]) {
   const port = Number(process.env.SMTP_PORT ?? 587);
   const local = /^(localhost|127\.0\.0\.1)$/.test(process.env.SMTP_HOST ?? '');
   const t = nodemailer.createTransport({
@@ -19,7 +19,7 @@ export async function sendMail(to: string, subject: string, html: string, text: 
     connectionTimeout: 10000, greetingTimeout: 10000, socketTimeout: 20000,
   });
   try {
-    await t.sendMail({ from: process.env.SMTP_FROM, to, subject, html, text });
+    await t.sendMail({ from: process.env.SMTP_FROM, to, subject, html, text, attachments: attachments?.map((a) => ({ ...a, content: Buffer.from(a.content) })) });
   } catch (e) {
     throw new Error(mailErrorText(e));
   }

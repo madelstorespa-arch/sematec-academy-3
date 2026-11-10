@@ -139,7 +139,7 @@ def main():
         sel_re(page, 'select[name=student_id]', 'Prueba Navegador')
         page.fill('input[name=amount]', '450000'); page.select_option('select[name=method]', 'bank_transfer')
         page.fill('input[name=external_reference]', 'E2E-TRX-1'); page.click('button:has-text("Registrar pago")')
-        check('Recibo N°' in status_msg(page), 'Pago registrado con recibo correlativo')
+        check('Comprobante N°' in status_msg(page), 'Pago registrado con comprobante correlativo')
         sid = sql("select id from students where student_code='EST-E2E1'")
         go(page, f'{BASE}/app/finanzas/cuenta/{sid}')
         paid = sql(f"select string_agg(paid::int::text, ',' order by number) from installment_balances where student_id='{sid}'")

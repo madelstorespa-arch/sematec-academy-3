@@ -6,6 +6,9 @@ import { ActionForm, Field, SelectField } from '@/components/forms';
 import { fmtDateTime, label, CONF_ROLES } from '@/lib/format';
 import { addParticipant, banParticipant, endSession, issueAttendanceCertificates, setSessionOptions, deleteRecording } from '../actions';
 import { RecordingShare } from '@/components/recording-share';
+import { listInvites, createInvite, revokeInvite } from '../invite-actions';
+import { ShareLink } from '../sala/[id]/invite';
+import { docLabel } from '@/lib/identity';
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -20,6 +23,10 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const active = s.status === 'scheduled' || s.status === 'live';
   const { data: recs } = await sb.from('conference_recordings').select('id, filename, size_bytes, duration_sec, created_at, group_id, part_no').eq('session_id', id).order('created_at', { ascending: false });
   const { data: canManage } = await sb.rpc('can_manage_recordings', { p_session: id });
+  const [{ data: guests }, invites] = await Promise.all([
+    sb.from('conference_guests').select('id, full_name, document_type, document_number, position, institution, email, phone, created_at, joined_at, left_at, removed').eq('session_id', id).order('created_at'),
+    moderator ? listInvites(id) : Promise.resolve([]),
+  ]);
   return (
     <>
       <PageHeader title={s.title} subtitle={`${s.conference_rooms?.name} · ${label(s.session_type)} · ${fmtDateTime(s.scheduled_start, s.timezone)} – ${fmtDateTime(s.scheduled_end, s.timezone)} (${s.timezone})`}
@@ -39,6 +46,38 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
               </tr>))}</tbody></table> : <Empty>Sin participantes registrados.</Empty>}
           {s.conference_rooms?.section_id && <p className="mt-3 text-xs text-slate-500">Los estudiantes inscritos en la sección pueden entrar sin invitación.</p>}
         </Card>
+        {(moderator || (guests?.length ?? 0) > 0) && (
+          <Card title={`🔗 Invitados externos (${guests?.length ?? 0})`} className="xl:order-last xl:col-span-2">
+            {moderator && active && (
+              <div className="mb-5 grid gap-4 md:grid-cols-2">
+                <div className="space-y-3">
+                  {invites.length ? invites.map((i) => (
+                    <div key={i.id} className="rounded-xl border border-slate-200 p-3">
+                      <p className="mb-2 text-xs text-slate-500">{i.label ? `${i.label} · ` : ''}Vence {fmtDateTime(i.expires_at, s.timezone)} · {i.uses}{i.max_uses ? `/${i.max_uses}` : ''} ingreso(s){i.allow_share ? ' · pueden compartir pantalla' : ''}{i.require_document ? ' · piden RUT/pasaporte' : ''}</p>
+                      <ShareLink url={i.url} title={s.title} dark={false} />
+                      <ActionForm action={revokeInvite} inline submitLabel="Desactivar enlace" submitClass="mt-2 text-xs text-red-600 hover:underline" confirm="¿Desactivar este enlace? Nadie más podrá entrar con él.">
+                        <input type="hidden" name="id" value={i.id} /><input type="hidden" name="session_id" value={id} />
+                      </ActionForm>
+                    </div>)) : <p className="text-sm text-slate-500">Aún no hay enlaces de invitado. Cree uno para que personas sin cuenta entren con su nombre, RUT o pasaporte y cargo.</p>}
+                </div>
+                <ActionForm action={createInvite} submitLabel="🔗 Crear enlace de invitado">
+                  <input type="hidden" name="session_id" value={id} />
+                  <Field label="Nombre del enlace (opcional)" name="label" placeholder="Ej.: Apoderados, Empresa X" />
+                  <SelectField label="Válido por" name="hours" defaultValue="24" options={[{ value: '2', label: '2 horas' }, { value: '24', label: '1 día' }, { value: '168', label: '1 semana' }, { value: '720', label: '30 días' }]} />
+                  <Field label="Máximo de personas (opcional)" name="max_uses" type="number" min={1} max={1000} />
+                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="allow_share" /> Pueden compartir su pantalla</label>
+                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="require_document" defaultChecked /> Pedir RUT o pasaporte</label>
+                </ActionForm>
+              </div>)}
+            {guests?.length ? <div className="overflow-x-auto"><table className="table" data-testid="tabla-invitados">
+              <thead><tr><th>Nombre</th><th>Documento</th><th>Cargo</th><th>Institución</th><th>Contacto</th><th>Entró</th><th>Salió</th></tr></thead>
+              <tbody>{guests.map((g: any) => (
+                <tr key={g.id}><td>{g.full_name}{g.removed && <Badge color="red">Expulsado</Badge>}</td>
+                  <td className="text-xs">{g.document_number ? `${docLabel(g.document_type).split(' ')[0]} ${g.document_number}` : '—'}</td>
+                  <td>{g.position ?? '—'}</td><td>{g.institution ?? '—'}</td><td className="text-xs">{[g.email, g.phone].filter(Boolean).join(' · ') || '—'}</td>
+                  <td className="text-xs">{fmtDateTime(g.joined_at ?? g.created_at, s.timezone)}</td><td className="text-xs">{g.left_at ? fmtDateTime(g.left_at, s.timezone) : '—'}</td></tr>))}</tbody></table></div>
+              : <Empty>Ningún invitado externo ha entrado todavía.</Empty>}
+          </Card>)}
         <div className="space-y-6">
           <Card title={`🎬 Grabaciones (${recs?.length ?? 0})`}>
             {recs?.length ? <ul className="space-y-3">{recs.map((r: any) => (

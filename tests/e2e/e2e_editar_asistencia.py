@@ -7,6 +7,7 @@ from playwright.sync_api import sync_playwright
 ORG = '0a000000-0000-4000-8000-000000000001'
 SEC = '0a000000-0000-4000-8000-00000000ad01'     # sección con 4 estudiantes (profesor1)
 SEC_EMPTY = '0a000000-0000-4000-8000-00000000ad02'
+sql(f"insert into section_enrollments (organization_id, section_id, student_id, enrollment_id) select '{ORG}', '{SEC}', e.student_id, e.id from enrollments e join students s on s.id = e.student_id where s.organization_id = '{ORG}' and s.user_id is not null and e.period_id = (select period_id from sections where id = '{SEC}') on conflict do nothing")
 ST1 = '0a000000-0000-4000-8000-00000000a501'
 OWNER = '00000000-0000-4000-8000-000000000010'
 
@@ -118,7 +119,8 @@ with sync_playwright() as pw:
     check(t.locator('[data-testid=tabla-asistencia]').count() == 1, 'El profesor ve los reportes de sus secciones')
 
     # ================= 3. Reportes, alertas, personal y Excel =================
-    emp = sql("select id from employees where organization_id = '0a000000-0000-4000-8000-000000000001' and status = 'active' limit 1")
+    emp = sql("select id from employees where organization_id = '0a000000-0000-4000-8000-000000000001' and status = 'active' limit 1") or \
+        sql(f"insert into employees (organization_id, employee_code, first_names, last_names, position) values ('{ORG}', 'E2E-FUNC', 'Funcionaria', 'De Prueba', 'Secretaria') returning id").splitlines()[0]
     sql(f"insert into staff_attendance (organization_id, employee_id, work_date, check_in, check_out) values ('{ORG}', '{emp}', current_date - 1, (current_date - 1) + time '08:30', (current_date - 1) + time '17:30') on conflict do nothing")
     go(o, BASE + '/app/asistencia')
     check(o.locator('a:has-text("Asistencia")').count() >= 1 and o.locator('[data-testid=tabla-asistencia] tr').count() >= 3, 'Propietario: asistencia de estudiantes por sección')

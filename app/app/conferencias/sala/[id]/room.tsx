@@ -5,16 +5,19 @@ import Link from 'next/link';
 import {
   LiveKitRoom, RoomAudioRenderer, StartAudio, ConnectionStateToast, GridLayout, FocusLayoutContainer, FocusLayout,
   CarouselLayout, ParticipantTile, TrackToggle, DisconnectButton, MediaDeviceMenu, useTracks, useChat, useParticipants,
-  useLocalParticipant, useRoomContext, useDataChannel, useLocalParticipantPermissions, LayoutContextProvider,
+  useLocalParticipant, useRoomContext, useDataChannel, useLocalParticipantPermissions, LayoutContextProvider, usePinnedTracks,
 } from '@livekit/components-react';
 import { Track, RoomEvent, ScreenSharePresets, type LocalVideoTrack, type Participant } from 'livekit-client';
 import { CONF_ROLES } from '@/lib/format';
-import { createBrowser } from '@/lib/supabase/browser';
 import { uploadRecording } from '@/lib/recordings-client';
 import { uploadUserFile } from '@/components/file-uploader';
+import { useConference, type Conn, type RoomOpts } from '@/components/conference/context';
+import { MiniDock, canDocPip, openPipWindow } from './mini';
+import { useBoard, Whiteboard } from './whiteboard';
+import { usePolls, PollPanel, PollCard } from './poll';
+import { InvitePanel } from './invite';
 
-type Conn = { token: string; url: string; role: string; moderator: boolean };
-type Opts = { sessionId: string; title: string; recording: boolean; chatEnabled: boolean; orgId: string; sectionId: string | null };
+type Opts = RoomOpts;
 const EMOJIS = ['👍', '👏', '❤️', '😂', '😮', '🎉', '🙌', '🤔', '👌', '🔥', '✅', '❌', '😀', '😊', '😍', '🙏', '💯', '📌', '✋', '👋', '☕', '📚', '💡', '⭐'];
 const REACTIONS = ['👍', '👏', '❤️', '😂', '😮', '🎉', '🙌', '🤔'];
 const BACKGROUNDS = [
@@ -23,72 +26,108 @@ const BACKGROUNDS = [
 ] as const;
 const canDisplayCapture = () => typeof navigator !== 'undefined' && !!navigator.mediaDevices && 'getDisplayMedia' in navigator.mediaDevices;
 const enc = new TextEncoder(); const dec = new TextDecoder();
+export type View = 'full' | 'mini';
 
+/** Antesala: pide el acceso y entrega la conexión al «anfitrión» del sistema, que la mantiene aunque navegue por otras páginas. */
 export function Room(props: Opts) {
-  const [conn, setConn] = useState<Conn | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const ctl = useConference();
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [own, setOwn] = useState<Conn | null>(null); // sin anfitrión (respaldo)
+  const here = ctl?.active?.opts.sessionId === props.sessionId;
+  const other = ctl?.active && !here ? ctl.active.opts : null;
+  useEffect(() => { if (here) ctl?.setMinimized(false); }, [here]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (ctl?.error) setError(ctl.error); }, [ctl?.error]);
+
   const join = useCallback(async () => {
     setBusy(true); setError(null);
     try {
       const r = await fetch('/api/livekit/token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session: props.sessionId }) });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? 'No se pudo obtener acceso');
-      setConn(j);
+      if (ctl) { if (ctl.active) ctl.leave(); ctl.join(j, props); } else setOwn(j);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Sin conexión con el servidor');
     } finally { setBusy(false); }
-  }, [props.sessionId]);
+  }, [props, ctl]);
 
-  if (!conn) {
-    return (
-      <div className="mx-auto mt-10 max-w-lg card card-pad text-center">
-        <h1 className="text-xl font-bold">{props.title}</h1>
+  if (own) return <RoomShell conn={own} opts={props} view="full" onLeave={() => setOwn(null)} onError={(m) => { setError(m); setOwn(null); }} />;
+  return (
+    <div className="mx-auto mt-10 max-w-lg card card-pad text-center">
+      <h1 className="text-xl font-bold">{props.title}</h1>
+      {here ? (<>
+        <p className="mt-3 rounded bg-emerald-50 p-3 text-sm text-emerald-800">🟢 Está conectado a esta sala (minimizada). Puede seguir trabajando en el sistema.</p>
+        <button onClick={() => ctl?.setMinimized(false)} className="btn-primary mt-5" data-testid="volver-sala">⤢ Volver a la sala</button>
+      </>) : (<>
         <p className="mt-2 text-sm text-slate-600">Al entrar, el navegador pedirá permiso para usar cámara y micrófono. Puede entrar con ambos apagados.</p>
         {props.recording && <p className="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-800">🔴 Esta sesión puede ser grabada por el anfitrión. Se avisará en pantalla mientras se graba.</p>}
+        {other && <p className="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-800">Está conectado a «{other.title}». Al entrar aquí saldrá de esa sala.</p>}
         <button onClick={join} disabled={busy} className="btn-primary mt-5">{busy ? 'Conectando…' : 'Entrar a la sala'}</button>
-        {error && <p className="mt-4 rounded bg-red-50 p-2 text-sm text-red-700">{error}</p>}
-        <p className="mt-4"><Link className="link text-sm" href={`/app/conferencias/${props.sessionId}`}>Detalle de la sesión y grabaciones</Link></p>
-      </div>
-    );
-  }
+        <p className="mt-3 text-xs text-slate-500">Dentro de la sala puede <b>🗕 minimizarla</b> para navegar por el sistema (y compartir su pantalla) sin desconectarse.</p>
+      </>)}
+      {error && <p className="mt-4 rounded bg-red-50 p-2 text-sm text-red-700">{error}</p>}
+      <p className="mt-4"><Link className="link text-sm" href={`/app/conferencias/${props.sessionId}`}>Detalle de la sesión, invitados y grabaciones</Link></p>
+    </div>
+  );
+}
+
+/** Conexión a la sala (pantalla completa o minimizada). La usan el anfitrión del sistema y la página de invitados. */
+export function RoomShell({ conn, opts, view, onMinimize, onExpand, onLeave, onError }: {
+  conn: Conn; opts: Opts; view: View; onMinimize?: () => void; onExpand?: () => void; onLeave: () => void; onError: (m: string) => void;
+}) {
+  const mini = view === 'mini';
   return (
-    <div data-lk-theme="default" className="fixed inset-0 z-50 flex flex-col bg-[#111]">
+    <div data-lk-theme="default" className={mini ? '' : 'sematec-room fixed inset-0 z-50 flex flex-col bg-[#111]'} data-testid="sala">
       <LiveKitRoom serverUrl={conn.url} token={conn.token} connect video={false} audio={false}
-        onDisconnected={() => setConn(null)} onError={(e) => setError(e.message)} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        onDisconnected={onLeave} onError={(e) => onError(e.message)}
+        style={mini ? { display: 'contents' } : { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <LayoutContextProvider>
-          <Stage {...props} conn={conn} />
+          <Stage {...opts} conn={conn} view={view} onMinimize={onMinimize} onExpand={onExpand} />
         </LayoutContextProvider>
         <RoomAudioRenderer />
-        <StartAudio label="Activar audio" />
-        <ConnectionStateToast />
+        <div className={mini ? 'hidden' : ''}><StartAudio label="Activar audio" /><ConnectionStateToast /></div>
       </LiveKitRoom>
     </div>
   );
 }
 
 type Floating = { id: number; emoji: string; left: number; from: string };
+type Panel = 'chat' | 'people' | 'effects' | 'poll' | 'invite' | null;
+const PANEL_TITLE: Record<string, string> = { effects: '🖼 Fondo y efectos', poll: '📊 Encuesta en vivo', invite: '🔗 Invitar a personas externas' };
 
-function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, conn }: Opts & { conn: Conn }) {
+function useElapsed() {
+  const [start] = useState(() => Date.now()); const [now, setNow] = useState(start);
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  const s = Math.floor((now - start) / 1000);
+  return `${s >= 3600 ? `${Math.floor(s / 3600)}:` : ''}${String(Math.floor((s % 3600) / 60)).padStart(s >= 3600 ? 2 : 1, '0')}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, guest, conn, view, onMinimize, onExpand }: Opts & { conn: Conn; view: View; onMinimize?: () => void; onExpand?: () => void }) {
   const room = useRoomContext();
   const { localParticipant } = useLocalParticipant();
   const hookPerms = useLocalParticipantPermissions();
   const participants = useParticipants();
-  const [panel, setPanel] = useState<'chat' | 'people' | 'effects' | null>(null);
+  const [panel, setPanel] = useState<Panel>(null);
   const [layout, setLayout] = useState<'grid' | 'speaker'>('grid');
   const [floating, setFloating] = useState<Floating[]>([]);
   const [showReactions, setShowReactions] = useState(false);
   const [unread, setUnread] = useState(0);
   const [recBy, setRecBy] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [pip, setPip] = useState<Window | null>(null);
+  const [boardHidden, setBoardHidden] = useState(false);
   const [, force] = useState(0);
   const mod = conn.moderator;
+  const elapsed = useElapsed();
+  const board = useBoard(mod);
+  const polls = usePolls(mod);
   const chat = useChat(); // una sola instancia: conserva los mensajes aunque el panel esté cerrado
   const seen = useRef(0);
   useEffect(() => {
-    if (panel === 'chat') { seen.current = chat.chatMessages.length; setUnread(0); }
+    if (panel === 'chat' && view === 'full') { seen.current = chat.chatMessages.length; setUnread(0); }
     else setUnread(chat.chatMessages.filter((m, i) => i >= seen.current && m.from?.identity !== localParticipant.identity).length);
-  }, [chat.chatMessages, panel, localParticipant.identity]);
+  }, [chat.chatMessages, panel, localParticipant.identity, view]);
+  useEffect(() => { if (board.open) setBoardHidden(false); }, [board.open]);
 
   // Repintar cuando cambian atributos (mano levantada) o permisos
   useEffect(() => {
@@ -131,9 +170,13 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, con
     } catch { say('No se pudo cambiar de cámara en este equipo.'); }
   };
   const tracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: true }, { source: Track.Source.ScreenShare, withPlaceholder: false }], { onlySubscribed: false });
+  const pinned = usePinnedTracks();
   const screen = tracks.find((t) => t.publication?.source === Track.Source.ScreenShare);
   const speaker = useMemo(() => [...participants].sort((a, b) => Number(b.isSpeaking) - Number(a.isSpeaking) || b.audioLevel - a.audioLevel)[0], [participants]);
-  const focus = screen ?? (layout === 'speaker' ? tracks.find((t) => t.participant.identity === speaker?.identity && t.source === Track.Source.Camera) : undefined);
+  const speakerTrack = tracks.find((t) => t.participant.identity === speaker?.identity && t.source === Track.Source.Camera);
+  const pinnedTrack = pinned[0] ? tracks.find((t) => t.participant.identity === pinned[0].participant.identity && t.source === pinned[0].source) : undefined;
+  const focus = pinnedTrack ?? screen ?? (layout === 'speaker' ? speakerTrack : undefined);
+  const miniFocus = screen ?? pinnedTrack ?? speakerTrack ?? tracks[0];
 
   const moderate = async (action: string, identity?: string) => {
     const r = await fetch('/api/livekit/moderar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session: sessionId, action, identity }) });
@@ -141,18 +184,55 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, con
     say(r.ok ? 'Listo.' : j.error ?? 'No se pudo completar.');
   };
 
+  /** ⧉ Ventana flotante encima de todos los programas (Chrome/Edge); en otros navegadores, imagen en imagen del video. */
+  const openPip = useCallback(async () => {
+    try {
+      if (canDocPip()) {
+        const w = await openPipWindow();
+        if (!w) return;
+        w.addEventListener('pagehide', () => setPip(null));
+        setPip(w); onMinimize?.();
+        return;
+      }
+      const v = document.querySelector('[data-testid=sala-mini] video, .lk-focus-layout video, .lk-grid-layout video') as HTMLVideoElement | null;
+      if (v && 'requestPictureInPicture' in v) { await v.requestPictureInPicture(); onMinimize?.(); }
+      else say('Su navegador no permite ventanas flotantes. Use «🗕 Minimizar» para seguir navegando en el sistema.');
+    } catch { say('No se pudo abrir la ventana flotante.'); }
+  }, [onMinimize, say]);
+  const closePip = useCallback(() => { pip?.close(); setPip(null); }, [pip]);
+  useEffect(() => () => { pip?.close(); }, [pip]);
+  // Chrome puede abrir la ventana flotante solo al cambiar de pestaña o programa durante la clase
+  useEffect(() => {
+    const ms = typeof navigator !== 'undefined' ? navigator.mediaSession : undefined;
+    try { ms?.setActionHandler('enterpictureinpicture' as MediaSessionAction, () => { openPip(); }); } catch { /* no soportado */ }
+    return () => { try { ms?.setActionHandler('enterpictureinpicture' as MediaSessionAction, null); } catch { /* */ } };
+  }, [openPip]);
+
+  const mini = view === 'mini';
+  const showBoard = board.open && !boardHidden;
+  const btn = (active: boolean) => `lk-button ${active ? 'lk-button-active' : ''}`;
+  const toggle = (p: Exclude<Panel, null>) => setPanel(panel === p ? null : p);
+
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col text-white">
-      <header className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2 text-sm">
-        <span className="truncate font-semibold">{title}</span>
+    <>
+    <div className={mini ? 'hidden' : 'relative flex min-h-0 flex-1 flex-col text-white'}>
+      <header className="flex items-center justify-between gap-2 border-b border-white/10 bg-gradient-to-r from-[#141a2e] to-[#111] px-3 py-2 text-sm">
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-blue-600 text-xs">🎥</span>
+          <span className="truncate font-semibold">{title}</span>
+          <span className="hidden rounded bg-white/10 px-1.5 py-0.5 font-mono text-[11px] sm:inline" title="Tiempo conectado">⏱ {elapsed}</span>
+        </span>
         <span className="flex shrink-0 items-center gap-2 text-xs">
           {recBy && <span className="animate-pulse rounded bg-red-600 px-2 py-0.5 font-bold">● GRABANDO</span>}
           <span className="opacity-70">{participants.length} 👥 · {CONF_ROLES[conn.role] ?? conn.role}</span>
+          {onMinimize && <button className="rounded-lg bg-white/10 px-2 py-1 hover:bg-white/20" onClick={onMinimize} title="Minimizar: siga navegando por el sistema sin salir de la clase" data-testid="minimizar">🗕 Minimizar</button>}
+          {(canDocPip() || onMinimize) && <button className="hidden rounded-lg bg-white/10 px-2 py-1 hover:bg-white/20 sm:inline" onClick={openPip} title="Ventana flotante encima de todos los programas">⧉ Flotante</button>}
         </span>
       </header>
       {localParticipant.isScreenShareEnabled && (
         <div className="flex flex-wrap items-center justify-center gap-2 bg-emerald-600/30 px-3 py-1 text-xs" data-testid="compartiendo">
           🟢 Está compartiendo su pantalla con todos
+          {onMinimize && <button className="rounded bg-white/15 px-2 py-0.5 font-semibold hover:bg-white/25" onClick={onMinimize}>🗕 Minimizar y seguir trabajando</button>}
           <button className="rounded bg-white/15 px-2 py-0.5 font-semibold hover:bg-white/25" onClick={() => localParticipant.setScreenShareEnabled(false)}>⏹ Dejar de compartir</button>
         </div>)}
       {screen && screen.participant.identity !== localParticipant.identity && (
@@ -164,6 +244,9 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, con
         <div className="flex flex-wrap gap-2 bg-amber-500/20 px-3 py-1 text-xs" data-testid="manos">
           ✋ {hands.map((p) => p.name || 'Participante').join(', ')}
         </div>)}
+      {board.open && boardHidden && (
+        <div className="flex items-center justify-center gap-2 bg-purple-600/30 px-3 py-1 text-xs">🖍 La pizarra está abierta
+          <button className="rounded bg-white/15 px-2 py-0.5 hover:bg-white/25" onClick={() => setBoardHidden(false)}>Ver pizarra</button></div>)}
 
       <div className="relative flex min-h-0 flex-1">
         <div className="lk-video-conference relative min-w-0 flex-1" style={{ height: '100%' }}>
@@ -175,20 +258,24 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, con
           ) : (
             <GridLayout tracks={tracks} style={{ height: '100%' }}><ParticipantTile /></GridLayout>
           )}
-          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          {showBoard && <Whiteboard board={board} title={title} />}
+          <PollCard polls={polls} />
+          <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
             {floating.map((f) => (
               <span key={f.id} className="reaction-float absolute bottom-6 text-4xl" style={{ left: `${f.left}%` }} title={f.from}>{f.emoji}</span>))}
           </div>
         </div>
         {panel && (
-          <aside className="absolute inset-0 z-10 flex flex-col bg-[#1b1b1f] sm:static sm:w-80 sm:border-l sm:border-white/10">
+          <aside className="absolute inset-0 z-20 flex flex-col bg-[#1b1b1f] sm:static sm:w-80 sm:border-l sm:border-white/10">
             <div className="flex items-center justify-between border-b border-white/10 px-3 py-2 text-sm font-semibold">
-              <span>{panel === 'chat' ? '💬 Chat' : panel === 'people' ? `👥 Participantes (${participants.length})` : '🖼 Fondo y efectos'}</span>
+              <span>{panel === 'chat' ? '💬 Chat' : panel === 'people' ? `👥 Participantes (${participants.length})` : PANEL_TITLE[panel]}</span>
               <button onClick={() => setPanel(null)} className="rounded px-2 hover:bg-white/10" aria-label="Cerrar panel">✕</button>
             </div>
-            {panel === 'chat' && <ChatPanel enabled={chatEnabled || mod} chat={chat} orgId={orgId} sectionId={sectionId} say={say} />}
+            {panel === 'chat' && <ChatPanel enabled={chatEnabled || mod} chat={chat} orgId={orgId} sectionId={sectionId} say={say} attachments={!guest} />}
             {panel === 'people' && <PeoplePanel mod={mod} me={localParticipant.identity} participants={participants} moderate={moderate} />}
             {panel === 'effects' && <EffectsPanel say={say} />}
+            {panel === 'poll' && <PollPanel polls={polls} />}
+            {panel === 'invite' && <InvitePanel sessionId={sessionId} title={title} />}
           </aside>)}
       </div>
 
@@ -198,20 +285,20 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, con
           <p className="mt-1 opacity-80">Los navegadores de celulares (Android y iPhone) no permiten transmitir la pantalla completa. Puede mostrar su contenido así:</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button className="rounded-lg bg-blue-600 px-3 py-2" onClick={() => { setShareHelp(false); flipCamera(); }}>📷 Mostrar con la cámara trasera</button>
-            <button className="rounded-lg bg-white/10 px-3 py-2" onClick={() => { setShareHelp(false); setPanel('chat'); }}>📎 Enviar foto, video o archivo al chat</button>
+            {!guest && <button className="rounded-lg bg-white/10 px-3 py-2" onClick={() => { setShareHelp(false); setPanel('chat'); }}>📎 Enviar foto, video o archivo al chat</button>}
             <button className="rounded-lg px-3 py-2 opacity-70" onClick={() => setShareHelp(false)}>Cerrar</button>
           </div>
           <p className="mt-2 text-xs opacity-60">Para compartir la pantalla completa, entre desde un computador con Chrome, Edge o Firefox.</p>
         </div>)}
-      {toast && <div className="absolute bottom-24 left-1/2 z-20 -translate-x-1/2 rounded-lg bg-black/80 px-4 py-2 text-sm">{toast}</div>}
+      {toast && <div className="absolute bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-lg bg-black/80 px-4 py-2 text-sm">{toast}</div>}
 
-      <footer className="flex flex-wrap items-center justify-center gap-1 border-t border-white/10 px-2 py-2 sm:gap-2">
+      <footer className="flex flex-wrap items-center justify-center gap-1 border-t border-white/10 bg-[#0c0c10] px-2 py-2 sm:gap-2">
         <span className="flex items-center"><TrackToggle source={Track.Source.Microphone} showIcon>Micrófono</TrackToggle><MediaDeviceMenu kind="audioinput" /></span>
         <span className="flex items-center"><TrackToggle source={Track.Source.Camera} showIcon>Cámara</TrackToggle><MediaDeviceMenu kind="videoinput" /></span>
         {canShare && <ShareButton say={say} />}
         {sharePerm && !canShare && <button className="lk-button" onClick={() => setShareHelp(true)} data-testid="compartir-celular">📲 Compartir pantalla</button>}
         {(isMobile || !canDisplayCapture()) && <button className="lk-button" onClick={flipCamera} title="Cambiar entre cámara frontal y trasera">🔄 Cámara</button>}
-        <button className={`lk-button ${panel === 'effects' ? 'lk-button-active' : ''}`} onClick={() => setPanel(panel === 'effects' ? null : 'effects')} title="Desenfoque y fondos virtuales">🖼 Fondo</button>
+        <button className={btn(panel === 'effects')} onClick={() => toggle('effects')} title="Desenfoque y fondos virtuales">🖼 Fondo</button>
         <span className="relative">
           <button className="lk-button" onClick={() => setShowReactions((v) => !v)} title="Reacciones">😀 Reaccionar</button>
           {showReactions && (
@@ -219,16 +306,25 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, con
               {REACTIONS.map((e) => <button key={e} className="rounded p-1 text-2xl hover:bg-white/10" onClick={() => react(e)} aria-label={`Reaccionar ${e}`}>{e}</button>)}
             </span>)}
         </span>
-        <button className={`lk-button ${hand ? 'lk-button-active' : ''}`} onClick={toggleHand}>{hand ? '✋ Bajar la mano' : '✋ Levantar la mano'}</button>
-        <button className={`lk-button ${panel === 'chat' ? 'lk-button-active' : ''}`} onClick={() => setPanel(panel === 'chat' ? null : 'chat')}>
+        <button className={btn(hand)} onClick={toggleHand}>{hand ? '✋ Bajar la mano' : '✋ Levantar la mano'}</button>
+        <button className={btn(panel === 'chat')} onClick={() => toggle('chat')}>
           💬 Chat{unread > 0 && <span className="ml-1 rounded-full bg-red-600 px-1.5 text-xs">{unread}</span>}</button>
-        <button className={`lk-button ${panel === 'people' ? 'lk-button-active' : ''}`} onClick={() => setPanel(panel === 'people' ? null : 'people')}>👥 Personas{hands.length > 0 && <span className="ml-1 rounded-full bg-amber-500 px-1.5 text-xs">{hands.length}</span>}</button>
+        <button className={btn(panel === 'people')} onClick={() => toggle('people')}>👥 Personas{hands.length > 0 && <span className="ml-1 rounded-full bg-amber-500 px-1.5 text-xs">{hands.length}</span>}</button>
+        {mod
+          ? <button className={btn(board.open)} onClick={() => (board.open ? board.hide() : board.show())} data-testid="boton-pizarra">🖍 {board.open ? 'Cerrar pizarra' : 'Pizarra'}</button>
+          : board.open && <button className={btn(showBoard)} onClick={() => setBoardHidden(!boardHidden)}>🖍 {showBoard ? 'Ver videos' : 'Ver pizarra'}</button>}
+        {mod && <button className={btn(panel === 'poll')} onClick={() => toggle('poll')} data-testid="boton-encuesta">📊 Encuesta</button>}
+        {mod && !guest && <button className={btn(panel === 'invite')} onClick={() => toggle('invite')} data-testid="boton-invitar">🔗 Invitar</button>}
         <button className="lk-button" onClick={() => setLayout(layout === 'grid' ? 'speaker' : 'grid')} title="Cambiar vista">{layout === 'grid' ? '🗣 Vista orador' : '▦ Vista galería'}</button>
-        {mod && recording && <Recorder sessionId={sessionId} title={title} say={say} broadcast={(on) => { sendRec(enc.encode(on ? '1' : '0'), { reliable: true }); setRecBy(on ? (localParticipant.name ?? 'Usted') : null); }} />}
+        {mod && recording && !guest && <Recorder sessionId={sessionId} title={title} say={say} broadcast={(on) => { sendRec(enc.encode(on ? '1' : '0'), { reliable: true }); setRecBy(on ? (localParticipant.name ?? 'Usted') : null); }} />}
         <button className="lk-button hidden sm:inline-flex" onClick={() => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {})}>⛶ Pantalla completa</button>
         <DisconnectButton>Salir</DisconnectButton>
       </footer>
     </div>
+    {(mini || pip) && (
+      <MiniDock title={title} focus={miniFocus} recording={!!recBy} unread={unread} hands={hands.length} people={participants.length}
+        pip={pip} onPip={openPip} onClosePip={closePip} onExpand={onExpand} canShare={canShare} />)}
+    </>
   );
 }
 
@@ -292,7 +388,7 @@ function ShareButton({ say }: { say: (m: string) => void }) {
 }
 
 const FILE_LINK = /\/app\/archivos\/ver\/([0-9a-f-]{36})/;
-function ChatPanel({ enabled, chat, orgId, sectionId, say }: { enabled: boolean; chat: ReturnType<typeof useChat>; orgId: string; sectionId: string | null; say: (m: string) => void }) {
+function ChatPanel({ enabled, chat, orgId, sectionId, say, attachments = true }: { enabled: boolean; chat: ReturnType<typeof useChat>; orgId: string; sectionId: string | null; say: (m: string) => void; attachments?: boolean }) {
   const { chatMessages, send, isSending } = chat;
   const fileInput = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -337,7 +433,7 @@ function ChatPanel({ enabled, chat, orgId, sectionId, say }: { enabled: boolean;
             </div>)}
           <form className="flex gap-1" onSubmit={(e) => { e.preventDefault(); submit(); }}>
             <button type="button" className="rounded-lg px-2 text-xl hover:bg-white/10" onClick={() => setEmojis((v) => !v)} aria-label="Emojis">😊</button>
-            <button type="button" className="rounded-lg px-2 text-xl hover:bg-white/10 disabled:opacity-50" disabled={uploading} onClick={() => fileInput.current?.click()} aria-label="Adjuntar archivo" title="Enviar foto, video o archivo">{uploading ? '⏳' : '📎'}</button>
+            {attachments && <button type="button" className="rounded-lg px-2 text-xl hover:bg-white/10 disabled:opacity-50" disabled={uploading} onClick={() => fileInput.current?.click()} aria-label="Adjuntar archivo" title="Enviar foto, video o archivo">{uploading ? '⏳' : '📎'}</button>}
             <input ref={fileInput} type="file" className="hidden" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip" data-testid="adjuntar-chat" onChange={(e) => attach(e.target.files?.[0])} />
             <input className="min-w-0 flex-1 rounded-lg bg-white/10 px-3 py-2 text-sm outline-none placeholder:text-white/50" value={text} maxLength={2000}
               onChange={(e) => setText(e.target.value)} placeholder="Escriba un mensaje…" aria-label="Mensaje del chat" />
@@ -354,12 +450,12 @@ function PeoplePanel({ mod, me, participants, moderate }: { mod: boolean; me: st
       {mod && <button className="mb-2 w-full rounded-lg bg-white/10 py-2 text-xs hover:bg-white/20" onClick={() => moderate('mute_all')}>🔇 Silenciar a todos</button>}
       <ul className="space-y-1">
         {participants.map((p) => {
-          let role = ''; try { role = JSON.parse(p.metadata || '{}').role ?? ''; } catch { /* */ }
+          let role = '', extra = ''; try { const md = JSON.parse(p.metadata || '{}'); role = md.role ?? ''; extra = [md.cargo, md.inst].filter(Boolean).join(' · '); } catch { /* */ }
           const isMe = p.identity === me;
           return (
             <li key={p.identity} className="rounded-lg px-2 py-2 hover:bg-white/5">
               <div className="flex items-center justify-between gap-2">
-                <span className="min-w-0 truncate">{p.attributes?.hand && '✋ '}{p.name || 'Participante'}{isMe && ' (usted)'}<span className="block text-[11px] opacity-60">{CONF_ROLES[role] ?? role}</span></span>
+                <span className="min-w-0 truncate">{p.attributes?.hand && '✋ '}{p.name || 'Participante'}{isMe && ' (usted)'}<span className="block text-[11px] opacity-60">{CONF_ROLES[role] ?? role}{extra && ` · ${extra}`}</span></span>
                 <span className="shrink-0 text-xs">{p.isMicrophoneEnabled ? '🎙' : '🔇'} {p.isCameraEnabled ? '📷' : ''} {p.isScreenShareEnabled ? '🖥' : ''}</span>
               </div>
               {mod && !isMe && (

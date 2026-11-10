@@ -33,7 +33,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         <Card title="Pagos y reembolsos">
           {pays?.length ? <div className="overflow-x-auto"><table className="table"><thead><tr><th>Recibo</th><th>Fecha</th><th>Medio</th><th className="text-right">Monto</th><th>Estado</th>{can(ctx, 'finance.void') && <th>Acciones (requiere MFA)</th>}</tr></thead>
             <tbody>{pays.map((p: any) => (
-              <tr key={p.id}><td className="font-mono text-xs">{p.kind === 'refund' ? 'R-' : ''}{p.receipt_number}</td><td>{fmtDateTime(p.paid_at)}</td><td>{PAY_METHODS.find((m) => m.value === p.method)?.label}</td>
+              <tr key={p.id}><td className="font-mono text-xs"><Link className="link" href={`/app/finanzas/boleta/${p.id}`} data-testid="ver-boleta">🧾 {p.kind === 'refund' ? 'R-' : ''}{p.receipt_number}</Link></td><td>{fmtDateTime(p.paid_at)}</td><td>{PAY_METHODS.find((m) => m.value === p.method)?.label}</td>
                 <td className="text-right font-semibold">{p.kind === 'refund' ? '−' : ''}{fmtMoney(p.amount, p.currency)}</td>
                 <td><StatusBadge status={p.status} />{p.void_reason && <p className="text-xs text-slate-500">{p.void_reason}</p>}</td>
                 {can(ctx, 'finance.void') && <td>{p.status === 'confirmed' && p.kind === 'payment' && (

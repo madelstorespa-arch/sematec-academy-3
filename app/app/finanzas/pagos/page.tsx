@@ -43,7 +43,7 @@ export default async function Page() {
         {payments?.length ? <div className="overflow-x-auto"><table className="table">
           <thead><tr><th>Recibo</th><th>Fecha</th><th>Estudiante</th><th>Tipo</th><th>Medio</th><th>Operación</th><th className="text-right">Monto</th><th>Estado</th></tr></thead>
           <tbody>{payments.map((p: any) => (
-            <tr key={p.id}><td className="font-mono text-xs">{p.kind === 'refund' ? 'R-' : ''}{p.receipt_number}</td><td>{fmtDateTime(p.paid_at)}</td>
+            <tr key={p.id}><td className="font-mono text-xs"><Link className="link" href={`/app/finanzas/boleta/${p.id}`} data-testid="ver-boleta">🧾 {p.kind === 'refund' ? 'R-' : ''}{p.receipt_number}</Link></td><td>{fmtDateTime(p.paid_at)}</td>
               <td><Link className="link" href={`/app/finanzas/cuenta/${p.students?.id}`}>{p.students?.last_names}, {p.students?.first_names}</Link></td>
               <td>{p.kind === 'refund' ? 'Reembolso' : 'Pago'}</td><td>{PAY_METHODS.find((m) => m.value === p.method)?.label}</td><td>{p.external_reference ?? '—'}</td>
               <td className={`text-right font-semibold ${p.kind === 'refund' ? 'text-red-600' : ''}`}>{p.kind === 'refund' ? '−' : ''}{fmtMoney(p.amount, p.currency)}</td>

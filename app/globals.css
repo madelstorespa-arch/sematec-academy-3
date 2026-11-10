@@ -40,3 +40,16 @@
   100% { transform: translateY(-60vh) scale(1); opacity: 0; }
 }
 .reaction-float { animation: reaction-float 4s ease-out forwards; }
+
+/* Aula virtual: controles modernos (botones redondeados, efecto vidrio) */
+.sematec-room .lk-button, .sematec-room .lk-disconnect-button {
+  border-radius: 9999px; padding: 0.5rem 0.9rem; font-size: 0.82rem; transition: background-color .15s, transform .1s;
+  background-color: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.08);
+}
+.sematec-room .lk-button:hover { background-color: rgba(255,255,255,.16); }
+.sematec-room .lk-button:active { transform: scale(.97); }
+.sematec-room .lk-button-active, .sematec-room .lk-button[aria-pressed='true'] { background-color: #2563eb; border-color: #3b82f6; }
+.sematec-room .lk-disconnect-button { background-color: #dc2626; border-color: #ef4444; color: #fff; }
+.sematec-room .lk-disconnect-button:hover { background-color: #b91c1c; }
+.sematec-room .lk-participant-tile { border-radius: 14px; overflow: hidden; }
+.sematec-room .lk-grid-layout { gap: .5rem; padding: .5rem; }
