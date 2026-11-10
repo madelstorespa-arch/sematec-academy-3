@@ -13,11 +13,29 @@ export async function sendMail(to: string, subject: string, html: string, text: 
   const local = /^(localhost|127\.0\.0\.1)$/.test(process.env.SMTP_HOST ?? '');
   const t = nodemailer.createTransport({
     host: process.env.SMTP_HOST, port, secure: port === 465,
-    auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
+    // Google muestra la contraseña de aplicación en grupos («abcd efgh ijkl mnop»): se quitan los espacios
+    auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER.trim(), pass: (process.env.SMTP_PASS ?? '').replace(/\s+/g, '') } : undefined,
     ignoreTLS: local, requireTLS: !local && port !== 465,
     connectionTimeout: 10000, greetingTimeout: 10000, socketTimeout: 20000,
   });
-  await t.sendMail({ from: process.env.SMTP_FROM, to, subject, html, text });
+  try {
+    await t.sendMail({ from: process.env.SMTP_FROM, to, subject, html, text });
+  } catch (e) {
+    throw new Error(mailErrorText(e));
+  }
+}
+
+/** Traduce los errores del servidor de correo a instrucciones claras. */
+export function mailErrorText(e: unknown) {
+  const m = (e as Error)?.message ?? String(e);
+  if (/535|BadCredentials|Username and Password not accepted|Invalid login|EAUTH/i.test(m))
+    return 'El servidor de correo rechazó el usuario o la clave. Revise en Vercel: SMTP_USER debe ser el correo completo de Gmail y SMTP_PASS la «contraseña de aplicación» de 16 letras creada en ESA misma cuenta de Google (no la contraseña normal de Gmail). Después haga «Redeploy».';
+  if (/534|Application-specific password required/i.test(m))
+    return 'Gmail exige una «contraseña de aplicación»: créela en myaccount.google.com → Seguridad → Contraseñas de aplicaciones y póngala en SMTP_PASS (Vercel). Después haga «Redeploy».';
+  if (/ENOTFOUND|EDNS|getaddrinfo/i.test(m)) return 'No se encontró el servidor de correo: revise SMTP_HOST en Vercel (para Gmail: smtp.gmail.com).';
+  if (/ETIMEDOUT|ECONNREFUSED|ESOCKET|timeout/i.test(m)) return 'No se pudo conectar con el servidor de correo: revise SMTP_PORT en Vercel (para Gmail: 465).';
+  if (/\b55[03]\b.*sender|sender address|Sender address/i.test(m)) return 'El servidor rechazó el remitente: SMTP_FROM debe usar el mismo correo que SMTP_USER, por ejemplo «SEMATEC ACADEMY <sucorreo@gmail.com>».';
+  return `No se pudo enviar el correo: ${m}`;
 }
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));

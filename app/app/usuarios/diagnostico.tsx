@@ -35,7 +35,7 @@ export async function AccessDiagnosis({ ctx, email }: { ctx: Ctx; email?: string
     if (!d.confirmed) f.push({ level: 'warn', text: 'El correo no está confirmado: al ponerle una contraseña nueva queda habilitada.' });
     const active = (d.roles ?? []).filter((r) => r.status === 'active' && (!r.until || new Date(r.until).getTime() > now));
     if (!active.length) f.push({ level: 'bad', text: 'No tiene ningún rol activo en la institución (sin rol no puede entrar a ningún módulo). Asígnele uno en «Asignar rol a un usuario».' });
-    else f.push({ level: 'ok', text: `Roles activos: ${active.map((r) => r.role).join(', ')}.` });
+    else f.push({ level: 'ok', text: `Roles activos: ${[...new Set(active.map((r) => r.role))].join(', ')}.` });
     if (d.needs_mfa && !d.mfa_enrolled) f.push({ level: 'warn', text: 'Su rol exige verificación en dos pasos: al entrar se le mostrará un código QR para configurar Google Authenticator (u otra app). Debe tener el celular a mano.' });
     if (d.mfa_enrolled) f.push({ level: 'warn', text: 'Usa verificación en dos pasos: si perdió el celular o borró la app, use «Reiniciar verificación en dos pasos».' });
     if ((d.fails_24h ?? 0) > 0) f.push({ level: 'warn', text: `${d.fails_24h} intento(s) fallido(s) en las últimas 24 horas: probablemente no recuerda la contraseña.` });
