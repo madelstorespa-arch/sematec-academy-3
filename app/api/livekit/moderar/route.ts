@@ -27,9 +27,12 @@ export async function POST(request: NextRequest) {
   const room = s.livekit_room_name;
   try {
     const svc = roomService();
+    // 📱 Conexión del celular (app SEMATEC Aula) que comparte la pantalla de esa persona
+    const dropPhone = async (id: string) => { try { await svc.removeParticipant(room, `pan_${id}`); } catch { /* no estaba compartiendo */ } };
     if (action === 'remove') {
       if (identity === user.id) return NextResponse.json({ error: 'No puede expulsarse a sí mismo' }, { status: 400 });
       await svc.removeParticipant(room, identity!);
+      await dropPhone(identity!);
       if (identity!.startsWith('inv_')) await supabase.rpc('remove_conference_guest', { p_guest: identity!.slice(4) });
     } else if (action === 'mute' || action === 'mute_all') {
       const list = action === 'mute' ? [await svc.getParticipant(room, identity!)] : (await svc.listParticipants(room)).filter((p) => p.identity !== user.id);
@@ -44,12 +47,20 @@ export async function POST(request: NextRequest) {
         },
         attributes: { ...(p.attributes ?? {}), share: action === 'allow_share' ? '1' : '' },
       });
+      if (action === 'revoke_share') await dropPhone(identity!);
     } else if (action === 'apply_policy') {
       // ⚙ Aplica la configuración de la sala a quienes ya están conectados (no a los anfitriones)
       const { data: ss } = await supabase.from('conference_sessions').select('room_policy').eq('id', session).maybeSingle();
       const policy = (ss?.room_policy ?? {}) as RoomPolicy;
-      for (const p of await svc.listParticipants(room)) {
+      const all = await svc.listParticipants(room);
+      for (const p of all) {
         let role = ''; try { role = JSON.parse(p.metadata || '{}').role ?? ''; } catch { /* */ }
+        if (p.identity.startsWith('pan_')) {
+          // Pantalla desde el celular: se corta si ya no se permite compartir a esa persona
+          const owner = all.find((x) => x.identity === p.identity.slice(4));
+          if (!MOD_ROLES.has(role) && policy.share === false && owner?.attributes?.share !== '1') await dropPhone(p.identity.slice(4));
+          continue;
+        }
         if (MOD_ROLES.has(role) || p.identity === user.id) continue;
         const sharing = p.attributes?.share === '1';
         const base = [TrackSource.CAMERA, TrackSource.MICROPHONE, ...(sharing || policy.share ? [TrackSource.SCREEN_SHARE, TrackSource.SCREEN_SHARE_AUDIO] : [])];

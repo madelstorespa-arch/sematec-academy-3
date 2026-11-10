@@ -1,4 +1,6 @@
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
+import { aulaExcluded } from '@/lib/platform-mode';
 import { getContext } from '@/lib/context';
 import { SiteLogo } from '@/components/site-chrome';
 import { brandStyle } from '@/lib/site';
@@ -28,6 +30,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const { data: site } = ctx.orgId
     ? await ctx.supabase.from('site_settings').select('site_name, tagline, logo_asset_id, primary_color, accent_color').eq('organization_id', ctx.orgId).maybeSingle()
     : { data: null };
+  const path = (await headers()).get('x-sematec-path') ?? '';
+  const blocked = ctx.orgMode === 'aula' && aulaExcluded(path);
   const avatar = ctx.profile?.avatar_asset_id ? `/media/${ctx.profile.avatar_asset_id}` : null;
 
   return (
@@ -71,6 +75,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <div className="card card-pad max-w-xl">
             <h1 className="text-xl font-bold">Cuenta sin institución asignada</h1>
             <p className="mt-2 text-sm text-slate-600">Su cuenta está activa, pero aún no tiene un rol en ninguna institución. Solicite acceso a la administración.</p>
+          </div>
+        ) : blocked ? (
+          <div className="card card-pad max-w-xl" data-testid="modulo-no-disponible">
+            <h1 className="text-xl font-bold">Módulo no disponible en esta plataforma</h1>
+            <p className="mt-2 text-sm text-slate-600">{ctx.org?.display_name} usa la plataforma de <b>aula virtual</b>. Este módulo administrativo no forma parte de ella.</p>
+            <a className="btn-primary mt-4 inline-block" href="/app/conferencias">🎥 Ir a las aulas virtuales</a>
           </div>
         ) : children}
       </main>

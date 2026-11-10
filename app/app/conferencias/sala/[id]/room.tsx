@@ -31,6 +31,9 @@ const BACKGROUNDS = [
 const canDisplayCapture = () => typeof navigator !== 'undefined' && !!navigator.mediaDevices && 'getDisplayMedia' in navigator.mediaDevices
   && !/Android/i.test(navigator.userAgent); // Chrome/Firefox/Samsung en Android tienen la función pero siempre la rechazan
 const enc = new TextEncoder(); const dec = new TextDecoder();
+// Al abrir la app de Android (enlace sematecaula://) el navegador avisa «salir de la página» sin salir:
+// la conexión se cierra solo cuando la página realmente se cierra (pagehide, ver Stage).
+const ROOM_OPTS = { disconnectOnPageLeave: false };
 export type View = 'full' | 'mini';
 
 /** Antesala: pide el acceso y entrega la conexión al «anfitrión» del sistema, que la mantiene aunque navegue por otras páginas. */
@@ -106,7 +109,7 @@ export function RoomShell({ conn: main, opts, view, onMinimize, onExpand, onLeav
   const mine = conn.token;
   return (
     <div data-lk-theme="default" className={mini ? '' : 'sematec-room fixed inset-0 z-50 flex flex-col bg-[#111]'} data-testid="sala">
-      <LiveKitRoom key={mine} serverUrl={conn.url} token={conn.token} connect video={false} audio={false}
+      <LiveKitRoom key={mine} serverUrl={conn.url} token={conn.token} connect video={false} audio={false} options={ROOM_OPTS}
         onDisconnected={() => { if (current.current === mine) { if (sub) goMain(); else onLeave(); } }}
         onError={(e) => { if (current.current === mine) { if (sub) goMain(); else onError(e.message); } }}
         style={mini ? { display: 'contents' } : { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
@@ -147,9 +150,16 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
   conn: Conn; view: View; onMinimize?: () => void; onExpand?: () => void; group: number; onGroup: (c: Conn, g: number) => void; onMain: () => void;
 }) {
   const room = useRoomContext();
+  useEffect(() => {
+    const leave = () => { room.disconnect().catch(() => {}); };
+    window.addEventListener('pagehide', leave);
+    return () => window.removeEventListener('pagehide', leave);
+  }, [room]);
   const { localParticipant } = useLocalParticipant();
   const hookPerms = useLocalParticipantPermissions();
-  const participants = useParticipants();
+  const everyone = useParticipants();
+  // 📱 La conexión que comparte la pantalla del celular es la misma persona: no se cuenta aparte
+  const participants = useMemo(() => everyone.filter((p) => !p.identity.startsWith('pan_')), [everyone]);
   const [panel, setPanel] = useState<Panel>(null);
   const [layout, setLayout] = useState<'grid' | 'speaker'>('grid');
   const [floating, setFloating] = useState<Floating[]>([]);
@@ -209,6 +219,27 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
   const sharePerm = !!perms?.canPublishSources?.some((x) => Number(x) === 3);
   const canShare = sharePerm && canDisplayCapture();
   const [shareHelp, setShareHelp] = useState(false);
+  const [appMissing, setAppMissing] = useState(false);
+  const [appBusy, setAppBusy] = useState(false);
+  const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
+  const inApp = typeof navigator !== 'undefined' && /SematecAula\//.test(navigator.userAgent);
+  /** 📱 Android: la app SEMATEC Aula comparte la pantalla completa del celular (el navegador no puede). */
+  const shareWithApp = async () => {
+    setAppBusy(true); setAppMissing(false);
+    try {
+      const r = await fetch('/api/livekit/pantalla', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session: sessionId }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { say(j.error ?? 'No se pudo preparar la pantalla.'); return; }
+      const bridge = (window as unknown as { SematecAula?: { postMessage: (m: string) => void } }).SematecAula;
+      if (bridge?.postMessage) { bridge.postMessage(JSON.stringify({ action: 'share', url: j.url, token: j.token, title: j.title })); setShareHelp(false); return; }
+      const link = `sematecaula://compartir?u=${encodeURIComponent(j.url)}&t=${encodeURIComponent(j.token)}&n=${encodeURIComponent(j.title)}`;
+      let left = false;
+      const onHide = () => { if (document.visibilityState === 'hidden') left = true; };
+      document.addEventListener('visibilitychange', onHide);
+      window.location.href = link;
+      setTimeout(() => { document.removeEventListener('visibilitychange', onHide); if (!left) setAppMissing(true); }, 2000);
+    } catch { say('Sin conexión: intente de nuevo.'); } finally { setAppBusy(false); }
+  };
   useEffect(() => { if (shareHelp) setMore(false); }, [shareHelp]);
   const [facing, setFacing] = useState<'user' | 'environment'>('user');
   const [seeOwnScreen, setSeeOwnScreen] = useState(false);
@@ -238,8 +269,11 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
     } catch { say('No se pudo cambiar de cámara en este equipo.'); }
   };
   const allTracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: true }, { source: Track.Source.ScreenShare, withPlaceholder: false }], { onlySubscribed: false });
+  const myPhone = `pan_${localParticipant.identity}`; // 📱 pantalla de mi celular (app SEMATEC Aula)
+  const phoneSharing = everyone.some((p) => p.identity === myPhone);
   const tracks = allTracks.filter((t) => {
-    if (t.source === Track.Source.ScreenShare && t.participant.isLocal && !seeOwnScreen) return false; // evita el «efecto espejo» al compartir
+    if (t.source === Track.Source.ScreenShare && (t.participant.isLocal || t.participant.identity === myPhone) && !seeOwnScreen) return false; // evita el «efecto espejo» al compartir
+    if (t.source === Track.Source.Camera && t.participant.identity.startsWith('pan_')) return false; // la conexión del celular solo trae pantalla
     if (my.hideNoVideo && t.source === Track.Source.Camera && !t.participant.isLocal && !t.participant.isCameraEnabled) return false;
     return true;
   });
@@ -308,6 +342,13 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
           {(canDocPip() || onMinimize || isMobile) && <button className="rounded-lg bg-white/10 px-2 py-1 hover:bg-white/20" onClick={openPip} title="Ventana flotante: use otras apps sin salir de la clase" data-testid="flotante">⧉<span className="hidden sm:inline"> Flotante</span></button>}
         </span>
       </header>
+      {phoneSharing && !localParticipant.isScreenShareEnabled && (
+        <div className="flex flex-wrap items-center justify-center gap-2 bg-emerald-600/30 px-3 py-1 text-xs" data-testid="compartiendo-celular">
+          📱 Su celular está compartiendo la pantalla con todos
+          <button className="rounded bg-white/15 px-2 py-0.5 hover:bg-white/25" onClick={() => setSeeOwnScreen((v) => !v)}>{seeOwnScreen ? '🙈 Ocultar en mi vista' : '👁 Ver lo que comparto'}</button>
+          {inApp ? <button className="rounded bg-white/15 px-2 py-0.5 font-semibold hover:bg-white/25" onClick={() => (window as unknown as { SematecAula?: { postMessage: (m: string) => void } }).SematecAula?.postMessage(JSON.stringify({ action: 'stop' }))}>⏹ Dejar de compartir</button>
+            : <span className="opacity-80">Para terminar, toque «Detener» en la notificación de la app.</span>}
+        </div>)}
       {localParticipant.isScreenShareEnabled && (
         <div className="flex flex-wrap items-center justify-center gap-2 bg-emerald-600/30 px-3 py-1 text-xs" data-testid="compartiendo">
           🟢 Está compartiendo su pantalla con todos
@@ -387,13 +428,18 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
       {shareHelp && (
         <div className="absolute inset-x-2 bottom-24 z-30 mx-auto max-w-md rounded-xl bg-[#222] p-4 text-sm shadow-2xl" data-testid="ayuda-compartir">
           <p className="font-semibold">📲 Compartir desde el celular</p>
-          <p className="mt-1 opacity-80">Los navegadores de celulares (Android y iPhone) no permiten transmitir la pantalla completa. Puede mostrar su contenido así:</p>
+          {isAndroid && !guest ? <>
+            <p className="mt-1 opacity-80">Con la app <b>SEMATEC Aula</b> comparte la pantalla completa de su Android (otras apps, fotos, documentos) sin salir de la clase.</p>
+            <button className="mt-3 w-full rounded-lg bg-emerald-600 px-3 py-2 font-semibold" onClick={shareWithApp} disabled={appBusy} data-testid="compartir-app">{appBusy ? 'Preparando…' : '📱 Compartir con la app SEMATEC Aula'}</button>
+            {(appMissing || !inApp) && <p className="mt-2 text-xs opacity-80" data-testid="descargar-app">{appMissing ? '¿No se abrió? ' : '¿Aún no la tiene? '}<a className="underline" href="/descargar" target="_blank" rel="noreferrer">Descargue la app para Android</a> (gratis, 1 minuto) y vuelva a tocar el botón.</p>}
+            <p className="mt-3 opacity-80">O muestre su contenido así:</p>
+          </> : <p className="mt-1 opacity-80">El navegador de este celular no permite transmitir la pantalla completa. Puede mostrar su contenido así:</p>}
           <div className="mt-3 flex flex-wrap gap-2">
             <button className="rounded-lg bg-blue-600 px-3 py-2" onClick={() => { setShareHelp(false); flipCamera(); }}>📷 Mostrar con la cámara trasera</button>
             {!guest && <button className="rounded-lg bg-white/10 px-3 py-2" onClick={() => { setShareHelp(false); setPanel('chat'); }}>📎 Enviar foto, video o archivo al chat</button>}
             <button className="rounded-lg px-3 py-2 opacity-70" onClick={() => setShareHelp(false)}>Cerrar</button>
           </div>
-          <p className="mt-2 text-xs opacity-60">Para compartir la pantalla completa, entre desde un computador con Chrome, Edge o Firefox.</p>
+          <p className="mt-2 text-xs opacity-60">{isAndroid ? 'También puede compartir desde un computador con Chrome, Edge o Firefox.' : 'En iPhone y iPad, Apple no permite que el navegador transmita la pantalla: use la cámara trasera, envíe archivos al chat o entre desde un computador.'}</p>
         </div>)}
       {toast && <div className="absolute bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-lg bg-black/80 px-4 py-2 text-sm">{toast}</div>}
 

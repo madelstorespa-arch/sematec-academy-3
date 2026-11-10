@@ -35,7 +35,7 @@ export default async function Dashboard() {
     <>
       <PageHeader title={`Hola, ${ctx.profile?.full_name?.split(' ')[0] || 'bienvenido'}`} subtitle={ctx.org?.display_name ?? 'Administración de la plataforma'} />
       {ctx.isPlatformAdmin && !ctx.org && (
-        <Card title="Primeros pasos"><p className="text-sm">Cree la primera institución en <Link className="link" href="/app/instituciones">Instituciones</Link>.</p></Card>
+        <Card title="🌎 Plataformas para otras organizaciones"><p className="text-sm">Cree aulas virtuales separadas para institutos, asociaciones u organizaciones, o apruebe las que se registran, en <Link className="link" href="/app/instituciones" data-testid="plataformas-aula">Plataformas y organizaciones</Link>.</p></Card>
       )}
       {stats.length > 0 && <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-3">{stats.map((s) => <Stat key={s.label} {...s} />)}</div>}
       <div className="grid gap-6 lg:grid-cols-2">

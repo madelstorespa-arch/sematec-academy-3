@@ -3,6 +3,7 @@ import { can, type Ctx } from '@/lib/context';
 import type { NavItem } from '@/components/nav';
 import { tNav } from '@/lib/i18n';
 import { prefsOf } from '@/lib/prefs';
+import { aulaExcluded } from '@/lib/platform-mode';
 
 /** Opciones que nunca se pueden ocultar (para no quedar sin acceso). */
 export const LOCKED = new Set(['/app', '/app/perfil', '/app/modulos']);
@@ -53,17 +54,25 @@ export function baseNav(ctx: Ctx): NavItem[] {
   if (can(ctx, 'audit.view')) items.push({ href: '/app/auditoria', label: 'Auditoría', icon: '📜' });
   if (ctx.isOwner && ctx.orgId) items.push({ href: '/app/papelera', label: 'Papelera', icon: '🗑' });
   if (ctx.isPlatformAdmin) items.push({ href: '/app/actualizar', label: 'Actualizar sistema', icon: '⬆' });
-  if (ctx.isPlatformAdmin) items.push({ href: '/app/instituciones', label: 'Instituciones', icon: '🌎' });
+  if (ctx.isPlatformAdmin) items.push({ href: '/app/instituciones', label: 'Plataformas y organizaciones', icon: '🌎' });
   if (can(ctx, 'settings.admin')) items.push({ href: '/app/sitio', label: 'Sitio web y marca', icon: '🌐' });
   if (can(ctx, 'admissions.view')) items.push({ href: '/app/admision', label: 'Admisión web', icon: '📨' });
   items.push({ href: '/app/perfil', label: 'Mi cuenta', icon: '👤' });
   if (ctx.isOwner && ctx.orgId) items.splice(items.length - 1, 0, { href: '/app/modulos', label: 'Módulos y menú', icon: '🧩' });
+  // 🎥 Plataforma solo de aula virtual: sin módulos administrativos (ventas, finanzas, sucursales…)
+  if (ctx.orgMode === 'aula') return items.filter((i) => !aulaExcluded(i.href));
   return items;
 }
 
 /** Menú final: el de los permisos + módulos creados sin código, con los nombres y ocultos que definió el propietario. */
 export async function buildNav(ctx: Ctx): Promise<NavItem[]> {
   const items = baseNav(ctx);
+  // 📨 Aviso de organizaciones que pidieron su plataforma
+  if (ctx.isPlatformAdmin && ctx.aal === 'aal2') {
+    const { count } = await ctx.supabase.from('org_signup_requests').select('id', { count: 'exact', head: true }).eq('status', 'pendiente');
+    const o = items.find((i) => i.href === '/app/instituciones');
+    if (o && count) o.label = `${o.label} · 📨 ${count}`;
+  }
   if (!ctx.orgId) return items;
   const [{ data: mods }, { data: menu }] = await Promise.all([
     ctx.supabase.rpc('my_custom_modules', { p_org: ctx.orgId }),

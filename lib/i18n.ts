@@ -21,7 +21,7 @@ const NAV: Record<string, Dict> = {
     'Punto estudiantil': 'Student hub', 'Oficinas y citas': 'Offices and appointments', 'Encuestas': 'Surveys', 'Egresados': 'Alumni', 'Bolsa de empleo': 'Job board',
     'Calendario': 'Calendar', 'Archivos': 'Files', 'Calificaciones': 'Grades', 'Asistencia': 'Attendance', 'Salas y recursos': 'Rooms and resources',
     'Personal y RR. HH.': 'Staff and HR', 'Inventario': 'Inventory', 'Reportes': 'Reports', 'Usuarios y roles': 'Users and roles', 'Configuración': 'Settings',
-    'Centro de Ciberseguridad': 'Cybersecurity center', 'Auditoría': 'Audit log', 'Papelera': 'Trash', 'Actualizar sistema': 'Update system', 'Instituciones': 'Institutions',
+    'Centro de Ciberseguridad': 'Cybersecurity center', 'Auditoría': 'Audit log', 'Papelera': 'Trash', 'Actualizar sistema': 'Update system', 'Instituciones': 'Institutions', 'Plataformas y organizaciones': 'Platforms & organizations',
     'Sitio web y marca': 'Website and brand', 'Admisión web': 'Online admissions', 'Módulos y menú': 'Modules and menu', 'Mi cuenta': 'My account', 'Traductor': 'Translator',
   },
   pt: {
@@ -32,7 +32,7 @@ const NAV: Record<string, Dict> = {
     'Punto estudiantil': 'Espaço do aluno', 'Oficinas y citas': 'Escritórios e agendamentos', 'Encuestas': 'Pesquisas', 'Egresados': 'Ex-alunos', 'Bolsa de empleo': 'Vagas de emprego',
     'Calendario': 'Calendário', 'Archivos': 'Arquivos', 'Calificaciones': 'Notas', 'Asistencia': 'Frequência', 'Salas y recursos': 'Salas e recursos',
     'Personal y RR. HH.': 'Pessoal e RH', 'Inventario': 'Inventário', 'Reportes': 'Relatórios', 'Usuarios y roles': 'Usuários e funções', 'Configuración': 'Configurações',
-    'Centro de Ciberseguridad': 'Centro de cibersegurança', 'Auditoría': 'Auditoria', 'Papelera': 'Lixeira', 'Actualizar sistema': 'Atualizar sistema', 'Instituciones': 'Instituições',
+    'Centro de Ciberseguridad': 'Centro de cibersegurança', 'Auditoría': 'Auditoria', 'Papelera': 'Lixeira', 'Actualizar sistema': 'Atualizar sistema', 'Instituciones': 'Instituições', 'Plataformas y organizaciones': 'Plataformas e organizações',
     'Sitio web y marca': 'Site e marca', 'Admisión web': 'Admissão online', 'Módulos y menú': 'Módulos e menu', 'Mi cuenta': 'Minha conta', 'Traductor': 'Tradutor',
   },
   fr: {
@@ -43,7 +43,7 @@ const NAV: Record<string, Dict> = {
     'Punto estudiantil': 'Espace étudiant', 'Oficinas y citas': 'Bureaux et rendez-vous', 'Encuestas': 'Sondages', 'Egresados': 'Anciens élèves', 'Bolsa de empleo': "Offres d'emploi",
     'Calendario': 'Calendrier', 'Archivos': 'Fichiers', 'Calificaciones': 'Notes', 'Asistencia': 'Présence', 'Salas y recursos': 'Salles et ressources',
     'Personal y RR. HH.': 'Personnel et RH', 'Inventario': 'Inventaire', 'Reportes': 'Rapports', 'Usuarios y roles': 'Utilisateurs et rôles', 'Configuración': 'Paramètres',
-    'Centro de Ciberseguridad': 'Centre de cybersécurité', 'Auditoría': 'Audit', 'Papelera': 'Corbeille', 'Actualizar sistema': 'Mettre à jour', 'Instituciones': 'Établissements',
+    'Centro de Ciberseguridad': 'Centre de cybersécurité', 'Auditoría': 'Audit', 'Papelera': 'Corbeille', 'Actualizar sistema': 'Mettre à jour', 'Instituciones': 'Établissements', 'Plataformas y organizaciones': 'Plateformes et organisations',
     'Sitio web y marca': 'Site web et marque', 'Admisión web': 'Admissions en ligne', 'Módulos y menú': 'Modules et menu', 'Mi cuenta': 'Mon compte', 'Traductor': 'Traducteur',
   },
 };

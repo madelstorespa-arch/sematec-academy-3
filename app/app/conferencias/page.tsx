@@ -29,7 +29,11 @@ export default async function Page() {
 
   return (
     <>
-      <PageHeader title="Aulas virtuales" subtitle="SEMATEC ACADEMY CONFERENCE · clases, reuniones, webinars y tutorías con audio, video, chat y pantalla compartida" />
+      <PageHeader title="Aulas virtuales" subtitle={`${ctx.org?.display_name ?? 'SEMATEC ACADEMY'} · clases, reuniones, webinars y tutorías con audio, video, chat y pantalla compartida`} />
+      {ctx.isPlatformAdmin && <a href="/app/instituciones" data-testid="plataformas-aula" className="card card-pad mb-5 flex flex-wrap items-center justify-between gap-3 hover:ring-2 hover:ring-brand-200">
+        <span><b>🌎 Plataformas para otras organizaciones</b><br /><span className="text-sm text-slate-600">Cree aulas virtuales separadas para institutos, asociaciones u organizaciones, cada una con sus usuarios, salas, grabaciones, marca y enlace.</span></span>
+        <span className="btn-secondary">Administrar →</span></a>}
+      <p className="mb-5 text-sm text-slate-600">📱 <a className="link" href="/descargar" data-testid="link-app-android">App SEMATEC Aula para Android</a>: comparta la pantalla completa de su celular en las clases.</p>
       <div className="mb-6 grid gap-6 xl:grid-cols-2">
         {canCreateRoom && (
           <Card title="Nueva sala">

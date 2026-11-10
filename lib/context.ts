@@ -27,15 +27,18 @@ export const getContext = cache(async () => {
   let isEmployee = false;
   let isGuardian = false;
   let campuses: { id: string; code: string; name: string; city: string | null; fixed: boolean }[] = [];
+  let orgMode: 'completo' | 'aula' = 'completo';
   if (org) {
-    const [p, s, t, e, g, cmp] = await Promise.all([
+    const [p, s, t, e, g, cmp, om] = await Promise.all([
       supabase.rpc('my_permissions', { p_org: org.organization_id }),
       supabase.from('students').select('id').eq('organization_id', org.organization_id).eq('user_id', user.id).maybeSingle(),
       supabase.from('teachers').select('id').eq('organization_id', org.organization_id).eq('user_id', user.id).maybeSingle(),
       supabase.from('employees').select('id').eq('organization_id', org.organization_id).eq('user_id', user.id).maybeSingle(),
       supabase.from('guardian_links').select('id').eq('organization_id', org.organization_id).eq('guardian_id', user.id).eq('status', 'activo').limit(1),
       supabase.rpc('my_campuses', { p_org: org.organization_id }),
+      supabase.from('organizations').select('platform_mode').eq('id', org.organization_id).maybeSingle(),
     ]);
+    orgMode = om.data?.platform_mode === 'aula' ? 'aula' : 'completo';
     campuses = (cmp.data ?? []) as typeof campuses;
     isGuardian = !!g.data?.length;
     isEmployee = !!e.data;
@@ -61,6 +64,8 @@ export const getContext = cache(async () => {
     orgs,
     org,
     orgId: org?.organization_id ?? null,
+    /** 🎥 «aula»: plataforma solo de aula virtual (organizaciones externas); «completo»: todo el sistema. */
+    orgMode,
     perms: new Set(perms),
     isPlatformAdmin,
     studentId,

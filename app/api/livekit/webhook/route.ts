@@ -17,6 +17,8 @@ export async function POST(request: NextRequest) {
   if (!event.room?.name?.startsWith('sg_') || !handled.includes(event.event)) return NextResponse.json({ ok: true, ignored: true });
   const identity = event.participant?.identity;
   const at = new Date(Number(event.createdAt ?? BigInt(Math.floor(Date.now() / 1000))) * 1000).toISOString();
+  // 📱 Pantalla compartida desde la app de celular: es la misma persona, no cuenta como otro asistente
+  if (identity?.startsWith('pan_')) return NextResponse.json({ ok: true, ignored: true });
   // Invitados externos (enlace del anfitrión): entrada y salida en su propio registro
   if (identity?.startsWith('inv_')) {
     const guest = identity.slice(4);

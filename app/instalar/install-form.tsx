@@ -31,6 +31,8 @@ export function InstallForm({ action }: { action: (fd: FormData) => Promise<R> }
             <label className="block"><span className="label">Contraseña del administrador</span>
               <PasswordInput name="admin_password" required minLength={12} autoComplete="new-password" />
               <span className="text-xs text-slate-500">Mínimo 12 caracteres, con mayúsculas, minúsculas y números.</span></label>
+            <label className="flex items-start gap-2 text-sm"><input type="checkbox" name="aula_only" className="mt-1" />
+              <span><b>Solo aula virtual</b> (para una organización que solo necesita clases en vivo, grabaciones y archivos; sin ventas ni finanzas)</span></label>
           </fieldset>
         )}
         <label className="flex items-start gap-2 text-sm"><input type="checkbox" name="demo" checked={demo} onChange={(e) => setDemo(e.target.checked)} className="mt-1" />

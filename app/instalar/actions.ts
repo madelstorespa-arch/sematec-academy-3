@@ -12,7 +12,7 @@ export async function runSetup(fd: FormData) {
     const demo = fd.get('demo') === 'on';
     const first = demo ? undefined : {
       name: String(fd.get('org_name') ?? ''), adminName: String(fd.get('admin_name') ?? ''),
-      email: String(fd.get('admin_email') ?? ''), password: String(fd.get('admin_password') ?? ''),
+      email: String(fd.get('admin_email') ?? ''), password: String(fd.get('admin_password') ?? ''), aulaOnly: fd.get('aula_only') === 'on',
     };
     const log = await runInstall(demo, first);
     // Comprobación final a través de la API de Supabase (la que usa la aplicación)

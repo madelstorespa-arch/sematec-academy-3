@@ -17,6 +17,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       </ActionForm>
       <p className="mt-6 text-center text-sm"><Link className="link" href="/recuperar">¿Olvidó su contraseña?</Link></p>
       <p className="mt-2 text-center text-sm"><Link className="link" href="/verificar">Verificar un certificado</Link></p>
+      <p className="mt-6 border-t border-slate-100 pt-4 text-center text-xs text-slate-500">¿Su instituto, asociación u organización quiere su propia aula virtual? <Link className="link" href="/registro-organizacion">Solicítela aquí</Link> · <Link className="link" href="/descargar">App Android</Link></p>
     </AuthShell>
   );
 }

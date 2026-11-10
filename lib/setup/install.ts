@@ -28,7 +28,7 @@ export async function installStatus() {
 }
 
 /** Aplica las migraciones pendientes (cada una en su transacción) y, opcionalmente, los datos de demostración. */
-export type FirstInstitution = { name: string; adminName: string; email: string; password: string };
+export type FirstInstitution = { name: string; adminName: string; email: string; password: string; aulaOnly?: boolean };
 
 export async function runInstall(withDemo: boolean, first?: FirstInstitution) {
   const c = client(); await c.connect();
@@ -123,6 +123,8 @@ async function createFirstInstitution(c: Client, f: FirstInstitution): Promise<s
     await c.query('update public.profiles set full_name = $2, is_platform_admin = true, status = $3 where id = $1', [uid, adminName, 'active']);
     const org = (await c.query(`insert into public.organizations (slug, legal_name, display_name, country_code, base_currency, timezone)
       values ($1, $2, $2, 'CL', 'CLP', 'America/Santiago') returning id`, [slug, name])).rows[0].id;
+    // 🎥 Plataforma independiente solo de aula virtual
+    if (f.aulaOnly) await c.query(`update public.organizations set platform_mode = 'aula' where id = $1`, [org]);
     await c.query(`insert into public.campuses (organization_id, code, name, country_code, city, timezone)
       values ($1, 'PRINCIPAL', 'Sede principal', 'CL', 'Santiago', 'America/Santiago')`, [org]);
     await c.query(`insert into public.grade_scales (organization_id, name, min_grade, max_grade, passing_grade, decimals)
@@ -134,5 +136,5 @@ async function createFirstInstitution(c: Client, f: FirstInstitution): Promise<s
       on conflict (organization_id) do nothing`, [org, name, email]);
     await c.query('commit');
   } catch (e) { await c.query('rollback'); throw e; }
-  return `✓ Institución «${name}» y administrador ${email} creados`;
+  return `✓ ${f.aulaOnly ? 'Plataforma de aula virtual' : 'Institución'} «${name}» y administrador ${email} creados`;
 }
