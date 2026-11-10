@@ -6,20 +6,32 @@ import nodemailer from 'nodemailer';
  * Variables en Vercel: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS y SMTP_FROM
  * (p. ej., Gmail con «contraseña de aplicación», Brevo, Resend u Outlook).
  */
-export const mailEnabled = () => !!process.env.SMTP_HOST && !!process.env.SMTP_FROM;
+/** Configuración efectiva: con solo SMTP_USER y SMTP_PASS de Gmail ya funciona (servidor, puerto y remitente se completan solos). */
+export function mailConfig() {
+  const user = (process.env.SMTP_USER ?? '').trim();
+  const gmail = /@(gmail|googlemail)\.com$/i.test(user);
+  const host = (process.env.SMTP_HOST ?? '').trim() || (gmail ? 'smtp.gmail.com' : '');
+  const port = Number(process.env.SMTP_PORT || (host === 'smtp.gmail.com' ? 465 : 587));
+  const from = (process.env.SMTP_FROM ?? '').trim() || (user ? `SEMATEC ACADEMY <${user}>` : '');
+  return { host, port, user, from, hasPass: !!(process.env.SMTP_PASS ?? '').trim() };
+}
+export const mailEnabled = () => { const c = mailConfig(); return !!c.host && !!c.from; };
 
 export async function sendMail(to: string, subject: string, html: string, text: string, attachments?: { filename: string; content: Buffer | Uint8Array; contentType?: string }[]) {
-  const port = Number(process.env.SMTP_PORT ?? 587);
-  const local = /^(localhost|127\.0\.0\.1)$/.test(process.env.SMTP_HOST ?? '');
+  const c = mailConfig();
+  if (!c.host || !c.from) throw new Error('El correo no está configurado: en Vercel agregue SMTP_USER (su Gmail) y SMTP_PASS (contraseña de aplicación) y haga «Redeploy».');
+  if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(to)) throw new Error('El correo del destinatario no es válido.');
+  const port = c.port;
+  const local = /^(localhost|127\.0\.0\.1)$/.test(c.host);
   const t = nodemailer.createTransport({
-    host: process.env.SMTP_HOST, port, secure: port === 465,
+    host: c.host, port, secure: port === 465,
     // Google muestra la contraseña de aplicación en grupos («abcd efgh ijkl mnop»): se quitan los espacios
     auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER.trim(), pass: (process.env.SMTP_PASS ?? '').replace(/\s+/g, '') } : undefined,
     ignoreTLS: local, requireTLS: !local && port !== 465,
     connectionTimeout: 10000, greetingTimeout: 10000, socketTimeout: 20000,
   });
   try {
-    await t.sendMail({ from: process.env.SMTP_FROM, to, subject, html, text, attachments: attachments?.map((a) => ({ ...a, content: Buffer.from(a.content) })) });
+    await t.sendMail({ from: c.from, to, subject, html, text, attachments: attachments?.map((a) => ({ ...a, content: Buffer.from(a.content) })) });
   } catch (e) {
     throw new Error(mailErrorText(e));
   }

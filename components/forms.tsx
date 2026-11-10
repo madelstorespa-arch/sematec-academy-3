@@ -62,7 +62,9 @@ export function ActionForm({
             // Solo se guarda en el dispositivo si de verdad no hubo conexión (nunca si la operación pudo llegar)
             const network = !navigator.onLine || err instanceof TypeError;
             if (network && queue()) return;
-            setResult({ ok: false, error: 'No se pudo contactar al servidor: la operación NO fue guardada. Recargue la página (F5) y vuelva a intentarlo; si persiste, revise su conexión.' });
+            setResult({ ok: false, error: network
+              ? 'No se pudo contactar al servidor: la operación NO fue guardada. Revise su conexión y vuelva a intentarlo.'
+              : `El servidor tuvo un problema y la operación NO fue guardada. Vuelva a intentarlo; si se repite, avise a soporte${digest ? ` (código ${digest})` : ''}.` });
           }
         });
       }}

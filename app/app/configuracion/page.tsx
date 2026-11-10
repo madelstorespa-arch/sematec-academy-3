@@ -1,5 +1,6 @@
 import { getContext, can, requirePerm, requireOrg } from '@/lib/context';
 import { OwnerActions } from '@/components/owner-actions';
+import { MailStatus } from '@/components/mail-status';
 import { PageHeader, Card, Empty } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField } from '@/components/forms';
 import { campusOptions, countryOptions } from '@/lib/options';
@@ -27,6 +28,7 @@ export default async function Page() {
   return (
     <>
       <PageHeader title="Configuración institucional" subtitle="Datos, sedes, salas y reglas de negocio sin editar código" />
+      {(ctx.isOwner || ctx.isPlatformAdmin) && <MailStatus />}
       <div className="grid gap-6 xl:grid-cols-2">
         {orgAdmin && (
           <Card title="Datos de la institución">

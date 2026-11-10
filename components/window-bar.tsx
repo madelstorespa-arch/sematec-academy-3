@@ -1,4 +1,5 @@
 'use client';
+import { IconMin, IconMax, IconRestore } from './win-icons';
 import { useCallback, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import type { NavItem } from '@/components/nav';
@@ -17,7 +18,7 @@ function apply(a: A11y) {
 }
 
 /**
- * Barra de ventana de cada página: 🗕 minimizar (queda en la barra de tareas de abajo), 🗖 maximizar
+ * Barra de ventana de cada página: minimizar (queda en la barra de tareas de abajo), maximizar
  * (oculta el menú y usa toda la pantalla), ✕ cerrar (vuelve atrás) y ♿ accesibilidad (letra, modo oscuro, contraste…).
  */
 export function WindowBar({ items }: { items: NavItem[] }) {
@@ -92,7 +93,7 @@ export function WindowBar({ items }: { items: NavItem[] }) {
               <p className="label">Tamaño de letra</p>
               <div className="mb-3 grid grid-cols-4 gap-1">{(['sm', 'md', 'lg', 'xl'] as const).map((f, i) => (
                 <button key={f} onClick={() => save({ ...a11y, fs: f })} className={`rounded-lg py-1 ${a11y.fs === f ? 'bg-brand-600 text-white' : 'bg-slate-100'}`} style={{ fontSize: 12 + i * 3 }} aria-pressed={a11y.fs === f}>A</button>))}</div>
-              {([['theme', '🌙 Modo oscuro'], ['contrast', '◐ Alto contraste'], ['links', '🔗 Subrayar enlaces'], ['spacing', '🔤 Letra más espaciada (lectura fácil)'], ['motion', '⏸ Reducir animaciones'], ['max', '🗖 Pantalla amplia (sin menú)']] as [keyof A11y, string][]).map(([k, l]) => (
+              {([['theme', '🌙 Modo oscuro'], ['contrast', '◐ Alto contraste'], ['links', '🔗 Subrayar enlaces'], ['spacing', '🔤 Letra más espaciada (lectura fácil)'], ['motion', '⏸ Reducir animaciones'], ['max', '⛶ Pantalla amplia (sin menú)']] as [keyof A11y, string][]).map(([k, l]) => (
                 <label key={k} className="flex cursor-pointer items-center justify-between gap-2 py-1">
                   <span>{l}</span>
                   <input type="checkbox" checked={k === 'theme' ? a11y.theme === 'dark' : !!a11y[k]} data-testid={`a11y-${k}`}
@@ -102,8 +103,8 @@ export function WindowBar({ items }: { items: NavItem[] }) {
               <p className="mt-2 text-[11px] text-slate-400">Atajos: Alt+M minimizar · Alt+F maximizar · Alt+W cerrar · Ctrl+K buscar · Ctrl+Z deshacer</p>
             </div>)}
         </span>
-        <button className={btn} onClick={minimize} disabled={path === '/app'} title="Minimizar (queda abajo, en la barra de tareas)" aria-label="Minimizar" data-testid="ventana-minimizar">🗕</button>
-        <button className={btn} onClick={toggleMax} title={a11y.max ? 'Restaurar (mostrar el menú)' : 'Maximizar (usar toda la pantalla)'} aria-label={a11y.max ? 'Restaurar' : 'Maximizar'} data-testid="ventana-maximizar">{a11y.max ? '🗗' : '🗖'}</button>
+        <button className={btn} onClick={minimize} disabled={path === '/app'} title="Minimizar (queda abajo, en la barra de tareas)" aria-label="Minimizar" data-testid="ventana-minimizar"><IconMin /></button>
+        <button className={btn} onClick={toggleMax} title={a11y.max ? 'Restaurar (mostrar el menú)' : 'Maximizar (usar toda la pantalla)'} aria-label={a11y.max ? 'Restaurar' : 'Maximizar'} data-testid="ventana-maximizar">{a11y.max ? <IconRestore /> : <IconMax />}</button>
         <button className={`${btn} hover:!bg-red-600 hover:!text-white`} onClick={close} disabled={path === '/app'} title="Cerrar esta página" aria-label="Cerrar" data-testid="ventana-cerrar">✕</button>
       </div>
       {wins.length > 0 && (

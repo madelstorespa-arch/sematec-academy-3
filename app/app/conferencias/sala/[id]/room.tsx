@@ -16,6 +16,7 @@ import { MiniDock, canDocPip, openPipWindow } from './mini';
 import { useBoard, Whiteboard } from './whiteboard';
 import { usePolls, PollPanel, PollCard } from './poll';
 import { InvitePanel } from './invite';
+import { IconMin } from '@/components/win-icons';
 import { useControls, useCaptions, CaptionsOverlay, HostPanel, GroupsPanel, TimerChip, useGroupsChannel, spotTrack } from './pro';
 
 type Opts = RoomOpts;
@@ -80,7 +81,7 @@ export function Room(props: Opts) {
             <button className="mt-3 text-xs underline" onClick={() => { stopWait.current = true; setWaiting(false); setBusy(false); }}>Cancelar</button>
           </div>
         ) : <button onClick={join} disabled={busy} className="btn-primary mt-5" data-testid="entrar-sala">{busy ? 'Conectando…' : 'Entrar a la sala'}</button>}
-        <p className="mt-3 text-xs text-slate-500">Dentro de la sala puede <b>🗕 minimizarla</b> para navegar por el sistema (y compartir su pantalla) sin desconectarse.</p>
+        <p className="mt-3 text-xs text-slate-500">Dentro de la sala puede <b>minimizarla</b> para navegar por el sistema (y compartir su pantalla) sin desconectarse.</p>
       </>)}
       {error && <p className="mt-4 rounded bg-red-50 p-2 text-sm text-red-700">{error}</p>}
       <p className="mt-4"><Link className="link text-sm" href={`/app/conferencias/${props.sessionId}`}>Detalle de la sesión, invitados y grabaciones</Link></p>
@@ -121,6 +122,16 @@ type Floating = { id: number; emoji: string; left: number; from: string };
 type Panel = 'chat' | 'people' | 'effects' | 'poll' | 'invite' | 'host' | 'groups' | null;
 const PANEL_TITLE: Record<string, string> = { effects: '🖼 Fondo y efectos', poll: '📊 Encuesta en vivo', invite: '🔗 Invitar a personas externas', host: '🛡 Controles del anfitrión', groups: '👥 Salas de grupos' };
 
+/** Pantalla angosta (celular): los controles se agrupan para no llenar la pantalla. */
+function useNarrow() {
+  const [n, setN] = useState(false);
+  useEffect(() => {
+    const m = window.matchMedia('(max-width: 639px)'); const f = () => setN(m.matches); f();
+    m.addEventListener('change', f); return () => m.removeEventListener('change', f);
+  }, []);
+  return n;
+}
+
 function useElapsed() {
   const [start] = useState(() => Date.now()); const [now, setNow] = useState(start);
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
@@ -144,6 +155,8 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
   const [toast, setToast] = useState<string | null>(null);
   const [pip, setPip] = useState<Window | null>(null);
   const [boardHidden, setBoardHidden] = useState(false);
+  const narrow = useNarrow();
+  const [more, setMore] = useState(false);
   const [, force] = useState(0);
   const mod = conn.moderator;
   const elapsed = useElapsed();
@@ -156,6 +169,7 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
     else setUnread(chat.chatMessages.filter((m, i) => i >= seen.current && m.from?.identity !== localParticipant.identity).length);
   }, [chat.chatMessages, panel, localParticipant.identity, view]);
   useEffect(() => { if (board.open) setBoardHidden(false); }, [board.open]);
+  useEffect(() => { setMore(false); }, [panel]);
 
   // Repintar cuando cambian atributos (mano levantada) o permisos
   useEffect(() => {
@@ -228,7 +242,7 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
       }
       const v = document.querySelector('[data-testid=sala-mini] video, .lk-focus-layout video, .lk-grid-layout video') as HTMLVideoElement | null;
       if (v && 'requestPictureInPicture' in v) { await v.requestPictureInPicture(); onMinimize?.(); }
-      else say('Su navegador no permite ventanas flotantes. Use «🗕 Minimizar» para seguir navegando en el sistema.');
+      else say('Su navegador no permite ventanas flotantes. Use «Minimizar» para seguir navegando en el sistema.');
     } catch { say('No se pudo abrir la ventana flotante.'); }
   }, [onMinimize, say]);
   const closePip = useCallback(() => { pip?.close(); setPip(null); }, [pip]);
@@ -258,16 +272,16 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
         </span>
         <span className="flex shrink-0 items-center gap-2 text-xs">
           {recBy && <span className="animate-pulse rounded bg-red-600 px-2 py-0.5 font-bold">● GRABANDO</span>}
-          <span className="opacity-70">{participants.length} 👥 · {CONF_ROLES[conn.role] ?? conn.role}</span>
+          <span className="opacity-70">{participants.length} 👥<span className="hidden sm:inline"> · {CONF_ROLES[conn.role] ?? conn.role}</span></span>
           {group > 0 && <button className="rounded-lg bg-emerald-600 px-2 py-1 hover:bg-emerald-500" onClick={onMain} data-testid="volver-principal">↩ Sala principal</button>}
-          {onMinimize && <button className="rounded-lg bg-white/10 px-2 py-1 hover:bg-white/20" onClick={onMinimize} title="Minimizar: siga navegando por el sistema sin salir de la clase" data-testid="minimizar">🗕 Minimizar</button>}
+          {onMinimize && <button className="rounded-lg bg-white/10 px-2 py-1 hover:bg-white/20" onClick={onMinimize} title="Minimizar: siga navegando por el sistema sin salir de la clase" data-testid="minimizar"><span className="flex items-center gap-1"><IconMin /><span className="hidden sm:inline">Minimizar</span></span></button>}
           {(canDocPip() || onMinimize) && <button className="hidden rounded-lg bg-white/10 px-2 py-1 hover:bg-white/20 sm:inline" onClick={openPip} title="Ventana flotante encima de todos los programas">⧉ Flotante</button>}
         </span>
       </header>
       {localParticipant.isScreenShareEnabled && (
         <div className="flex flex-wrap items-center justify-center gap-2 bg-emerald-600/30 px-3 py-1 text-xs" data-testid="compartiendo">
           🟢 Está compartiendo su pantalla con todos
-          {onMinimize && <button className="rounded bg-white/15 px-2 py-0.5 font-semibold hover:bg-white/25" onClick={onMinimize}>🗕 Minimizar y seguir trabajando</button>}
+          {onMinimize && <button className="rounded bg-white/15 px-2 py-0.5 font-semibold hover:bg-white/25" onClick={onMinimize}>Minimizar y seguir trabajando</button>}
           <button className="rounded bg-white/15 px-2 py-0.5 font-semibold hover:bg-white/25" onClick={() => localParticipant.setScreenShareEnabled(false)}>⏹ Dejar de compartir</button>
         </div>)}
       {screen && screen.participant.identity !== localParticipant.identity && (
@@ -336,9 +350,43 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
         </div>)}
       {toast && <div className="absolute bottom-24 left-1/2 z-30 -translate-x-1/2 rounded-lg bg-black/80 px-4 py-2 text-sm">{toast}</div>}
 
-      <footer className="flex flex-wrap items-center justify-center gap-1 border-t border-white/10 bg-[#0c0c10] px-2 py-2 sm:gap-2">
-        <span className="flex items-center"><TrackToggle source={Track.Source.Microphone} showIcon>Micrófono</TrackToggle><MediaDeviceMenu kind="audioinput" /></span>
-        <span className="flex items-center"><TrackToggle source={Track.Source.Camera} showIcon>Cámara</TrackToggle><MediaDeviceMenu kind="videoinput" /></span>
+      {narrow && more && (<>
+        <div className="absolute inset-0 z-30 bg-black/50" onClick={() => setMore(false)} aria-hidden />
+        <div className="absolute inset-x-0 bottom-[60px] z-40 flex flex-wrap justify-center gap-2 rounded-t-2xl border-t border-white/10 bg-[#1b1b1f] p-3 shadow-2xl" data-testid="mas-opciones">
+        {canShare && <ShareButton say={say} />}
+        {sharePerm && !canShare && <button className="lk-button" onClick={() => setShareHelp(true)} data-testid="compartir-celular">📲 Compartir pantalla</button>}
+        {(isMobile || !canDisplayCapture()) && <button className="lk-button" onClick={flipCamera} title="Cambiar entre cámara frontal y trasera">🔄 Cámara</button>}
+        <button className={btn(panel === 'effects')} onClick={() => toggle('effects')} title="Desenfoque y fondos virtuales">🖼 Fondo</button>
+        <span className="relative">
+          <button className="lk-button" onClick={() => setShowReactions((v) => !v)} title="Reacciones">😀 Reaccionar</button>
+          {showReactions && (
+            <span className="absolute bottom-12 left-1/2 z-20 flex -translate-x-1/2 gap-1 rounded-xl bg-[#222] p-2 shadow-xl">
+              {REACTIONS.map((e) => <button key={e} className="rounded p-1 text-2xl hover:bg-white/10" onClick={() => react(e)} aria-label={`Reaccionar ${e}`}>{e}</button>)}
+            </span>)}
+        </span>
+        <button className={btn(hand)} onClick={toggleHand}>{hand ? '✋ Bajar la mano' : '✋ Levantar la mano'}</button>
+        {mod
+          ? <button className={btn(board.open)} onClick={() => (board.open ? board.hide() : board.show())} data-testid="boton-pizarra">🖍 {board.open ? 'Cerrar pizarra' : 'Pizarra'}</button>
+          : board.open && <button className={btn(showBoard)} onClick={() => setBoardHidden(!boardHidden)}>🖍 {showBoard ? 'Ver videos' : 'Ver pizarra'}</button>}
+        {mod && <button className={btn(panel === 'poll')} onClick={() => toggle('poll')} data-testid="boton-encuesta">📊 Encuesta</button>}
+        {mod && !guest && <button className={btn(panel === 'invite')} onClick={() => toggle('invite')} data-testid="boton-invitar">🔗 Invitar</button>}
+        {cc.supported && <button className={btn(cc.show)} data-testid="boton-subtitulos" title="Subtítulos en vivo (transcribe su voz para todos)"
+          onClick={() => { const on = !cc.show; cc.setShow(on); cc.setMine(on); if (on) say('💬 Subtítulos activados: lo que usted diga aparecerá escrito para todos.'); }}>💬 {cc.show ? 'Quitar subtítulos' : 'Subtítulos'}</button>}
+        {mod && !group && <button className={btn(panel === 'host')} onClick={() => toggle('host')} data-testid="boton-anfitrion">🛡 Anfitrión</button>}
+        {mod && !group && !guest && <button className={btn(panel === 'groups')} onClick={() => toggle('groups')} data-testid="boton-grupos">👥 Grupos</button>}
+        <button className="lk-button" onClick={() => setLayout(layout === 'grid' ? 'speaker' : 'grid')} title="Cambiar vista">{layout === 'grid' ? '🗣 Vista orador' : '▦ Vista galería'}</button>
+        {mod && recording && !guest && <Recorder sessionId={sessionId} title={title} say={say} broadcast={(on) => { sendRec(enc.encode(on ? '1' : '0'), { reliable: true }); setRecBy(on ? (localParticipant.name ?? 'Usted') : null); }} />}
+        <button className="lk-button" onClick={() => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {})}>⛶ Pantalla completa</button>
+        </div>
+      </>)}
+      <footer className={`flex items-center justify-center border-t border-white/10 bg-[#0c0c10] px-2 py-2 ${narrow ? 'relative z-40 gap-1' : 'flex-wrap gap-1 sm:gap-2'}`} data-testid="barra-controles">
+        <span className="flex items-center"><TrackToggle source={Track.Source.Microphone} showIcon aria-label="Micrófono">{narrow ? null : 'Micrófono'}</TrackToggle>{!narrow && <MediaDeviceMenu kind="audioinput" />}</span>
+        <span className="flex items-center"><TrackToggle source={Track.Source.Camera} showIcon aria-label="Cámara">{narrow ? null : 'Cámara'}</TrackToggle>{!narrow && <MediaDeviceMenu kind="videoinput" />}</span>
+        {narrow ? (<>
+          <button className={btn(panel === 'chat')} onClick={() => toggle('chat')} aria-label="Chat">💬{unread > 0 && <span className="ml-1 rounded-full bg-red-600 px-1.5 text-xs">{unread}</span>}</button>
+          <button className={btn(panel === 'people')} onClick={() => toggle('people')} aria-label="Personas">👥{hands.length > 0 && <span className="ml-1 rounded-full bg-amber-500 px-1.5 text-xs">{hands.length}</span>}</button>
+          <button className={btn(more)} onClick={() => setMore((v) => !v)} aria-expanded={more} data-testid="boton-mas">⋯ Más</button>
+        </>) : (<>
         {canShare && <ShareButton say={say} />}
         {sharePerm && !canShare && <button className="lk-button" onClick={() => setShareHelp(true)} data-testid="compartir-celular">📲 Compartir pantalla</button>}
         {(isMobile || !canDisplayCapture()) && <button className="lk-button" onClick={flipCamera} title="Cambiar entre cámara frontal y trasera">🔄 Cámara</button>}
@@ -365,7 +413,8 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
         {mod && !group && !guest && <button className={btn(panel === 'groups')} onClick={() => toggle('groups')} data-testid="boton-grupos">👥 Grupos</button>}
         <button className="lk-button" onClick={() => setLayout(layout === 'grid' ? 'speaker' : 'grid')} title="Cambiar vista">{layout === 'grid' ? '🗣 Vista orador' : '▦ Vista galería'}</button>
         {mod && recording && !guest && <Recorder sessionId={sessionId} title={title} say={say} broadcast={(on) => { sendRec(enc.encode(on ? '1' : '0'), { reliable: true }); setRecBy(on ? (localParticipant.name ?? 'Usted') : null); }} />}
-        <button className="lk-button hidden sm:inline-flex" onClick={() => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {})}>⛶ Pantalla completa</button>
+        <button className="lk-button" onClick={() => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {})}>⛶ Pantalla completa</button>
+        </>)}
         <DisconnectButton>Salir</DisconnectButton>
       </footer>
     </div>

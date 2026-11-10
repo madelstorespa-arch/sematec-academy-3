@@ -43,7 +43,8 @@ export function GlobalSearch({ items }: { items: NavItem[] }) {
   const pages = useMemo(() => {
     const t = norm(q.trim());
     if (t.length < 2) return [];
-    return items.filter((i) => norm(i.label).includes(t)).slice(0, 5)
+    const ws = t.split(/\s+/).filter(Boolean);
+    return items.filter((i) => { const l = norm(i.label); return l.includes(t) || ws.some((w) => w.length >= 3 && l.includes(w)); }).slice(0, 5)
       .map((i) => ({ kind: 'Página', id: i.href, title: `${i.icon} ${i.label}`, subtitle: 'Ir a la sección', href: i.href }));
   }, [q, items]);
   const all = [...pages, ...hits];
