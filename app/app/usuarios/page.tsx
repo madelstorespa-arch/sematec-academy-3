@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { getContext, can, requirePerm, requireOrg } from '@/lib/context';
 import { PageHeader, Card, Empty, StatusBadge, Badge } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField } from '@/components/forms';
@@ -83,6 +84,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
               <td>{fmtDate(m.created_at)}{m.valid_until && <><br /><span className="text-xs">hasta {fmtDate(m.valid_until)}</span></>}</td>
               <td><StatusBadge status={m.status} /></td><td><StatusBadge status={m.profiles?.status} /></td>
               {(admin || manage) && <td className="space-y-1">
+                {m.profiles?.id && <Link className="link block text-xs" href={`/app/usuarios/${m.profiles.id}/permisos`} data-testid="permisos-usuario">🛡 Permisos</Link>}
                 {manage && m.profiles?.id && (
                   <details data-testid="editar-usuario"><summary className="link cursor-pointer text-xs">✏ Editar</summary>
                     <div className="mt-2 w-[min(90vw,34rem)] rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
