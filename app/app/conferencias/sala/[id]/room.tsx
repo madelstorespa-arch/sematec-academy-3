@@ -16,6 +16,7 @@ import { MiniDock, canDocPip, openPipWindow } from './mini';
 import { useBoard, Whiteboard } from './whiteboard';
 import { usePolls, PollPanel, PollCard } from './poll';
 import { InvitePanel } from './invite';
+import { useControls, useCaptions, CaptionsOverlay, HostPanel, GroupsPanel, TimerChip, useGroupsChannel, spotTrack } from './pro';
 
 type Opts = RoomOpts;
 const EMOJIS = ['👍', '👏', '❤️', '😂', '😮', '🎉', '🙌', '🤔', '👌', '🔥', '✅', '❌', '😀', '😊', '😍', '🙏', '💯', '📌', '✋', '👋', '☕', '📚', '💡', '⭐'];
@@ -34,18 +35,27 @@ export function Room(props: Opts) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [own, setOwn] = useState<Conn | null>(null); // sin anfitrión (respaldo)
+  const [waiting, setWaiting] = useState(false);
+  const stopWait = useRef(false);
+  useEffect(() => () => { stopWait.current = true; }, []);
   const here = ctl?.active?.opts.sessionId === props.sessionId;
   const other = ctl?.active && !here ? ctl.active.opts : null;
   useEffect(() => { if (here) ctl?.setMinimized(false); }, [here]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (ctl?.error) setError(ctl.error); }, [ctl?.error]);
 
   const join = useCallback(async () => {
-    setBusy(true); setError(null);
+    setBusy(true); setError(null); stopWait.current = false;
     try {
-      const r = await fetch('/api/livekit/token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session: props.sessionId }) });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error ?? 'No se pudo obtener acceso');
-      if (ctl) { if (ctl.active) ctl.leave(); ctl.join(j, props); } else setOwn(j);
+      // ⏳ Sala de espera: se vuelve a preguntar cada 3 segundos hasta que el anfitrión lo admita
+      for (;;) {
+        const r = await fetch('/api/livekit/token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session: props.sessionId }) });
+        const j = await r.json();
+        if (r.status === 202) { setWaiting(true); await new Promise((ok) => setTimeout(ok, 3000)); if (stopWait.current) return; continue; }
+        setWaiting(false);
+        if (!r.ok) throw new Error(j.error ?? 'No se pudo obtener acceso');
+        if (ctl) { if (ctl.active) ctl.leave(); ctl.join(j, props); } else setOwn(j);
+        return;
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Sin conexión con el servidor');
     } finally { setBusy(false); }
@@ -62,7 +72,14 @@ export function Room(props: Opts) {
         <p className="mt-2 text-sm text-slate-600">Al entrar, el navegador pedirá permiso para usar cámara y micrófono. Puede entrar con ambos apagados.</p>
         {props.recording && <p className="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-800">🔴 Esta sesión puede ser grabada por el anfitrión. Se avisará en pantalla mientras se graba.</p>}
         {other && <p className="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-800">Está conectado a «{other.title}». Al entrar aquí saldrá de esa sala.</p>}
-        <button onClick={join} disabled={busy} className="btn-primary mt-5">{busy ? 'Conectando…' : 'Entrar a la sala'}</button>
+        {waiting ? (
+          <div className="mt-5 rounded-xl bg-blue-50 p-4 text-sm text-blue-900" data-testid="sala-espera">
+            <p className="text-2xl">⏳</p>
+            <p className="mt-1 font-semibold">Está en la sala de espera</p>
+            <p className="mt-1">El anfitrión lo dejará entrar en un momento. No cierre esta página.</p>
+            <button className="mt-3 text-xs underline" onClick={() => { stopWait.current = true; setWaiting(false); setBusy(false); }}>Cancelar</button>
+          </div>
+        ) : <button onClick={join} disabled={busy} className="btn-primary mt-5" data-testid="entrar-sala">{busy ? 'Conectando…' : 'Entrar a la sala'}</button>}
         <p className="mt-3 text-xs text-slate-500">Dentro de la sala puede <b>🗕 minimizarla</b> para navegar por el sistema (y compartir su pantalla) sin desconectarse.</p>
       </>)}
       {error && <p className="mt-4 rounded bg-red-50 p-2 text-sm text-red-700">{error}</p>}
@@ -72,17 +89,26 @@ export function Room(props: Opts) {
 }
 
 /** Conexión a la sala (pantalla completa o minimizada). La usan el anfitrión del sistema y la página de invitados. */
-export function RoomShell({ conn, opts, view, onMinimize, onExpand, onLeave, onError }: {
+export function RoomShell({ conn: main, opts, view, onMinimize, onExpand, onLeave, onError }: {
   conn: Conn; opts: Opts; view: View; onMinimize?: () => void; onExpand?: () => void; onLeave: () => void; onError: (m: string) => void;
 }) {
   const mini = view === 'mini';
+  // 👥 Salas de grupos: se cambia de sala sin salir del sistema y luego se vuelve a la principal
+  const [sub, setSub] = useState<{ conn: Conn; group: number } | null>(null);
+  const conn = sub?.conn ?? main;
+  const current = useRef(conn.token); current.current = conn.token;
+  const goGroup = useCallback((c: Conn, group: number) => { current.current = c.token; setSub({ conn: c, group }); }, []);
+  const goMain = useCallback(() => { current.current = main.token; setSub(null); }, [main.token]);
+  const mine = conn.token;
   return (
     <div data-lk-theme="default" className={mini ? '' : 'sematec-room fixed inset-0 z-50 flex flex-col bg-[#111]'} data-testid="sala">
-      <LiveKitRoom serverUrl={conn.url} token={conn.token} connect video={false} audio={false}
-        onDisconnected={onLeave} onError={(e) => onError(e.message)}
+      <LiveKitRoom key={mine} serverUrl={conn.url} token={conn.token} connect video={false} audio={false}
+        onDisconnected={() => { if (current.current === mine) { if (sub) goMain(); else onLeave(); } }}
+        onError={(e) => { if (current.current === mine) { if (sub) goMain(); else onError(e.message); } }}
         style={mini ? { display: 'contents' } : { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <LayoutContextProvider>
-          <Stage {...opts} conn={conn} view={view} onMinimize={onMinimize} onExpand={onExpand} />
+          <Stage {...opts} title={sub ? `${opts.title} · Grupo ${sub.group}` : opts.title} conn={conn} view={view} onMinimize={onMinimize} onExpand={onExpand}
+            group={sub?.group ?? 0} onGroup={goGroup} onMain={goMain} />
         </LayoutContextProvider>
         <RoomAudioRenderer />
         <div className={mini ? 'hidden' : ''}><StartAudio label="Activar audio" /><ConnectionStateToast /></div>
@@ -92,8 +118,8 @@ export function RoomShell({ conn, opts, view, onMinimize, onExpand, onLeave, onE
 }
 
 type Floating = { id: number; emoji: string; left: number; from: string };
-type Panel = 'chat' | 'people' | 'effects' | 'poll' | 'invite' | null;
-const PANEL_TITLE: Record<string, string> = { effects: '🖼 Fondo y efectos', poll: '📊 Encuesta en vivo', invite: '🔗 Invitar a personas externas' };
+type Panel = 'chat' | 'people' | 'effects' | 'poll' | 'invite' | 'host' | 'groups' | null;
+const PANEL_TITLE: Record<string, string> = { effects: '🖼 Fondo y efectos', poll: '📊 Encuesta en vivo', invite: '🔗 Invitar a personas externas', host: '🛡 Controles del anfitrión', groups: '👥 Salas de grupos' };
 
 function useElapsed() {
   const [start] = useState(() => Date.now()); const [now, setNow] = useState(start);
@@ -102,7 +128,9 @@ function useElapsed() {
   return `${s >= 3600 ? `${Math.floor(s / 3600)}:` : ''}${String(Math.floor((s % 3600) / 60)).padStart(s >= 3600 ? 2 : 1, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
 
-function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, guest, conn, view, onMinimize, onExpand }: Opts & { conn: Conn; view: View; onMinimize?: () => void; onExpand?: () => void }) {
+function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, guest, conn, view, onMinimize, onExpand, group, onGroup, onMain }: Opts & {
+  conn: Conn; view: View; onMinimize?: () => void; onExpand?: () => void; group: number; onGroup: (c: Conn, g: number) => void; onMain: () => void;
+}) {
   const room = useRoomContext();
   const { localParticipant } = useLocalParticipant();
   const hookPerms = useLocalParticipantPermissions();
@@ -136,7 +164,10 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
     return () => { room.off(RoomEvent.ParticipantAttributesChanged, f).off(RoomEvent.ParticipantPermissionsChanged, f); };
   }, [room]);
 
-  const say = useCallback((m: string) => { setToast(m); setTimeout(() => setToast(null), 3500); }, []);
+  const say = useCallback((m: string) => { setToast(m); setTimeout(() => setToast(null), m.startsWith('📣') ? 9000 : 3500); }, []);
+  const controls = useControls(mod && !group);
+  const cc = useCaptions(controls.ccAll);
+  useGroupsChannel((c, g) => { say(`👥 Pasando al grupo ${g}…`); onGroup(c, g); }, () => { if (group) { say('↩ Volviendo a la sala principal…'); onMain(); } }, say);
   const addFloating = useCallback((emoji: string, from: string) => {
     const id = Date.now() + Math.random();
     setFloating((f) => [...f.slice(-25), { id, emoji, from, left: 10 + Math.random() * 80 }]);
@@ -175,7 +206,8 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
   const speaker = useMemo(() => [...participants].sort((a, b) => Number(b.isSpeaking) - Number(a.isSpeaking) || b.audioLevel - a.audioLevel)[0], [participants]);
   const speakerTrack = tracks.find((t) => t.participant.identity === speaker?.identity && t.source === Track.Source.Camera);
   const pinnedTrack = pinned[0] ? tracks.find((t) => t.participant.identity === pinned[0].participant.identity && t.source === pinned[0].source) : undefined;
-  const focus = pinnedTrack ?? screen ?? (layout === 'speaker' ? speakerTrack : undefined);
+  const spotlit = spotTrack(tracks, controls.spot);
+  const focus = pinnedTrack ?? spotlit ?? screen ?? (layout === 'speaker' ? speakerTrack : undefined);
   const miniFocus = screen ?? pinnedTrack ?? speakerTrack ?? tracks[0];
 
   const moderate = async (action: string, identity?: string) => {
@@ -221,10 +253,13 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-blue-600 text-xs">🎥</span>
           <span className="truncate font-semibold">{title}</span>
           <span className="hidden rounded bg-white/10 px-1.5 py-0.5 font-mono text-[11px] sm:inline" title="Tiempo conectado">⏱ {elapsed}</span>
+          {group > 0 && <span className="rounded bg-emerald-600 px-2 py-0.5 text-xs font-bold" data-testid="en-grupo">👥 Grupo {group}</span>}
+          <TimerChip timer={controls.timer} onEnd={() => say('⏱ ¡Se acabó el tiempo!')} />
         </span>
         <span className="flex shrink-0 items-center gap-2 text-xs">
           {recBy && <span className="animate-pulse rounded bg-red-600 px-2 py-0.5 font-bold">● GRABANDO</span>}
           <span className="opacity-70">{participants.length} 👥 · {CONF_ROLES[conn.role] ?? conn.role}</span>
+          {group > 0 && <button className="rounded-lg bg-emerald-600 px-2 py-1 hover:bg-emerald-500" onClick={onMain} data-testid="volver-principal">↩ Sala principal</button>}
           {onMinimize && <button className="rounded-lg bg-white/10 px-2 py-1 hover:bg-white/20" onClick={onMinimize} title="Minimizar: siga navegando por el sistema sin salir de la clase" data-testid="minimizar">🗕 Minimizar</button>}
           {(canDocPip() || onMinimize) && <button className="hidden rounded-lg bg-white/10 px-2 py-1 hover:bg-white/20 sm:inline" onClick={openPip} title="Ventana flotante encima de todos los programas">⧉ Flotante</button>}
         </span>
@@ -244,6 +279,11 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
         <div className="flex flex-wrap gap-2 bg-amber-500/20 px-3 py-1 text-xs" data-testid="manos">
           ✋ {hands.map((p) => p.name || 'Participante').join(', ')}
         </div>)}
+      {spotlit && (
+        <div className="flex items-center justify-center gap-2 bg-amber-500/25 px-3 py-1 text-xs" data-testid="destacado">
+          ⭐ El anfitrión destacó a {spotlit.participant.name || 'un participante'} para todos
+          {mod && <button className="rounded bg-white/15 px-2 py-0.5 hover:bg-white/25" onClick={() => controls.spotlight(null)}>Quitar</button>}
+        </div>)}
       {board.open && boardHidden && (
         <div className="flex items-center justify-center gap-2 bg-purple-600/30 px-3 py-1 text-xs">🖍 La pizarra está abierta
           <button className="rounded bg-white/15 px-2 py-0.5 hover:bg-white/25" onClick={() => setBoardHidden(false)}>Ver pizarra</button></div>)}
@@ -260,6 +300,7 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
           )}
           {showBoard && <Whiteboard board={board} title={title} />}
           <PollCard polls={polls} />
+          <CaptionsOverlay cc={cc} />
           <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
             {floating.map((f) => (
               <span key={f.id} className="reaction-float absolute bottom-6 text-4xl" style={{ left: `${f.left}%` }} title={f.from}>{f.emoji}</span>))}
@@ -272,7 +313,10 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
               <button onClick={() => setPanel(null)} className="rounded px-2 hover:bg-white/10" aria-label="Cerrar panel">✕</button>
             </div>
             {panel === 'chat' && <ChatPanel enabled={chatEnabled || mod} chat={chat} orgId={orgId} sectionId={sectionId} say={say} attachments={!guest} />}
-            {panel === 'people' && <PeoplePanel mod={mod} me={localParticipant.identity} participants={participants} moderate={moderate} />}
+            {panel === 'people' && <PeoplePanel mod={mod} me={localParticipant.identity} participants={participants} moderate={moderate} spot={controls.spot} onSpot={group ? undefined : controls.spotlight} />}
+            {panel === 'host' && <HostPanel sessionId={sessionId} title={title} controls={controls} cc={cc} say={say} />}
+            {panel === 'groups' && <GroupsPanel sessionId={sessionId} me={localParticipant.identity} say={say} onVisit={(c, g) => onGroup(c, g)}
+              people={participants.map((p) => { let r = ''; try { r = JSON.parse(p.metadata || '{}').role ?? ''; } catch { /* */ } return { identity: p.identity, name: p.name || 'Participante', mod: ['organizer', 'moderator', 'teacher'].includes(r) }; })} />}
             {panel === 'effects' && <EffectsPanel say={say} />}
             {panel === 'poll' && <PollPanel polls={polls} />}
             {panel === 'invite' && <InvitePanel sessionId={sessionId} title={title} />}
@@ -315,6 +359,10 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
           : board.open && <button className={btn(showBoard)} onClick={() => setBoardHidden(!boardHidden)}>🖍 {showBoard ? 'Ver videos' : 'Ver pizarra'}</button>}
         {mod && <button className={btn(panel === 'poll')} onClick={() => toggle('poll')} data-testid="boton-encuesta">📊 Encuesta</button>}
         {mod && !guest && <button className={btn(panel === 'invite')} onClick={() => toggle('invite')} data-testid="boton-invitar">🔗 Invitar</button>}
+        {cc.supported && <button className={btn(cc.show)} data-testid="boton-subtitulos" title="Subtítulos en vivo (transcribe su voz para todos)"
+          onClick={() => { const on = !cc.show; cc.setShow(on); cc.setMine(on); if (on) say('💬 Subtítulos activados: lo que usted diga aparecerá escrito para todos.'); }}>💬 {cc.show ? 'Quitar subtítulos' : 'Subtítulos'}</button>}
+        {mod && !group && <button className={btn(panel === 'host')} onClick={() => toggle('host')} data-testid="boton-anfitrion">🛡 Anfitrión</button>}
+        {mod && !group && !guest && <button className={btn(panel === 'groups')} onClick={() => toggle('groups')} data-testid="boton-grupos">👥 Grupos</button>}
         <button className="lk-button" onClick={() => setLayout(layout === 'grid' ? 'speaker' : 'grid')} title="Cambiar vista">{layout === 'grid' ? '🗣 Vista orador' : '▦ Vista galería'}</button>
         {mod && recording && !guest && <Recorder sessionId={sessionId} title={title} say={say} broadcast={(on) => { sendRec(enc.encode(on ? '1' : '0'), { reliable: true }); setRecBy(on ? (localParticipant.name ?? 'Usted') : null); }} />}
         <button className="lk-button hidden sm:inline-flex" onClick={() => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {})}>⛶ Pantalla completa</button>
@@ -444,7 +492,7 @@ function ChatPanel({ enabled, chat, orgId, sectionId, say, attachments = true }:
   );
 }
 
-function PeoplePanel({ mod, me, participants, moderate }: { mod: boolean; me: string; participants: Participant[]; moderate: (a: string, id?: string) => void }) {
+function PeoplePanel({ mod, me, participants, moderate, spot, onSpot }: { mod: boolean; me: string; participants: Participant[]; moderate: (a: string, id?: string) => void; spot?: string | null; onSpot?: (id: string | null) => void }) {
   return (
     <div className="flex-1 overflow-y-auto p-2 text-sm" data-testid="personas">
       {mod && <button className="mb-2 w-full rounded-lg bg-white/10 py-2 text-xs hover:bg-white/20" onClick={() => moderate('mute_all')}>🔇 Silenciar a todos</button>}
@@ -458,6 +506,9 @@ function PeoplePanel({ mod, me, participants, moderate }: { mod: boolean; me: st
                 <span className="min-w-0 truncate">{p.attributes?.hand && '✋ '}{p.name || 'Participante'}{isMe && ' (usted)'}<span className="block text-[11px] opacity-60">{CONF_ROLES[role] ?? role}{extra && ` · ${extra}`}</span></span>
                 <span className="shrink-0 text-xs">{p.isMicrophoneEnabled ? '🎙' : '🔇'} {p.isCameraEnabled ? '📷' : ''} {p.isScreenShareEnabled ? '🖥' : ''}</span>
               </div>
+              {mod && onSpot && (
+                <button className="mt-1 rounded bg-amber-500/30 px-2 py-0.5 text-[11px] hover:bg-amber-500/50" data-testid="destacar"
+                  onClick={() => onSpot(spot === p.identity ? null : p.identity)}>{spot === p.identity ? '⭐ Quitar destacado' : '⭐ Destacar para todos'}</button>)}
               {mod && !isMe && (
                 <div className="mt-1 flex flex-wrap gap-1 text-[11px]">
                   {p.isMicrophoneEnabled && <button className="rounded bg-white/10 px-2 py-0.5 hover:bg-white/20" onClick={() => moderate('mute', p.identity)}>Silenciar</button>}

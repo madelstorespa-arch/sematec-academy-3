@@ -7,7 +7,7 @@ export const TABLE_LABELS: Record<string, string> = {
   calendar_events: 'Evento', academic_periods: 'Periodo académico', offices: 'Oficina', appointments: 'Cita',
   student_requests: 'Solicitud', guardian_links: 'Vínculo de apoderado', fee_schedules: 'Arancel',
   memberships: 'Rol de usuario', roles: 'Rol', role_permissions: 'Permiso de rol', certificate_templates: 'Plantilla de certificado',
-  site_settings: 'Sitio web', organization_settings: 'Configuración', rooms: 'Sala', attendance_records: 'Asistencia',
+  site_settings: 'Sitio web', custom_modules: 'Módulo', custom_records: 'Registro de módulo', conference_waiting: 'Sala de espera', organization_settings: 'Configuración', rooms: 'Sala', attendance_records: 'Asistencia',
   assessments: 'Evaluación', assignments: 'Tarea', quizzes: 'Prueba', quiz_questions: 'Pregunta', course_units: 'Unidad',
   course_contents: 'Contenido', class_materials: 'Material de clase', forum_threads: 'Tema del foro', forum_posts: 'Mensaje del foro',
   authorities: 'Autoridad', enrollments: 'Matrícula', section_enrollments: 'Inscripción en sección',

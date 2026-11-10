@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { AccessToken, TrackSource } from 'livekit-server-sdk';
+import { issueGuestToken } from '@/lib/guest-token';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { checkDocument } from '@/lib/identity';
 
@@ -16,8 +16,7 @@ const txt = (v: unknown, max: number) => (typeof v === 'string' ? v.replace(/[\u
  * y entrega un acceso temporal SOLO a esa sala. Limitado por IP.
  */
 export async function POST(request: NextRequest) {
-  const { LIVEKIT_API_KEY: key, LIVEKIT_API_SECRET: secret, NEXT_PUBLIC_LIVEKIT_URL: url } = process.env;
-  if (!key || !secret || !url) return NextResponse.json({ error: 'El servicio de videoconferencia no está configurado.' }, { status: 503 });
+  if (!process.env.LIVEKIT_API_KEY || !process.env.LIVEKIT_API_SECRET || !process.env.NEXT_PUBLIC_LIVEKIT_URL) return NextResponse.json({ error: 'El servicio de videoconferencia no está configurado.' }, { status: 503 });
   const b = await request.json().catch(() => ({}));
   const token = txt(b.token, 64);
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(token)) return NextResponse.json({ error: REASONS.not_found }, { status: 404 });
@@ -47,15 +46,10 @@ export async function POST(request: NextRequest) {
   if (error) { console.error('[invitado]', error.message); return NextResponse.json({ error: 'No se pudo registrar su ingreso.' }, { status: 500 }); }
   if (!j?.allowed) return NextResponse.json({ error: REASONS[j?.reason] ?? 'Acceso denegado.' }, { status: 403 });
 
-  const ttl = Math.max(60, Math.floor((new Date(j.expires_at).getTime() - Date.now()) / 1000));
-  const at = new AccessToken(key, secret, {
-    identity: `inv_${j.guest_id}`, name: `${name} (invitado)`, ttl,
-    metadata: JSON.stringify({ role: 'guest', cargo: cargo || undefined, inst: inst || undefined }),
-  });
-  at.addGrant({
-    room: j.room, roomJoin: true, canSubscribe: true, canPublish: true, canPublishData: true, canUpdateOwnMetadata: true,
-    canPublishSources: [TrackSource.CAMERA, TrackSource.MICROPHONE, ...(j.allow_share ? [TrackSource.SCREEN_SHARE, TrackSource.SCREEN_SHARE_AUDIO] : [])],
-  });
-  return NextResponse.json({ token: await at.toJwt(), url, role: 'guest', moderator: false, title: j.title, sessionId: j.session_id, orgId: j.org_id, chat: j.chat },
-    { headers: { 'Cache-Control': 'no-store' } });
+  // Sala de espera / sala bloqueada
+  const { data: st } = await admin.rpc('guest_entry_check', { p_guest: j.guest_id });
+  if (st === 'waiting') return NextResponse.json({ waiting: true, guest: j.guest_id, invite: token }, { status: 202, headers: { 'Cache-Control': 'no-store' } });
+  if (st === 'locked') return NextResponse.json({ error: '🔒 El anfitrión bloqueó la sala: no pueden entrar más personas.' }, { status: 423 });
+  try { return NextResponse.json(await issueGuestToken(j.guest_id), { headers: { 'Cache-Control': 'no-store' } }); }
+  catch (e) { return NextResponse.json({ error: (e as Error).message }, { status: 403 }); }
 }

@@ -16,10 +16,18 @@ export function GuestJoin({ token, requireDocument, title }: { token: string; re
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [left, setLeft] = useState(false);
+  const [waiting, setWaiting] = useState(false);
 
   if (joined) return (
     <RoomShell conn={joined} view="full" onLeave={() => { setJoined(null); setLeft(true); }} onError={(m) => { setError(m); setJoined(null); }}
       opts={{ sessionId: joined.sessionId, title: joined.title, recording: false, chatEnabled: joined.chat, orgId: joined.orgId, sectionId: null, guest: true }} />
+  );
+  if (waiting) return (
+    <div className="mt-6 rounded-xl bg-blue-50 p-6 text-center text-blue-900" data-testid="sala-espera">
+      <p className="text-3xl">⏳</p>
+      <p className="mt-2 font-semibold">Está en la sala de espera</p>
+      <p className="mt-1 text-sm">El anfitrión lo dejará entrar en un momento. No cierre esta página.</p>
+    </div>
   );
   return (
     <form key={ready} className="mt-6 space-y-3" data-testid="form-invitado" onSubmit={async (e) => {
@@ -29,9 +37,22 @@ export function GuestJoin({ token, requireDocument, title }: { token: string; re
       try {
         const r = await fetch('/api/livekit/invitado', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...f, token, consent: f.consent === 'on' }) });
         const j = await r.json();
+        if (r.status === 202 && j.waiting) {
+          // ⏳ Sala de espera: pregunta cada 3 segundos si el anfitrión ya lo admitió
+          setWaiting(true);
+          for (;;) {
+            await new Promise((ok) => setTimeout(ok, 3000));
+            const w = await fetch('/api/livekit/invitado/espera', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ guest: j.guest, invite: j.invite }) });
+            const k = await w.json().catch(() => ({}));
+            if (w.status === 202) continue;
+            setWaiting(false);
+            if (!w.ok) throw new Error(k.error ?? 'No se pudo entrar.');
+            setJoined(k); setLeft(false); return;
+          }
+        }
         if (!r.ok) throw new Error(j.error ?? 'No se pudo entrar.');
         setJoined(j); setLeft(false);
-      } catch (err) { setError((err as Error).message); } finally { setBusy(false); }
+      } catch (err) { setWaiting(false); setError((err as Error).message); } finally { setBusy(false); }
     }}>
       {left && <p className="rounded-lg bg-slate-100 p-3 text-sm">Salió de «{title}». Puede volver a entrar cuando quiera.</p>}
       <label className="block"><span className="label">Nombre completo *</span><input name="name" required minLength={3} maxLength={120} defaultValue={saved.name} className="input" autoComplete="name" /></label>

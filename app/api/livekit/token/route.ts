@@ -32,6 +32,11 @@ export async function POST(request: NextRequest) {
     };
     return NextResponse.json({ error: reasons[auth.reason ?? ''] ?? 'Acceso denegado' }, { status: 403 });
   }
+  // Sala bloqueada o sala de espera (el anfitrión siempre entra)
+  const { data: entry } = await supabase.rpc('conference_entry_check', { p_session: session });
+  if (entry === 'waiting') return NextResponse.json({ waiting: true, message: 'Esperando que el anfitrión lo admita…' }, { status: 202, headers: { 'Cache-Control': 'no-store' } });
+  if (entry === 'locked') return NextResponse.json({ error: '🔒 El anfitrión bloqueó la sala: no pueden entrar más personas.' }, { status: 423 });
+  if (entry === 'rejected') return NextResponse.json({ error: 'El anfitrión no admitió su ingreso a esta sesión.' }, { status: 403 });
   const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
   const ttl = Math.max(60, Math.floor((new Date(auth.expires_at!).getTime() - Date.now()) / 1000));
   const at = new AccessToken(key, secret, { identity: user.id, name: profile?.full_name || user.email || 'Participante', ttl, metadata: JSON.stringify({ role: auth.role }) });
