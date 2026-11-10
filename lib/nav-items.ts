@@ -73,6 +73,12 @@ export async function buildNav(ctx: Ctx): Promise<NavItem[]> {
   items.splice(items.length - 1, 0, ...extra);
   const c = (menu?.value ?? {}) as MenuCustom;
   const hidden = new Set(c.hidden ?? []);
+  // 🔑 Aviso en el menú cuando hay personas pidiendo ayuda para recuperar su contraseña
+  if (ctx.isOwner || can(ctx, 'security.admin') || can(ctx, 'users.admin')) {
+    const { count } = await ctx.supabase.from('password_help_requests').select('id', { count: 'exact', head: true }).eq('organization_id', ctx.orgId).eq('status', 'pendiente');
+    const u = items.find((i) => i.href === '/app/usuarios');
+    if (u && count) u.label = `${u.label} · 🔑 ${count}`;
+  }
   const loc = prefsOf(ctx.profile).locale;
   return items.filter((i) => LOCKED.has(i.href) || !hidden.has(i.href)).map((i) => (c.labels?.[i.href] ? { ...i, label: c.labels[i.href] } : { ...i, label: tNav(loc, i.label) }));
 }

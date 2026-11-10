@@ -7,6 +7,7 @@ import { DOC_TYPES } from '@/lib/identity';
 import { SelectAll } from '@/components/select-all';
 import { editMember, removeMember, bulkMembers, grantRole, revokeRole, setAccountStatus, createRole } from './actions';
 import { AccessDiagnosis } from './diagnostico';
+import { HelpRequests } from './solicitudes';
 
 export const metadata = { title: 'Usuarios y roles' };
 
@@ -37,6 +38,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
   return (
     <>
       <PageHeader title="Usuarios y roles" subtitle="Acceso por institución, sede y rol. Los roles administrativos exigen MFA." />
+      <HelpRequests ctx={ctx} />
       <AccessDiagnosis ctx={ctx} email={sp.revisar?.trim().toLowerCase().slice(0, 254)} />
       {admin && (
         <Card title="Asignar rol a un usuario" className="mb-6">

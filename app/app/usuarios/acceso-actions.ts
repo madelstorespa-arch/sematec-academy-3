@@ -45,6 +45,8 @@ export async function setNewPassword(fd: FormData): Promise<ActionResult> {
     if (error) return fail(error.message);
     await admin.rpc('unlock_after_password_reset', { p_user: userId });
     await log('admin_password_set');
+    const help = str(fd, 'help_id');
+    if (help) await ctx.supabase.from('password_help_requests').update({ status: 'resuelta', resolved_by: ctx.user.id, resolved_at: new Date().toISOString(), resolution: 'Contraseña temporal entregada' }).eq('id', help);
     revalidatePath('/app/usuarios');
     return ok('Contraseña nueva guardada. Entréguesela a la persona (puede cambiarla en «Mi cuenta»).');
   });
@@ -73,5 +75,21 @@ export async function sendRecovery(fd: FormData): Promise<ActionResult> {
     if (r === 'not_allowed') return fail('La cuenta está suspendida o bloqueada por la administración: desbloquéela primero.');
     if (r !== 'sent') return fail('No se pudo generar el enlace para esa cuenta.');
     return ok(`Enlace enviado a ${email}. Vence en 1 hora.`);
+  });
+}
+
+/** Marca una solicitud de recuperación como resuelta o descartada. */
+export async function closeHelpRequest(fd: FormData): Promise<ActionResult> {
+  return wrap(async () => {
+    const ctx = await getContext();
+    if (!(ctx.isOwner || can(ctx, 'security.admin') || can(ctx, 'users.admin'))) return fail('Sin permiso.');
+    const status = fd.get('status') === 'descartada' ? 'descartada' : 'resuelta';
+    const { data, error } = await ctx.supabase.from('password_help_requests').update({
+      status, resolved_by: ctx.user.id, resolved_at: new Date().toISOString(), resolution: str(fd, 'resolution')?.slice(0, 300) ?? null,
+    }).eq('id', reqStr(fd, 'id', 'solicitud')).select('id');
+    if (error) return fail(error);
+    if (!data?.length) return fail('Solicitud no encontrada.');
+    revalidatePath('/app/usuarios');
+    return ok(status === 'resuelta' ? 'Solicitud marcada como resuelta.' : 'Solicitud descartada.');
   });
 }
