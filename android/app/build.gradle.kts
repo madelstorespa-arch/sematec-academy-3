@@ -16,6 +16,8 @@ android {
         targetSdk = 35
         versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
         versionName = "1.0." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
+        // Solo celulares y tablets reales (ARM): la app pesa la mitad
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
         buildConfigField("String", "SITE_URL", "\"" + (System.getenv("SITE_URL") ?: "https://sematec-academy-3.vercel.app") + "\"")
     }
 
