@@ -3,7 +3,7 @@ export const EXPENSE_CATEGORIES: [string, string][] = [
   ['remuneraciones', 'Remuneraciones / sueldos'], ['honorarios', 'Honorarios docentes'], ['arriendo', 'Arriendo'],
   ['servicios_basicos', 'Luz, agua, gas'], ['internet_tecnologia', 'Internet y tecnología'], ['materiales', 'Materiales y útiles'],
   ['marketing', 'Publicidad y marketing'], ['mantencion', 'Mantención y aseo'], ['impuestos', 'Impuestos y patentes'],
-  ['comisiones', 'Comisiones bancarias / pasarela'], ['capacitacion', 'Capacitación'], ['otros', 'Otros'],
+  ['comisiones', 'Comisiones bancarias / pasarela'], ['capacitacion', 'Capacitación'], ['mercaderia', 'Mercadería (compras tienda)'], ['otros', 'Otros'],
 ];
 export const expenseLabel = (k: string) => EXPENSE_CATEGORIES.find(([v]) => v === k)?.[1] ?? k;
 

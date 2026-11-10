@@ -61,6 +61,12 @@ async function fulfill(orderId: string) {
   const admin = createAdminClient();
   const { data: o } = await admin.from('checkout_orders').select('id, kind, buyer_email, buyer_name, fulfilled_at, user_id').eq('id', orderId).single();
   if (!o || o.fulfilled_at) return;
+  if (o.kind === 'store') {
+    // Pedido de la tienda web pagado en línea
+    const { error } = await admin.rpc('fulfill_store_order', { p_order: orderId });
+    if (error) throw new Error(error.message);
+    return;
+  }
   if (o.kind === 'installments') {
     // Pago de cuotas desde el portal: se abona a la cuenta del estudiante
     const { error } = await admin.rpc('fulfill_installments_order', { p_order: orderId });

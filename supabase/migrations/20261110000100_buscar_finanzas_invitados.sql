@@ -439,3 +439,6 @@ grant execute on function public.guest_invite_info(text), public.guest_join(text
   public.record_guest_event(text, text, uuid, timestamptz, text) to service_role;
 grant execute on function public.remove_conference_guest(uuid) to authenticated;
 grant execute on function public.global_search(uuid, text, int) to authenticated;
+
+-- El servidor de la plataforma (service_role) también accede a estas tablas
+grant all on public.expenses, public.conference_invites, public.conference_guests to service_role;

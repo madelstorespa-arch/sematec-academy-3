@@ -15,7 +15,7 @@ export const TABLE_LABELS: Record<string, string> = {
   applications: 'Postulación', benefits: 'Beneficio', leave_requests: 'Solicitud de permiso',
   employment_contracts: 'Contrato', support_tickets: 'Ticket de soporte', conference_rooms: 'Sala virtual',
   conference_sessions: 'Sesión virtual', library_loans: 'Préstamo', document_permissions: 'Permiso de documento',
-  grade_scales: 'Escala de notas', expenses: 'Gasto', conference_invites: 'Enlace de invitados',
+  grade_scales: 'Escala de notas', expenses: 'Gasto', conference_invites: 'Enlace de invitados', products: 'Producto',
 };
 
 const FIELD_LABELS: Record<string, string> = {

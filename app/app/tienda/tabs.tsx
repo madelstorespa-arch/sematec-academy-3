@@ -1,0 +1,11 @@
+import { Tabs } from '@/components/ui';
+export function StoreTabs({ current }: { current: string }) {
+  return <Tabs current={current} items={[
+    { key: 'resumen', label: '📊 Resumen', href: '/app/tienda' },
+    { key: 'caja', label: '🧾 Caja', href: '/app/tienda/caja' },
+    { key: 'productos', label: '📦 Productos', href: '/app/tienda/productos' },
+    { key: 'pedidos', label: '🛍 Pedidos web', href: '/app/tienda/pedidos' },
+    { key: 'ventas', label: '💰 Ventas', href: '/app/tienda/ventas' },
+    { key: 'compras', label: '📥 Compras', href: '/app/tienda/compras' },
+  ]} />;
+}

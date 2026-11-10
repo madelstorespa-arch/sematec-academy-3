@@ -16,7 +16,7 @@ function sniff(b: Buffer): string | null {
  * Guarda una imagen validada. El llamador debe haber verificado los permisos.
  * Se rechazan SVG y cualquier archivo que no sea PNG, JPEG o WebP reales.
  */
-export async function saveImage(file: File | null, opts: { kind: 'logo' | 'hero' | 'course' | 'avatar'; organizationId: string | null; userId: string; isPublic: boolean }) {
+export async function saveImage(file: File | null, opts: { kind: 'logo' | 'hero' | 'course' | 'avatar' | 'product'; organizationId: string | null; userId: string; isPublic: boolean }) {
   if (!file || file.size === 0) return { error: 'Seleccione una imagen.' };
   if (file.size > MAX) return { error: 'La imagen supera 3 MB.' };
   const buf = Buffer.from(await file.arrayBuffer());

@@ -128,7 +128,8 @@ with sync_playwright() as pw:
 
     go(m, f'{BASE}/app/finanzas/balance')
     ing, gas, sal = (m.locator(f'[data-testid=kpi-{k}]').inner_text() for k in ('ingresos', 'gastos', 'saldo'))
-    inc = int(float(sql(f"select coalesce(sum(case when kind = 'refund' then -amount else amount end), 0) from payments where organization_id = '{ORG}' and status = 'confirmed' and currency = 'CLP' and date_trunc('month', paid_at at time zone 'America/Santiago') = date_trunc('month', now() at time zone 'America/Santiago')")))
+    inc = int(float(sql(f"select coalesce(sum(case when kind = 'refund' then -amount else amount end), 0) from payments where organization_id = '{ORG}' and status = 'confirmed' and currency = 'CLP' and date_trunc('month', paid_at at time zone 'America/Santiago') = date_trunc('month', now() at time zone 'America/Santiago')"))) \
+        + int(float(sql(f"select coalesce(sum(total), 0) from sales where organization_id = '{ORG}' and status <> 'anulada' and paid_at is not null and currency = 'CLP' and date_trunc('month', paid_at at time zone 'America/Santiago') = date_trunc('month', now() at time zone 'America/Santiago')") or 0))
     dots = lambda n: f'{n:,}'.replace(',', '.')
     check(dots(inc) in ing and '20.000' in gas and dots(inc - 20000) in sal, f'📊 Ingresos, gastos y lo que queda del mes ({ing} − {gas} = {sal})')
     cells = m.locator('[data-testid=balance-programas] tr:has-text("Técnico en Informática") td').all_inner_texts()

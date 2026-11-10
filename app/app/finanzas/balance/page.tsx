@@ -11,6 +11,7 @@ type Row = { id: string; code: string; name: string; students: number; income: n
 type Report = {
   currency: string; income: number; expenses: number; months: { m: string; income: number; expenses: number }[];
   programs: Row[]; sections: Row[]; unassigned_income: number; general_expenses: number; categories: Record<string, number>;
+  tuition_income?: number; store_income?: number; store_cost?: number;
 };
 
 function ym(d: Date) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
@@ -74,7 +75,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ d
         <>
           <p className="mb-3 text-sm text-slate-500">{r.from === r.to ? monthName(r.from) : `${monthName(r.from)} a ${monthName(r.to)}`} · {cur}</p>
           <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="card card-pad"><p className="label">💰 Ingresos</p><p className="text-2xl font-bold text-emerald-700" data-testid="kpi-ingresos">{money(rep.income)}</p><p className="text-xs text-slate-500">Pagos recibidos menos reembolsos</p></div>
+            <div className="card card-pad"><p className="label">💰 Ingresos</p><p className="text-2xl font-bold text-emerald-700" data-testid="kpi-ingresos">{money(rep.income)}</p><p className="text-xs text-slate-500">{rep.store_income ? <>Educación {money(rep.tuition_income ?? 0)} · <span data-testid="kpi-tienda">🛒 Tienda {money(rep.store_income)}</span></> : 'Pagos recibidos menos reembolsos'}</p></div>
             <div className="card card-pad"><p className="label">💸 Gastos</p><p className="text-2xl font-bold text-red-600" data-testid="kpi-gastos">{money(rep.expenses)}</p><p className="text-xs text-slate-500"><Link className="link" href={`/app/finanzas/gastos?mes=${r.to}`}>Registrar o ver gastos</Link></p></div>
             <div className={`card card-pad ${net < 0 ? 'ring-2 ring-red-200' : 'ring-2 ring-emerald-200'}`}><p className="label">🏦 Queda (saldo)</p><p className={`text-2xl font-bold ${net < 0 ? 'text-red-600' : ''}`} data-testid="kpi-saldo">{money(net)}</p><p className="text-xs text-slate-500">Ingresos − gastos</p></div>
             <div className="card card-pad"><p className="label">📈 Margen</p><p className="text-2xl font-bold">{rep.income > 0 ? `${Math.round((net / rep.income) * 100)}%` : '—'}</p><p className="text-xs text-slate-500">Del ingreso que queda</p></div>

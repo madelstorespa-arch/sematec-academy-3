@@ -6,7 +6,7 @@ import type { NavItem } from '@/components/nav';
 
 const ICONS: Record<string, string> = {
   Página: '📄', Estudiante: '🎓', Profesor: '🧑‍🏫', Funcionario: '🧾', Programa: '🏛', Asignatura: '📘', Sección: '📝', Matrícula: '🗂',
-  Boleta: '🧾', Gasto: '💸', 'Clase o reunión': '🎥', Biblioteca: '📖', Archivo: '📁', Certificado: '🏅', Anuncio: '📢', Soporte: '🛟',
+  Boleta: '🧾', Gasto: '💸', 'Clase o reunión': '🎥', Biblioteca: '📖', Archivo: '📁', Certificado: '🏅', Anuncio: '📢', Soporte: '🛟', Producto: '🛒', Venta: '🧾',
 };
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
@@ -63,7 +63,7 @@ export function GlobalSearch({ items }: { items: NavItem[] }) {
             <div className="flex items-center gap-3 border-b border-slate-100 px-4">
               <span aria-hidden className="text-lg">🔍</span>
               <input ref={input} value={q} onChange={(e) => setQ(e.target.value)} data-testid="buscar-texto"
-                placeholder="Nombre, RUT, pasaporte, sección, programa, N° de boleta, archivo…" aria-label="Texto a buscar"
+                placeholder="Nombre, RUT, producto, código de barras, sección, N° de boleta o venta…" aria-label="Texto a buscar"
                 className="w-full py-4 text-base outline-none"
                 onKeyDown={(e) => {
                   if (e.key === 'ArrowDown') { e.preventDefault(); setSel((s) => Math.min(s + 1, all.length - 1)); }
