@@ -12,8 +12,9 @@ type Result = { ok: boolean; message?: string; error?: string; data?: unknown; q
  * dispositivo y se envía solo al volver la conexión (se informa que aún no está en la nube).
  */
 export function ActionForm({
-  action, children, submitLabel = 'Guardar', className = '', confirm, resetOnSuccess = true, submitClass = 'btn-primary', inline = false, onDone, hideSubmit = false, offline,
+  action, children, submitLabel = 'Guardar', className = '', confirm, resetOnSuccess = true, submitClass = 'btn-primary', inline = false, onDone, hideSubmit = false, offline, id,
 }: {
+  id?: string;
   action: (fd: FormData) => Promise<Result>;
   children?: ReactNode; submitLabel?: string; className?: string; confirm?: string; resetOnSuccess?: boolean;
   submitClass?: string; inline?: boolean; onDone?: (r: Result) => void; hideSubmit?: boolean;
@@ -26,6 +27,7 @@ export function ActionForm({
   return (
     <form
       ref={ref}
+      id={id}
       className={className}
       onSubmit={(e) => {
         e.preventDefault();

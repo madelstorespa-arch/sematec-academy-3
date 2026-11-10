@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { KINDS, kindIcon, SALE_METHODS, bestPromo, type Promo } from '@/lib/store';
 import { DOC_TYPES } from '@/lib/identity';
 import { checkCoupon, sell, type CartLine } from '../actions';
+import { notifyChanged } from '@/components/undo-bar';
 
 type P = { id: string; sku: string; barcode: string | null; name: string; kind: string; category: string | null; unit: string; price: number; stock: number;
   track_stock: boolean; requires_serial: boolean; warranty_months: number | null; tax_rate: number; image_asset_id: string | null };
@@ -92,7 +93,7 @@ export function Pos({ products: initial, currency, promos = [] }: { products: P[
     if (!r.ok) { setMsg({ ok: false, text: r.error ?? 'No se pudo registrar la venta.' }); return; }
     const d = r.data as { id: string; number: number; code?: string; total: number; change: number | null };
     setProducts((ps) => ps.map((p) => { const l = cart.find((x) => x.p.id === p.id); return l ? { ...p, stock: Number(p.stock) - l.qty } : p; }));
-    setDone(d); setCart([]); setCash(''); setDiscount(''); setCoupon(null); setCouponText(''); setCustomer({ name: '', doc_type: 'RUN', doc_number: '', email: '' });
+    notifyChanged(); setDone(d); setCart([]); setCash(''); setDiscount(''); setCoupon(null); setCouponText(''); setCustomer({ name: '', doc_type: 'RUN', doc_number: '', email: '' });
   });
 
   return (

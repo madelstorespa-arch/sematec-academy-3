@@ -6,7 +6,7 @@ import { fail, guard, ok, reqStr, type ActionResult } from '@/lib/actions';
 export type UndoItem = { tx: string; label: string; at: string } | null;
 export type UndoStatus = { undo: UndoItem; redo: UndoItem };
 
-/** Estado de la barra ↶ ↷: qué se puede deshacer o rehacer ahora (cambios propios de la última hora). */
+/** Estado de la barra ↶ ↷: qué se puede deshacer o rehacer ahora (cambios propios de las últimas 24 horas). */
 export async function getUndoStatus(): Promise<UndoStatus> {
   const ctx = await getContext();
   if (!ctx.orgId) return { undo: null, redo: null };

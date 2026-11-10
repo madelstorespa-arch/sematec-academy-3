@@ -45,7 +45,7 @@ export default async function PapeleraPage() {
       </Card>
       <p className="mt-4 text-xs text-slate-500">
         Pagos, notas, actas y certificados no pasan por la papelera: se anulan o rectifican con motivo y quedan en la Auditoría.
-        Cada usuario puede además deshacer sus propios cambios de la última hora con el botón ↶ Deshacer (Ctrl+Z).
+        Cada usuario puede además deshacer sus propios cambios de las últimas 24 horas con el botón ↶ Deshacer (Ctrl+Z).
       </p>
     </div>
   );

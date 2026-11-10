@@ -10,6 +10,7 @@ import { UndoBar } from '@/components/undo-bar';
 import { VersionWatcher } from '@/components/version-watcher';
 import { GlobalSearch } from '@/components/global-search';
 import { ConferenceHost } from '@/components/conference/host';
+import { WindowBar } from '@/components/window-bar';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,7 +71,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <ConferenceHost>
     <div className="lg:flex" style={brandStyle(site?.primary_color, site?.accent_color)}>
-      <aside className="sticky top-0 z-30 flex max-h-screen flex-col overflow-y-auto bg-ink px-4 py-3 lg:fixed lg:inset-y-0 lg:w-64 lg:py-5">
+      <aside className="app-aside sticky top-0 z-30 flex max-h-screen flex-col overflow-y-auto bg-ink px-4 py-3 lg:fixed lg:inset-y-0 lg:w-64 lg:py-5">
         <MobileMenu header={<div className="px-2"><SiteLogo site={site} light /></div>} top={ctx.orgId ? <GlobalSearch items={items} /> : undefined}>
         {ctx.orgs.length > 0 && (
           <form action={switchOrg} className="mt-5 px-1">
@@ -97,7 +98,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
         </MobileMenu>
       </aside>
-      <main className="min-w-0 flex-1 px-4 py-6 lg:ml-64 lg:px-10 lg:py-8">
+      <main className="app-main min-w-0 flex-1 px-3 pb-16 pt-4 lg:ml-64 lg:px-8 lg:pt-5">
+        <WindowBar items={items} />
         <OfflineBar userId={ctx.user.id} warmUrls={items.map((i) => i.href)} />
         <VersionWatcher />
         {ctx.orgId && <UndoBar />}

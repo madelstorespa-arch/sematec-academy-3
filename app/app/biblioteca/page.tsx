@@ -2,8 +2,9 @@ import { getContext, can, requireOrg } from '@/lib/context';
 import { PageHeader, Card, Badge, Empty } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField, TextArea } from '@/components/forms';
 import { fmtDate } from '@/lib/format';
-import { addItem, loanItem, returnLoan } from './actions';
+import { setVisibility, addItem, loanItem, returnLoan } from './actions';
 import { OwnerActions } from '@/components/owner-actions';
+import { VisibilityFields } from './visibility';
 
 export const metadata = { title: 'Biblioteca' };
 const TYPES = [['libro', 'Libro'], ['ebook', 'Libro digital'], ['revista', 'Revista'], ['tesis', 'Tesis'], ['video', 'Video'], ['enlace', 'Enlace / recurso web'], ['otro', 'Otro']];
@@ -81,6 +82,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
                   <input type="file" name="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.zip" className="text-sm" /></label>
                 <Field label="…o enlace al libro (https://, por ejemplo Google Drive)" name="url" />
                 <TextArea label="Descripción" name="description" />
+                <VisibilityFields people={(borrowers ?? []) as any[]} />
               </ActionForm>
             </div>
           </details>
@@ -122,11 +124,15 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
           <thead><tr><th>Título</th><th>Autor</th><th>Tipo</th><th>Para</th><th>Disponibles</th><th></th></tr></thead>
           <tbody>{list.map((i: any) => (
             <tr key={i.id}>
-              <td><b>{i.title}</b>{i.year ? ` (${i.year})` : ''}{i.description && <span className="block text-xs text-slate-500">{i.description}</span>}</td>
+              <td><b>{i.title}</b>{i.year ? ` (${i.year})` : ''}{staff && (i.visible_roles?.length > 0 || i.hidden_users?.length > 0) && <span className="ml-2" data-testid="restringido"><Badge color="amber">🔒 Restringido</Badge></span>}{i.description && <span className="block text-xs text-slate-500">{i.description}</span>}</td>
               <td>{i.author ?? '—'}</td><td>{TYPES.find(([v]) => v === i.item_type)?.[1]}</td><td className="text-xs">{[i.programs?.name && `Carrera: ${i.programs.name}`, i.courses?.name && `Asignatura: ${i.courses.name}`, i.sections?.code && `Curso: ${i.sections.code}`].filter(Boolean).join(' · ') || <span className="text-amber-700">⚠ Sin asociar (edítelo)</span>}</td>
               <td>{i.total_copies ? `${i.available_copies} de ${i.total_copies}` : '—'}</td>
               <td className="space-y-1 whitespace-nowrap">{i.file_id && <a className="link block" href={`/app/biblioteca/libro/${i.file_id}`} target="_blank" rel="noopener noreferrer">📘 Leer</a>}
                 {i.url && <a className="link block" href={i.url} target="_blank" rel="noopener noreferrer">Abrir ↗</a>}
+                {staff && <details className="text-left"><summary className="link cursor-pointer text-xs">👁 Quién lo ve</summary>
+                  <div className="mt-2 w-[min(90vw,32rem)] whitespace-normal rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
+                    <ActionForm action={setVisibility} submitLabel="Guardar" resetOnSuccess={false}><input type="hidden" name="id" value={i.id} />
+                      <VisibilityFields roles={i.visible_roles ?? []} hidden={i.hidden_users ?? []} people={(borrowers ?? []) as any[]} /></ActionForm></div></details>}
                 {ctx.isOwner && <OwnerActions table="library_items" id={i.id} path="/app/biblioteca" name={`«${i.title}»`} />}</td>
             </tr>))}</tbody>
         </table></div> : <Empty>{q ? 'Sin resultados.' : 'El catálogo está vacío.'}</Empty>}

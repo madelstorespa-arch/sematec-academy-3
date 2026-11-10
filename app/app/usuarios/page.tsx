@@ -3,7 +3,9 @@ import { PageHeader, Card, Empty, StatusBadge, Badge } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField } from '@/components/forms';
 import { campusOptions } from '@/lib/options';
 import { fmtDate } from '@/lib/format';
-import { grantRole, revokeRole, setAccountStatus, createRole } from './actions';
+import { DOC_TYPES } from '@/lib/identity';
+import { SelectAll } from '@/components/select-all';
+import { editMember, removeMember, bulkMembers, grantRole, revokeRole, setAccountStatus, createRole } from './actions';
 import { AccessDiagnosis } from './diagnostico';
 
 export const metadata = { title: 'Usuarios y roles' };
@@ -15,13 +17,14 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
   const orgId = requireOrg(ctx);
   const sb = ctx.supabase;
   const [{ data: members }, { data: roles }, campuses, { data: perms }] = await Promise.all([
-    sb.from('memberships').select('id, status, valid_until, created_at, campus_id, campuses(name), roles(code, name, requires_mfa), profiles!memberships_user_id_fkey(id, full_name, email, status, user_code, id_document_number)')
+    sb.from('memberships').select('id, status, valid_until, created_at, campus_id, campuses(name), roles(code, name, requires_mfa), profiles!memberships_user_id_fkey(id, full_name, email, status, user_code, id_document_number, id_document_type, phone)')
       .eq('organization_id', orgId).order('created_at', { ascending: false }),
     sb.from('roles').select('code, name, requires_mfa, organization_id').order('name'),
     campusOptions(ctx),
     sb.from('permissions').select('code, module, description').order('code'),
   ]);
   const admin = can(ctx, 'security.admin');
+  const manage = (ctx.isOwner || admin) && ctx.aal === 'aal2';
   const roleOpts = (roles ?? []).filter((r: any) => !r.organization_id || r.organization_id === orgId).map((r: any) => ({ value: r.code, label: `${r.name}${r.requires_mfa ? ' (MFA)' : ''}` }));
   const modules = [...new Set((perms ?? []).map((p: any) => p.module))];
   const q = (sp.q ?? '').trim().toLowerCase();
@@ -63,14 +66,40 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
           {(sp.q || sp.rol || sp.estado) && <a className="btn-secondary" href="/app/usuarios">Limpiar</a>}
         </form>
         <p className="mb-3 text-xs text-slate-500">🔒 Cada cuenta tiene su propia contraseña. Por seguridad las contraseñas nunca se pueden ver; si alguien la olvida, asigne una nueva desde Estudiantes, Profesores o Personal (botón 🔑 Cambiar).</p>
-        {shown.length ? <div className="overflow-x-auto"><table className="table">
-          <thead><tr><th>Usuario</th><th>Rol</th><th>Sede</th><th>Desde</th><th>Estado</th><th>Cuenta</th>{admin && <th>Acciones</th>}</tr></thead>
+        {manage && shown.length > 0 && (
+          <ActionForm action={bulkMembers} id="bulk" className="mb-3 flex flex-wrap items-end gap-2 rounded-xl bg-slate-50 p-3" submitLabel="Aplicar a los seleccionados" submitClass="btn-secondary btn-sm"
+            confirm="¿Aplicar la acción a todos los usuarios seleccionados?">
+            <span className="text-sm font-semibold">Con los seleccionados{sp.rol ? ` (rol: ${usedRoles.find(([c]) => c === sp.rol)?.[1] ?? sp.rol})` : ''}:</span>
+            <select name="bulk_action" className="input w-auto py-1 text-sm" data-testid="accion-masiva"><option value="suspend">Suspender</option><option value="activate">Reactivar</option><option value="remove">🗑 Eliminar del sistema</option></select>
+            <input name="bulk_reason" placeholder="Motivo" required className="input w-40 py-1 text-sm" />
+          </ActionForm>)}
+        {shown.length ? <div className="overflow-x-auto"><table className="table" data-testid="tabla-usuarios">
+          <thead><tr>{manage && <th><SelectAll /></th>}<th>Usuario</th><th>Rol</th><th>Sede</th><th>Desde</th><th>Estado</th><th>Cuenta</th>{admin && <th>Acciones</th>}</tr></thead>
           <tbody>{shown.map((m: any) => (
-            <tr key={m.id}><td>{m.profiles?.full_name || '—'}{m.profiles?.user_code && <span className="ml-2 rounded bg-slate-100 px-1.5 font-mono text-[11px]" data-testid="codigo-usuario">{m.profiles.user_code}</span>}<br /><span className="text-xs text-slate-500">{m.profiles?.email}{m.profiles?.id_document_number && ` · ${m.profiles.id_document_number}`}</span></td>
+            <tr key={m.id}>{manage && <td>{m.profiles?.id !== ctx.user.id && <input type="checkbox" name="sel" value={m.profiles?.id} form="bulk" className="sel-one" aria-label={`Seleccionar ${m.profiles?.full_name ?? ''}`} />}</td>}<td>{m.profiles?.full_name || '—'}{m.profiles?.user_code && <span className="ml-2 rounded bg-slate-100 px-1.5 font-mono text-[11px]" data-testid="codigo-usuario">{m.profiles.user_code}</span>}<br /><span className="text-xs text-slate-500">{m.profiles?.email}{m.profiles?.id_document_number && ` · ${m.profiles.id_document_number}`}</span></td>
               <td>{m.roles?.name} {m.roles?.requires_mfa && <Badge color="blue">MFA</Badge>}</td><td>{m.campuses?.name ?? 'Todas'}</td>
               <td>{fmtDate(m.created_at)}{m.valid_until && <><br /><span className="text-xs">hasta {fmtDate(m.valid_until)}</span></>}</td>
               <td><StatusBadge status={m.status} /></td><td><StatusBadge status={m.profiles?.status} /></td>
-              {admin && <td className="space-y-1">
+              {(admin || manage) && <td className="space-y-1">
+                {manage && m.profiles?.id && (
+                  <details data-testid="editar-usuario"><summary className="link cursor-pointer text-xs">✏ Editar</summary>
+                    <div className="mt-2 w-[min(90vw,34rem)] rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
+                      <ActionForm action={editMember} submitLabel="Guardar cambios" resetOnSuccess={false}>
+                        <input type="hidden" name="user_id" value={m.profiles.id} /><input type="hidden" name="membership_id" value={m.id} /><input type="hidden" name="old_email" value={m.profiles.email} />
+                        <Grid>
+                          <Field label="Nombre completo" name="full_name" required defaultValue={m.profiles.full_name} />
+                          <Field label="Correo de acceso" name="email" type="email" required defaultValue={m.profiles.email} />
+                          <SelectField label="Documento" name="id_document_type" defaultValue={m.profiles.id_document_type ?? 'RUN'} options={DOC_TYPES.map(([value, label]) => ({ value, label }))} />
+                          <Field label="RUT / pasaporte" name="id_document_number" defaultValue={m.profiles.id_document_number} />
+                          <Field label="Teléfono" name="phone" defaultValue={m.profiles.phone} />
+                          <SelectField label="Rol" name="role" defaultValue={m.roles?.code} options={roleOpts} />
+                          <SelectField label="Sede" name="campus_id" defaultValue={m.campus_id} options={campuses} placeholder="Todas" />
+                        </Grid>
+                      </ActionForm>
+                    </div></details>)}
+                {manage && m.profiles?.id && m.profiles.id !== ctx.user.id && (
+                  <ActionForm action={removeMember} inline submitLabel="🗑 Eliminar" submitClass="text-xs text-red-600 hover:underline" confirm={`¿Eliminar a ${m.profiles.full_name ?? m.profiles.email} del sistema? Ya no podrá entrar; su historial se conserva.`}>
+                    <input type="hidden" name="user_id" value={m.profiles.id} /><input name="reason" required placeholder="Motivo" className="input w-24 py-1 text-xs" /></ActionForm>)}
                 {m.status === 'active' && <ActionForm action={revokeRole} inline submitLabel="Revocar" submitClass="btn-secondary btn-sm" confirm="¿Revocar este rol?">
                   <input type="hidden" name="id" value={m.id} /><input name="reason" required placeholder="Motivo" className="input w-28 py-1 text-xs" /></ActionForm>}
                 {m.profiles?.id !== ctx.user.id && <ActionForm action={setAccountStatus} inline submitLabel="Aplicar" submitClass="btn-secondary btn-sm">

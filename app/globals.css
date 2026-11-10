@@ -53,3 +53,24 @@
 .sematec-room .lk-disconnect-button:hover { background-color: #b91c1c; }
 .sematec-room .lk-participant-tile { border-radius: 14px; overflow: hidden; }
 .sematec-room .lk-grid-layout { gap: .5rem; padding: .5rem; }
+
+/* ===== Ventanas: maximizar (oculta el menú) ===== */
+html[data-max="1"] .app-aside { display: none; }
+html[data-max="1"] .app-main { margin-left: 0 !important; }
+@media (min-width: 1024px) { .app-taskbar { left: 16rem; } html[data-max="1"] .app-taskbar { left: 0; } }
+
+/* ===== Accesibilidad ===== */
+html[data-fs="sm"] { font-size: 15px; }
+html[data-fs="lg"] { font-size: 18px; }
+html[data-fs="xl"] { font-size: 21px; }
+html[data-contrast="1"] { filter: contrast(1.35) saturate(1.1); }
+html[data-contrast="1"] .text-slate-400, html[data-contrast="1"] .text-slate-500 { color: #334155 !important; }
+html[data-theme="dark"] { filter: invert(0.92) hue-rotate(180deg); background: #fff; }
+html[data-theme="dark"][data-contrast="1"] { filter: invert(0.92) hue-rotate(180deg) contrast(1.35); }
+html[data-theme="dark"] img, html[data-theme="dark"] video, html[data-theme="dark"] canvas, html[data-theme="dark"] .sematec-room { filter: invert(1) hue-rotate(180deg); }
+html[data-links="1"] a { text-decoration: underline !important; }
+html[data-spacing="1"] body { letter-spacing: 0.04em; word-spacing: 0.12em; line-height: 1.75; }
+html[data-motion="reduce"] *, html[data-motion="reduce"] *::before, html[data-motion="reduce"] *::after {
+  animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important;
+}
+:focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }

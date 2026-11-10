@@ -16,7 +16,7 @@ const editable = (el: EventTarget | null) => {
 
 /**
  * Barra Deshacer / Rehacer de todo el sistema. Deshace los cambios propios de la
- * última hora (crear, editar, suspender, eliminar…). También con Ctrl+Z y Ctrl+Y
+ * últimas 24 horas (crear, editar, vender, suspender, eliminar…). También con Ctrl+Z y Ctrl+Y
  * (dentro de un campo de texto, Ctrl+Z sigue deshaciendo lo escrito).
  */
 export function UndoBar() {
