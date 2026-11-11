@@ -32,7 +32,7 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.10.2'
+          gradle-version: '8.11.1'
 
       # Firma estable sin secretos: la clave se guarda en la caché privada de Actions (no en el código),
       # así las actualizaciones se instalan encima sin desinstalar.
@@ -60,7 +60,10 @@ jobs:
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           SITE_URL: ${{ vars.SITE_URL || 'https://sematec-academy-3.vercel.app' }}
-        run: gradle assembleRelease --no-daemon --stacktrace
+        run: |
+          gradle assembleRelease --no-daemon --stacktrace
+          # Para Google Play (formato AAB), solo con la firma propia de los secretos
+          if [ -n "$KEYSTORE_FILE" ]; then gradle bundleRelease --no-daemon --stacktrace; fi
 
       - name: Preparar el archivo
         run: cp android/app/build/outputs/apk/release/app-release.apk sematec-aula.apk
@@ -69,6 +72,13 @@ jobs:
         with:
           name: sematec-aula
           path: sematec-aula.apk
+
+      # Archivo para subir a Google Play Console (Actions → esta ejecución → Artifacts)
+      - uses: actions/upload-artifact@v4
+        if: env.KEYSTORE_FILE != ''
+        with:
+          name: sematec-aula-google-play
+          path: android/app/build/outputs/bundle/release/app-release.aab
 
       - name: Publicar para descargar
         env:
