@@ -16,10 +16,11 @@ const KINDS: [string, string][] = [['institucion', 'Institución'], ['instituto'
 const kindLabel = (k: string) => KINDS.find(([v]) => v === k)?.[1] ?? k;
 const WANTS: Record<string, string> = { aula: '🎥 Aula virtual', completo: '🏛 Plataforma completa', independiente: '🗄 Independiente (base propia)' };
 
-export default async function Page({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+export default async function Page({ searchParams }: { searchParams: Promise<{ tab?: string; eliminada?: string; filas?: string; archivos?: string; cuentas?: string }> }) {
   const ctx = await getContext();
   if (!ctx.isPlatformAdmin) notFound();
-  const tab = (await searchParams).tab ?? 'organizaciones';
+  const sp = await searchParams;
+  const tab = sp.tab ?? 'organizaciones';
   const [{ data: orgsData, error }, { data: reqs }, { data: ext }, countries] = await Promise.all([
     ctx.supabase.rpc('platform_overview'),
     ctx.supabase.from('org_signup_requests').select('*').order('created_at', { ascending: false }).limit(200),
@@ -32,6 +33,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
   return (
     <>
       <PageHeader title="Plataformas y organizaciones" subtitle="Cada organización tiene su propio espacio aislado: usuarios, salas, grabaciones, marca y enlace." />
+      {sp.eliminada && <p role="status" data-testid="org-eliminada" className="mb-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">✓ «{String(sp.eliminada).slice(0, 200)}» fue eliminada: {Number(sp.filas) || 0} registros, {Number(sp.archivos) || 0} archivos{Number(sp.cuentas) ? ` y ${Number(sp.cuentas)} cuentas` : ''}.</p>}
       {error && <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Falta actualizar la base de datos: entre en ⬆ Actualizar sistema → Aplicar.</p>}
       <div className="mb-5 grid gap-3 sm:grid-cols-4">
         <Stat label="Organizaciones" value={orgs.length} />
@@ -60,7 +62,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
               <Field label="Identificador tributario" name="tax_id" />
             </Grid>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="invite" /> Invitar al propietario por correo (requiere SMTP)</label>
-            <p className="text-xs text-slate-500">La moneda y la zona horaria se toman del país. El superadministrador no ve los datos personales de la organización: solo su propietario y quienes él autorice.</p>
+            <p className="text-xs text-slate-500">Para eliminar una organización: primero «Suspender» y luego «🗑 Eliminar». La moneda y la zona horaria se toman del país. El superadministrador no ve los datos personales de la organización: solo su propietario y quienes él autorice.</p>
           </ActionForm>
         </Card>
         <Card title="Organizaciones">{orgs.length ? <div className="overflow-x-auto"><table className="table" data-testid="tabla-orgs"><thead><tr><th>Organización</th><th>Tipo</th><th>Enlace</th><th>Uso</th><th>Estado</th><th></th></tr></thead>
@@ -74,6 +76,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
               <ActionForm action={setPlatform} inline submitLabel="Cambiar tipo" submitClass="btn-secondary text-xs" resetOnSuccess={false}>
                 <input type="hidden" name="org" value={o.id} /><input type="hidden" name="platform_mode" value={o.platform_mode === 'aula' ? 'completo' : 'aula'} />
               </ActionForm>
+              {o.status !== 'active' && <a className="btn-secondary block text-center text-xs text-red-700" href={`/app/instituciones/eliminar/${o.id}`} data-testid="eliminar-org">🗑 Eliminar</a>}
               <ActionForm action={setPlatform} inline submitLabel={o.status === 'active' ? 'Suspender' : 'Reactivar'} submitClass="btn-secondary text-xs" resetOnSuccess={false}
                 confirm={o.status === 'active' ? `¿Suspender ${o.display_name}? Sus miembros no podrán entrar hasta reactivarla.` : undefined}>
                 <input type="hidden" name="org" value={o.id} /><input type="hidden" name="status" value={o.status === 'active' ? 'inactive' : 'active'} />
