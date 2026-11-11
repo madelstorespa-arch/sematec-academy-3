@@ -16,6 +16,8 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 
@@ -63,6 +65,11 @@ class ScreenShareActivity : ComponentActivity() {
             textSize = 13f; setTextColor(Color.parseColor("#B8C2DC")); gravity = Gravity.CENTER; setPadding(0, pad, 0, 0)
         })
         setContentView(box)
+        ViewCompat.setOnApplyWindowInsetsListener(box) { v, insets ->
+            val b = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+            v.setPadding(pad + b.left, pad + b.top, pad + b.right, pad + b.bottom)
+            WindowInsetsCompat.CONSUMED
+        }
         lifecycleScope.launch { ShareSession.state.collect { render(it) } }
     }
 
