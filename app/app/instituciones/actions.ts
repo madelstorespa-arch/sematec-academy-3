@@ -1,5 +1,7 @@
 'use server';
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getContext } from '@/lib/context';
 import { fail, guard, ok, reqStr, str, ValidationError, type ActionResult } from '@/lib/actions';
 import { ensureAuthUser } from '@/lib/users';
@@ -170,4 +172,71 @@ export async function deleteExternal(fd: FormData): Promise<ActionResult> {
     revalidatePath('/app/instituciones');
     return ok('Quitada del directorio (la plataforma y su base de datos siguen funcionando).');
   });
+}
+
+/** Archivos guardados (grabaciones, documentos, materiales…) de una organización, para borrarlos del almacenamiento. */
+async function storageObjects(org: string) {
+  const admin = createAdminClient();
+  const out = new Map<string, string[]>();
+  const add = (bucket: string | null | undefined, path: string | null | undefined) => {
+    if (!bucket || !path) return;
+    out.set(bucket, [...(out.get(bucket) ?? []), path]);
+  };
+  const q = async (table: string, cols: string, bucket?: string) => {
+    const { data } = await admin.from(table).select(cols).eq('organization_id', org).limit(20000);
+    for (const r of (data ?? []) as unknown as Record<string, string | null>[]) {
+      add(bucket ?? r.storage_bucket, r.storage_path ?? r.pdf_storage_path);
+    }
+  };
+  await Promise.all([
+    q('conference_recordings', 'storage_bucket, storage_path'),
+    q('document_versions', 'storage_bucket, storage_path'),
+    q('enrollment_documents', 'storage_bucket, storage_path'),
+    q('class_materials', 'storage_path', 'class-materials'),
+    q('user_files', 'storage_path', 'user-files'),
+    q('certificates', 'pdf_storage_path', 'certificates'),
+  ].map((p) => p.catch(() => undefined)));
+  return out;
+}
+
+/** 🗑 Elimina una organización completa (suspendida, confirmando su enlace). No se puede deshacer. */
+export async function deleteOrganization(fd: FormData): Promise<ActionResult> {
+  let done: { name: string; rows: number; files: number; accounts: number } | null = null;
+  const res = await guard(async () => {
+    const ctx = await adminCtx();
+    const org = reqStr(fd, 'org', 'Organización');
+    const confirm = reqStr(fd, 'confirm', 'Enlace de confirmación').trim().toLowerCase();
+    if (fd.get('entiendo') !== 'on') return fail('Marque «Entiendo que no se puede deshacer».');
+    if (org === ctx.orgId) return fail('No puede eliminar la organización con la que está trabajando ahora.');
+    const files = await storageObjects(org);
+    const { data, error } = await ctx.supabase.rpc('delete_organization', { p_org: org, p_confirm: confirm });
+    if (error) return fail(error);
+    const r = data as { rows: number; users: string[]; name: string };
+    // Archivos del almacenamiento (si alguno falla, la organización ya no existe y no queda accesible)
+    const admin = createAdminClient();
+    let removed = 0;
+    for (const [bucket, paths] of files) {
+      for (let i = 0; i < paths.length; i += 500) {
+        try { const { data: rm } = await admin.storage.from(bucket).remove(paths.slice(i, i + 500)); removed += rm?.length ?? 0; } catch { /* sigue */ }
+      }
+    }
+    // Cuentas que quedaron sin ninguna organización
+    let accounts = 0;
+    if (fd.get('borrar_cuentas') === 'on' && r.users?.length) {
+      const { data: alone } = await ctx.supabase.rpc('users_without_organization', { p_users: r.users });
+      for (const id of (alone ?? []) as string[]) {
+        const { error: pe } = await admin.from('profiles').delete().eq('id', id);
+        if (!pe) { const { error: ue } = await admin.auth.admin.deleteUser(id); if (!ue) { accounts++; continue; } }
+        // Si la persona aparece en registros de otras organizaciones, su cuenta se desactiva en vez de borrarse
+        await admin.from('profiles').update({ status: 'suspended', status_reason: 'Su organización fue eliminada' }).eq('id', id);
+        accounts++;
+      }
+    }
+    done = { name: r.name, rows: r.rows, files: removed, accounts };
+    return ok('Eliminada');
+  });
+  if (!res.ok || !done) return res;
+  revalidatePath('/app', 'layout');
+  const d = done as { name: string; rows: number; files: number; accounts: number };
+  redirect(`/app/instituciones?eliminada=${encodeURIComponent(d.name)}&filas=${d.rows}&archivos=${d.files}&cuentas=${d.accounts}`);
 }
