@@ -1,0 +1,43 @@
+{
+  "name": "sematec-aula-escritorio",
+  "version": "1.0.0",
+  "description": "SEMATEC Aula para computador (Windows, Mac y Linux)",
+  "main": "main.js",
+  "author": "SEMATEC ACADEMY",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --publish never"
+  },
+  "devDependencies": {
+    "electron": "latest",
+    "electron-builder": "latest"
+  },
+  "build": {
+    "appId": "cl.sematec.aula",
+    "productName": "SEMATEC Aula",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["main.js", "package.json"],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "artifactName": "SEMATEC-Aula-Windows.${ext}"
+    },
+    "nsis": { "oneClick": true, "perMachine": false, "createDesktopShortcut": true, "shortcutName": "SEMATEC Aula" },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["universal"] }],
+      "category": "public.app-category.education",
+      "identity": null,
+      "artifactName": "SEMATEC-Aula-Mac.${ext}",
+      "extendInfo": {
+        "NSCameraUsageDescription": "Para transmitir su video en las clases en vivo.",
+        "NSMicrophoneUsageDescription": "Para transmitir su voz en las clases en vivo."
+      }
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "category": "Education",
+      "artifactName": "SEMATEC-Aula-Linux.${ext}"
+    }
+  }
+}

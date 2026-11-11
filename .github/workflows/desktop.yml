@@ -1,0 +1,76 @@
+name: App de escritorio (Windows, Mac, Linux)
+
+# Compila la app de computador y la publica en la versión «app-escritorio» del repositorio.
+on:
+  push:
+    branches: [main]
+    paths: ['desktop/**', '.github/workflows/desktop.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Ícono desde la plataforma
+        shell: bash
+        env:
+          SITE_URL: ${{ vars.SITE_URL || 'https://sematec-academy-3.vercel.app' }}
+        run: mkdir -p desktop/build && curl -fsSL "$SITE_URL/app-icon/512" -o desktop/build/icon.png && ls -la desktop/build
+
+      - name: Compilar
+        working-directory: desktop
+        shell: bash
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          npm install --no-audit --no-fund
+          npx electron-builder --publish never
+          ls -la dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: escritorio-${{ matrix.os }}
+          path: |
+            desktop/dist/SEMATEC-Aula-Windows.exe
+            desktop/dist/SEMATEC-Aula-Mac.dmg
+            desktop/dist/SEMATEC-Aula-Linux.AppImage
+          if-no-files-found: ignore
+
+  publish:
+    needs: build
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+
+      - name: Publicar para descargar
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ls -la out
+          gh release view app-escritorio >/dev/null 2>&1 || gh release create app-escritorio --title "App de escritorio SEMATEC Aula" --notes "Windows, Mac y Linux." --latest=false
+          for f in out/SEMATEC-Aula-*; do gh release upload app-escritorio "$f" --clobber; done
+          gh release edit app-escritorio --notes "Versión ${{ github.run_number }} · $(date -u +%Y-%m-%d). SEMATEC Aula para Windows (.exe), Mac (.dmg) y Linux (.AppImage)."
