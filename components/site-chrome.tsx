@@ -50,7 +50,7 @@ export async function PublicFooter({ site }: { site: Site | null }) {
   return (
     <footer className="mt-24 bg-ink text-sky-100/80">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 md:grid-cols-2 lg:grid-cols-4 lg:px-8">
-        <div className="lg:col-span-2"><SiteLogo site={site} light /><p className="mt-4 max-w-md text-sm leading-relaxed">{site?.tagline}</p>
+        <div className="lg:col-span-2"><SiteLogo site={site} light /><p className="mt-4 max-w-md text-sm leading-relaxed" translate="yes">{site?.tagline}</p>
           {social.length > 0 && <p className="mt-5 flex flex-wrap gap-2">{social.map(([k, u]) => <a key={k} href={u} target="_blank" rel="noopener noreferrer" className="rounded-full border border-white/15 px-3 py-1 text-xs capitalize hover:bg-white/10">{k}</a>)}</p>}
         </div>
         <div className="space-y-2 text-sm">

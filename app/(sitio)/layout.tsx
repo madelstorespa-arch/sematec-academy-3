@@ -16,7 +16,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
   const lang = await getLang();
   return (
     <SiteLangProvider lang={lang}>
-      <div style={brandStyle(site?.primary_color, site?.accent_color)} className="relative min-h-screen bg-white" lang={lang}>
+      <div style={brandStyle(site?.primary_color, site?.accent_color)} className="relative min-h-screen bg-white" lang={lang} translate="no">
         <PublicHeader site={site} />
         {children}
         <PublicFooter site={site} />

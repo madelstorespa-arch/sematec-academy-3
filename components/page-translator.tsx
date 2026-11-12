@@ -40,7 +40,10 @@ export function PageTranslator({ locale }: { locale: string }) {
       const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
         acceptNode: (n) => {
           for (let p = n.parentElement; p; p = p.parentElement) {
-            if (SKIP.has(p.tagName.toUpperCase()) || p.getAttribute('translate') === 'no' || p.classList.contains('notranslate') || p.isContentEditable) return NodeFilter.FILTER_REJECT;
+            if (SKIP.has(p.tagName.toUpperCase()) || p.classList.contains('notranslate') || p.isContentEditable) return NodeFilter.FILTER_REJECT;
+            const tv = p.getAttribute('translate');
+            if (tv === 'no') return NodeFilter.FILTER_REJECT;
+            if (tv === 'yes') break;
             if (p === document.body) break;
           }
           const v = n.nodeValue ?? ''; const m = orig.current.get(n);
@@ -55,7 +58,7 @@ export function PageTranslator({ locale }: { locale: string }) {
         if (n.nodeValue === v && out !== v) { orig.current.set(n, { o: v, t: out }); n.nodeValue = out; }
       }
       for (const el of Array.from(document.body.querySelectorAll<HTMLElement>('[placeholder],[title],[aria-label]')).slice(0, 1500)) {
-        if (el.closest('[translate=no],.notranslate')) continue;
+        if (el.closest('.notranslate') || el.closest('[translate]')?.getAttribute('translate') === 'no') continue;
         const rec = origAttr.current.get(el) ?? {};
         for (const a of ATTRS) {
           const v = el.getAttribute(a); if (!v || !worth(v) || rec[a]?.t === v) continue;

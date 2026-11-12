@@ -31,7 +31,7 @@ export function CourseCard({ c, avail, t = ES }: { c: any; avail?: Avail; t?: TF
       <div className="flex flex-1 flex-col p-6">
         {cat && <p className="text-xs font-bold uppercase tracking-wider text-brand-600">{cat}</p>}
         <h3 className="mt-1 text-lg font-bold leading-snug group-hover:text-brand-700">{c.title}</h3>
-        <p className="mt-2 line-clamp-3 flex-1 text-sm text-slate-600">{c.summary}</p>
+        <p className="mt-2 line-clamp-3 flex-1 text-sm text-slate-600" translate="yes">{c.summary}</p>
         {avail && <p className={`mt-3 text-xs font-semibold ${availClass(avail)}`} data-testid="cupos">{availText(avail, t)}</p>}
         <div className="mt-4 flex items-end justify-between gap-3 border-t border-slate-100 pt-4">
           <div><PriceTag c={c} t={t} />{c.starts_on && <p className="text-xs text-slate-500">{t('card.starts', { date: fmtDate(c.starts_on) })}</p>}</div>

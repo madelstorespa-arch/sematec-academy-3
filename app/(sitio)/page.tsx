@@ -51,8 +51,8 @@ export default async function Home() {
             <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.2em] text-sky-100">
               <span className="h-2 w-2 rounded-full bg-accent" />{site.site_name}
             </p>
-            <h1 className="mt-6 text-4xl font-black leading-[1.05] md:text-6xl">{site.hero_title || site.tagline}</h1>
-            {site.hero_subtitle && <p className="mt-6 max-w-2xl text-lg text-sky-100/85 md:text-xl">{site.hero_subtitle}</p>}
+            <h1 className="mt-6 text-4xl font-black leading-[1.05] md:text-6xl" translate="yes">{site.hero_title || site.tagline}</h1>
+            {site.hero_subtitle && <p className="mt-6 max-w-2xl text-lg text-sky-100/85 md:text-xl" translate="yes">{site.hero_subtitle}</p>}
             <div className="mt-9 flex flex-wrap gap-3">
               <Link href="/cursos" className="btn bg-white px-6 py-3 text-base text-ink shadow-lg hover:bg-sky-50">{t('home.ctaCourses')}</Link>
               <Link href="/contacto" className="btn border border-white/40 px-6 py-3 text-base text-white hover:bg-white/10">{t('home.ctaContact')}</Link>
@@ -92,7 +92,7 @@ export default async function Home() {
       {site.highlights?.length > 0 && (
         <section className="mx-auto grid max-w-7xl gap-6 px-4 pt-20 md:grid-cols-3 lg:px-8">
           {site.highlights.map((h, i) => (
-            <div key={i} className="rounded-3xl border border-slate-200 p-7 transition hover:shadow-lg">
+            <div key={i} className="rounded-3xl border border-slate-200 p-7 transition hover:shadow-lg" translate="yes">
               <div className="mb-4 h-1.5 w-12 rounded-full bg-accent" />
               <h3 className="text-lg font-bold">{h.title}</h3><p className="mt-2 text-sm leading-relaxed text-slate-600">{h.text}</p>
             </div>))}
@@ -156,7 +156,7 @@ export default async function Home() {
           <div className="grid gap-8 rounded-3xl border border-slate-200 p-8 md:grid-cols-3 md:p-12">
             <h2 className="text-2xl font-black md:text-3xl">{t('home.about.title', { name: site.site_name })}</h2>
             <div className="md:col-span-2">
-              <p className="whitespace-pre-line leading-relaxed text-slate-700">{site.about_text.slice(0, 700)}{site.about_text.length > 700 ? '…' : ''}</p>
+              <p className="whitespace-pre-line leading-relaxed text-slate-700" translate="yes">{site.about_text.slice(0, 700)}{site.about_text.length > 700 ? '…' : ''}</p>
               <Link href="/nosotros" className="btn-primary mt-6">{t('home.about.more')}</Link>
             </div>
           </div>

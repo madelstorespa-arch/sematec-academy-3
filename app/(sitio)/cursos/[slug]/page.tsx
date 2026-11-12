@@ -26,7 +26,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
           <Link href="/cursos" className="text-sm font-semibold text-sky-200 hover:text-white">← {t('nav.courses')}</Link>
           <p className="mt-4 text-sm font-bold uppercase tracking-[0.2em] text-sky-200">{[t(`kind.${c.kind ?? 'curso'}`), c.category].filter(Boolean).join(' · ')}</p>
           <h1 className="mt-2 max-w-4xl text-4xl font-black leading-tight md:text-5xl">{c.title}</h1>
-          {c.summary && <p className="mt-4 max-w-3xl text-lg text-sky-100/90">{c.summary}</p>}
+          {c.summary && <p className="mt-4 max-w-3xl text-lg text-sky-100/90" translate="yes">{c.summary}</p>}
           <div className="mt-6 flex flex-wrap gap-2 text-sm">
             {c.modality && <span className="rounded-full bg-white/15 px-3 py-1">{t(`mod.${c.modality}`)}</span>}
             {c.duration_text && <span className="rounded-full bg-white/15 px-3 py-1">⏱ {c.duration_text}</span>}
@@ -40,7 +40,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
             // eslint-disable-next-line @next/next/no-img-element
             <img src={img} alt={c.title} className="mb-8 w-full rounded-3xl object-cover shadow-lg" />
           )}
-          <div className="whitespace-pre-line text-lg leading-relaxed text-slate-700">{c.description}</div>
+          <div className="whitespace-pre-line text-lg leading-relaxed text-slate-700" translate="yes">{c.description}</div>
         </article>
         <aside className="h-fit rounded-3xl border border-slate-200 bg-white p-6 shadow-xl lg:sticky lg:top-24 lg:-mt-32">
           <PriceTag c={c} size="lg" t={t} />
