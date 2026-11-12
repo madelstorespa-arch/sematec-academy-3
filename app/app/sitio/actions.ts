@@ -56,6 +56,10 @@ function offeringRow(fd: FormData) {
   const pct = num(fd, 'discount_pct');
   if (pct != null && (pct < 0 || pct >= 100)) throw new ValidationError('El descuento debe estar entre 0 y 99 %.');
   const price = pct ? Math.round(regular * (1 - pct / 100) * 100) / 100 : regular;
+  const fee = num(fd, 'enrollment_fee');
+  if (fee != null && fee < 0) throw new ValidationError('La matrícula no puede ser negativa.');
+  const inst = Math.trunc(num(fd, 'installments_count') ?? 1);
+  if (inst < 1 || inst > 36) throw new ValidationError('Las cuotas deben estar entre 1 y 36.');
   return {
     kind: str(fd, 'kind') ?? 'curso', regular_price: regular, discount_pct: pct || null, discount_ends_on: pct ? str(fd, 'discount_ends_on') : null,
     slug: reqStr(fd, 'slug', 'Dirección web (slug)').toLowerCase(), title: reqStr(fd, 'title', 'Título'), summary: str(fd, 'summary') ?? '',
@@ -64,6 +68,7 @@ function offeringRow(fd: FormData) {
     price, currency: reqStr(fd, 'currency', 'Moneda').toUpperCase(), admission_mode: reqStr(fd, 'admission_mode', 'Ingreso'),
     program_id: reqStr(fd, 'program_id', 'Programa'), period_id: reqStr(fd, 'period_id', 'Periodo'), capacity: num(fd, 'capacity'),
     is_published: fd.get('is_published') === 'on', sort_order: num(fd, 'sort_order') ?? 0,
+    enrollment_fee: fee && fee > 0 ? fee : null, installments_count: inst,
   };
 }
 

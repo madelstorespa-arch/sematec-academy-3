@@ -17,10 +17,17 @@ export const anonClient = () => createPlain(env.supabaseUrl(), env.supabaseAnonK
 /** Sitio público activo (SITE_ORG_ID permite fijar la institución si hay varias publicadas). */
 export const getPublicSite = cache(async (): Promise<Site | null> => {
   try {
+    // Varias instituciones pueden publicar su sitio: la plataforma principal es la institución más antigua
+    // (así una organización creada después nunca reemplaza el sitio principal). SITE_ORG_ID la fija a mano.
     let q = anonClient().from('site_settings').select('*').eq('is_published', true);
     if (process.env.SITE_ORG_ID) q = q.eq('organization_id', process.env.SITE_ORG_ID);
-    const { data } = await q.order('updated_at').limit(1).maybeSingle();
-    return (data as Site) ?? null;
+    const { data: rows } = await q.limit(200);
+    if (!rows?.length) return null;
+    if (rows.length === 1) return rows[0] as Site;
+    const { data: orgs } = await anonClient().rpc('public_org_created', { p_ids: rows.map((r: any) => r.organization_id) });
+    const created = new Map<string, number>((orgs as { id: string; created_at: string }[] | null ?? []).map((o) => [o.id, Date.parse(o.created_at)]));
+    const at = (r: any) => created.get(r.organization_id) ?? Number.MAX_SAFE_INTEGER;
+    return ([...rows].sort((a, b) => at(a) - at(b))[0] as Site) ?? null;
   } catch (e) {
     console.error('Sitio público no disponible:', (e as Error).message);
     return null; // configuración incompleta o base aún sin instalar

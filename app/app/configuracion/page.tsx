@@ -10,7 +10,9 @@ import { MailStatus } from '@/components/mail-status';
 import { PageHeader, Card, Empty } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField } from '@/components/forms';
 import { campusOptions, countryOptions } from '@/lib/options';
-import { updateOrganization, createCampus, createRoom, saveSetting, savePreferences } from './actions';
+import { updateOrganization, createCampus, createRoom, saveSetting, savePreferences, saveCardTheme } from './actions';
+import { CardThemePicker } from '@/components/card-theme-picker';
+import { parseCardTheme } from '@/lib/card-theme';
 
 export const metadata = { title: 'Configuración' };
 const KNOWN = [
@@ -36,6 +38,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
   const chk = (name: string, label: string, val: boolean | undefined, hint?: string) => (
     <label className="flex items-start gap-2 text-sm"><input type="hidden" name={name} value="off" /><input type="checkbox" name={name} value="on" defaultChecked={!!val} className="mt-1" />
       <span>{label}{hint && <span className="block text-xs text-slate-500">{hint}</span>}</span></label>);
+  const { data: cardSetting } = await ctx.supabase.from('organization_settings').select('value').eq('organization_id', orgId).eq('key', 'ui.cards').maybeSingle();
+  const orgCards = parseCardTheme(cardSetting?.value);
   if (t !== 'institucion') {
     const nav = t === 'personal' ? await buildNav(ctx) : [];
     return (
@@ -54,6 +58,11 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
                 <select name="density" defaultValue={pr.density ?? 'normal'} className="input"><option value="normal">Normal</option><option value="compacta">Compacta (más filas en pantalla)</option></select></label>
               {chk('notices', 'Recibir avisos por correo (boletas, anuncios importantes)', pr.notices ?? true)}
               <p className="text-xs text-slate-500">♿ Letra grande, modo oscuro y contraste: botón ♿ arriba a la derecha de cada página. 🔑 Contraseña y verificación en dos pasos: <Link className="link" href="/app/perfil">Mi cuenta</Link>.</p>
+            </ActionForm></Card>}
+          {t === 'personal' && <Card title="🎨 Colores de mis tarjetas" className="mt-6 scroll-mt-6" id="tarjetas">
+            <p className="mb-4 text-sm text-slate-600">Elija cómo se ven las tarjetas de cifras del panel. Solo cambia para usted.</p>
+            <ActionForm action={saveCardTheme} submitLabel="Guardar colores" resetOnSuccess={false}><input type="hidden" name="scope" value="personal" />
+              <CardThemePicker value={parseCardTheme((ctx.profile?.preferences as { cards?: unknown } | null)?.cards)} allowInherit inherited={orgCards ?? undefined} />
             </ActionForm></Card>}
           {t === 'docencia' && <Card title="🧑‍🏫 Mis clases virtuales">
             <ActionForm action={savePreferences} submitLabel="Guardar" resetOnSuccess={false}><input type="hidden" name="part" value="teaching" />
@@ -93,6 +102,12 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
         <p className="mt-2 text-sm text-slate-600">Descargue una copia de todos los datos de su organización (usuarios, salas, clases, asistencia, grabaciones, anuncios, archivos y más) en un archivo JSON.</p>
         <a className="btn-secondary mt-3 inline-block" href="/app/configuracion/exportar" data-testid="exportar-datos">⬇ Exportar todos los datos</a>
       </Card>}
+      <Card title="🎨 Colores de las tarjetas (toda la institución)" className="mb-6 scroll-mt-6" id="tarjetas-institucion">
+        <p className="mb-4 text-sm text-slate-600">Estilo y color por defecto de las tarjetas de cifras para todos los usuarios. Cada persona puede cambiar el suyo en «Mi configuración».</p>
+        <ActionForm action={saveCardTheme} submitLabel="Guardar para toda la institución" resetOnSuccess={false}><input type="hidden" name="scope" value="institucion" />
+          <CardThemePicker value={orgCards} />
+        </ActionForm>
+      </Card>
       <div className="grid gap-6 xl:grid-cols-2">
         {orgAdmin && (
           <Card title="Datos de la institución">

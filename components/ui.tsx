@@ -14,11 +14,11 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
   );
 }
 
-export function Card({ title, children, actions, className = '' }: { title?: string; children: ReactNode; actions?: ReactNode; className?: string }) {
+export function Card({ title, children, actions, className = '', id }: { title?: string; children: ReactNode; actions?: ReactNode; className?: string; id?: string }) {
   return (
-    <section className={`card ${className}`}>
+    <section id={id} className={`card ${className}`}>
       {title && (
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
+        <div className="card-head flex items-center justify-between border-b border-slate-100 px-5 py-3">
           <h2 className="text-sm font-bold uppercase tracking-wide text-slate-600">{title}</h2>
           {actions}
         </div>
@@ -53,10 +53,10 @@ export function Empty({ children }: { children: ReactNode }) {
 
 export function Stat({ label: l, value, href, hint }: { label: string; value: ReactNode; href?: string; hint?: string }) {
   const body = (
-    <div className="card card-pad h-full transition hover:border-brand-500">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{l}</p>
-      <p className="mt-2 text-3xl font-bold text-ink">{value}</p>
-      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+    <div className="stat-card card card-pad h-full transition hover:-translate-y-0.5 hover:border-brand-500 hover:shadow-md">
+      <p className="stat-label text-xs font-semibold uppercase tracking-wide text-slate-500">{l}</p>
+      <p className="stat-value mt-2 text-3xl font-bold text-ink">{value}</p>
+      {hint && <p className="stat-hint mt-1 text-xs text-slate-500">{hint}</p>}
     </div>
   );
   return href ? <Link href={href}>{body}</Link> : body;

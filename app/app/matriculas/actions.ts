@@ -12,17 +12,30 @@ export async function enroll(fd: FormData): Promise<ActionResult> {
     const { data: enrollmentId, error } = await ctx.supabase.rpc('enroll_student', { p_student: student, p_program: program, p_period: period });
     if (error) return fail(error);
     let extra = '';
+    // Matrícula opcional: cargo de una cuota (concepto «enrollment_fee»)
+    const fee = num(fd, 'enrollment_fee');
+    if (fee && fee > 0) {
+      if (!can(ctx, 'finance.create')) extra += ' (La matrícula no se cobró: requiere permiso de finanzas.)';
+      else {
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
+        const { error: e1 } = await ctx.supabase.rpc('create_charge', {
+          p_student: student, p_concept: 'enrollment_fee', p_gross: fee, p_currency: reqStr(fd, 'currency', 'Moneda'),
+          p_installments: 1, p_first_due: str(fd, 'first_due') ?? today, p_enrollment: enrollmentId, p_benefit: null, p_description: 'Matrícula',
+        });
+        extra += e1 ? ` Atención: la matrícula quedó registrada, pero el cobro de la matrícula NO se generó: ${e1.message}` : ' Cobro de matrícula generado.';
+      }
+    }
     // Compromiso económico opcional: genera el arancel en cuotas
     const amount = num(fd, 'amount');
     if (amount && amount > 0) {
-      if (!can(ctx, 'finance.create')) extra = ' (El arancel no se generó: requiere permiso de finanzas.)';
+      if (!can(ctx, 'finance.create')) extra += ' (El arancel no se generó: requiere permiso de finanzas.)';
       else {
         const { error: e2 } = await ctx.supabase.rpc('create_charge', {
           p_student: student, p_concept: 'tuition', p_gross: amount, p_currency: reqStr(fd, 'currency', 'Moneda'),
           p_installments: num(fd, 'installments') ?? 1, p_first_due: reqStr(fd, 'first_due', 'Primer vencimiento'),
           p_enrollment: enrollmentId, p_benefit: str(fd, 'benefit_id'), p_description: 'Arancel de matrícula',
         });
-        extra = e2 ? ` Atención: la matrícula quedó registrada, pero el arancel NO se generó: ${e2.message}` : ' Arancel y cuotas generados.';
+        extra += e2 ? ` Atención: la matrícula quedó registrada, pero el arancel NO se generó: ${e2.message}` : ' Arancel y cuotas generados.';
       }
     }
     revalidatePath('/app/matriculas');

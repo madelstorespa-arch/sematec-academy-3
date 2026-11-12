@@ -33,7 +33,8 @@ export default async function Dashboard() {
 
   return (
     <>
-      <PageHeader title={`Hola, ${ctx.profile?.full_name?.split(' ')[0] || 'bienvenido'}`} subtitle={ctx.org?.display_name ?? 'Administración de la plataforma'} />
+      <PageHeader title={`Hola, ${ctx.profile?.full_name?.split(' ')[0] || 'bienvenido'}`} subtitle={ctx.org?.display_name ?? 'Administración de la plataforma'}
+        actions={ctx.orgId ? <Link href="/app/configuracion#tarjetas" className="btn-secondary btn-sm" data-testid="atajo-colores">🎨 Colores de tarjetas</Link> : undefined} />
       {ctx.isPlatformAdmin && !ctx.org && (
         <Card title="🌎 Plataformas para otras organizaciones"><p className="text-sm">Cree aulas virtuales separadas para institutos, asociaciones u organizaciones, o apruebe las que se registran, en <Link className="link" href="/app/instituciones" data-testid="plataformas-aula">Plataformas y organizaciones</Link>.</p></Card>
       )}

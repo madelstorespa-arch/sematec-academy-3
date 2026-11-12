@@ -13,7 +13,7 @@ export const metadata = { title: 'Gastos' };
 function ExpenseFields({ d = {}, programs, sections, campuses, currency }: { d?: Record<string, any>; programs: any[]; sections: any[]; campuses: any[]; currency: string }) {
   return (
     <Grid cols={4}>
-      <Field label="Fecha" name="spent_on" type="date" required defaultValue={d.spent_on ?? new Date().toISOString().slice(0, 10)} />
+      <Field label="Fecha" name="spent_on" type="date" required defaultValue={d.spent_on ?? new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santiago' })} />
       <SelectField label="Categoría" name="category" required defaultValue={d.category ?? 'otros'} options={EXPENSE_CATEGORIES.map(([value, label]) => ({ value, label }))} />
       <Field label="Monto" name="amount" type="number" min={1} step="0.01" required defaultValue={d.amount} />
       <Field label="Moneda" name="currency" required defaultValue={d.currency ?? currency} />

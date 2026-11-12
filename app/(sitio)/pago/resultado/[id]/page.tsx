@@ -49,6 +49,12 @@ export default async function Page({ params, searchParams }: { params: Promise<{
           {o.paid_at && <div className="flex justify-between"><dt>Fecha de pago</dt><dd>{fmtDateTime(o.paid_at)}</dd></div>}
           <div className="flex justify-between"><dt>Correo</dt><dd>{o.buyer_email}</dd></div>
         </dl>
+        {o.kind === 'offering' && o.plan === 'matricula' && (
+          <p className="mt-4 rounded-xl bg-white/70 p-3 text-sm" data-testid="aviso-cuotas">
+            {paid ? 'Pagaste la matrícula. ' : 'Este pago corresponde solo a la matrícula. '}
+            El arancel del programa ({fmtMoney(o.course_amount ?? 0, o.currency)}) queda en {o.plan_installments} cuota(s) mensual(es) que pagas en línea desde <b>Mi portal → Mis pagos</b>.
+          </p>
+        )}
         {paid && newAccount && !tienda && (
           <form action="/pago/acceso" method="post" className="mt-6">
             <input type="hidden" name="order" value={o.id} /><input type="hidden" name="t" value={t} />

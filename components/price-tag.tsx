@@ -1,9 +1,13 @@
 import { fmtDate, fmtMoney } from '@/lib/format';
-import { offeringPricing } from '@/lib/pricing';
+import { offeringBreakdown, offeringPricing } from '@/lib/pricing';
+import { makeT, type TFn } from '@/lib/site-i18n-dict';
 
-/** Precio con descuento: precio normal tachado, precio final, % y total ahorrado. */
-export function PriceTag({ c, size = 'md' }: { c: any; size?: 'md' | 'lg' }) {
+const ES = makeT('es');
+
+/** Precio con descuento: precio normal tachado, precio final, % y total ahorrado; + matrícula si corresponde. */
+export function PriceTag({ c, size = 'md', t = ES }: { c: any; size?: 'md' | 'lg'; t?: TFn }) {
   const p = offeringPricing(c);
+  const b = offeringBreakdown(c);
   const big = size === 'lg' ? 'text-3xl' : 'text-2xl';
   return (
     <div>
@@ -15,7 +19,11 @@ export function PriceTag({ c, size = 'md' }: { c: any; size?: 'md' | 'lg' }) {
       <p className={`${big} font-black`}>{fmtMoney(p.current, c.currency)}</p>
       {p.discounted && (
         <p className="text-xs font-semibold text-emerald-700">
-          Ahorras {fmtMoney(p.saving, c.currency)}{p.endsOn ? ` · oferta hasta el ${fmtDate(p.endsOn)}` : ''}
+          {t('price.save', { amount: fmtMoney(p.saving, c.currency) })}{p.endsOn ? ` · ${t('price.until', { date: fmtDate(p.endsOn) })}` : ''}
+        </p>)}
+      {b.fee > 0 && (
+        <p className="mt-1 text-xs text-slate-600" data-testid="precio-matricula">
+          {t('price.plusFee', { amount: fmtMoney(b.fee, c.currency) })}{b.installments > 1 ? ` · ${t('price.inInstallments', { n: b.installments, amount: fmtMoney(b.each, c.currency) })}` : ''}
         </p>)}
     </div>
   );

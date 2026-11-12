@@ -23,6 +23,22 @@ export default async function Page() {
       <PageHeader title="Sitio web y marca" subtitle="Medios de pago en línea" />
       <SiteTabs current="pagos" />
       <p className="mb-6 max-w-3xl text-sm text-slate-600">Por seguridad, las claves de los medios de pago <b>no se guardan en la base de datos ni se escriben aquí</b>: se cargan como variables de entorno del servidor (Vercel → Settings → Environment Variables). Un medio aparece en el sitio en cuanto sus variables están cargadas.</p>
+      {(() => {
+        const active = Object.values(PROVIDERS).filter((p) => p.enabled());
+        return active.length ? (
+          <p className="mb-6 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800" data-testid="pagos-activos">✓ Cobros en línea activos con: <b>{active.map((p) => p.label).join(', ')}</b>. Las inscripciones del sitio, la matrícula y las cuotas se pagan con estos medios.</p>
+        ) : (
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900" data-testid="pagos-inactivos">
+            <p className="font-bold">Aún no hay un medio de pago activo: el sitio muestra «El pago en línea aún no está habilitado».</p>
+            <ol className="mt-2 list-decimal space-y-1 pl-5">
+              <li>Cree su cuenta de comercio en el proveedor (por ejemplo Flow o Webpay de Transbank en Chile, Mercado Pago o Stripe). El proveedor le pedirá los datos de su empresa y su cuenta bancaria.</li>
+              <li>Copie las claves de producción del panel del proveedor (indicado abajo en cada tarjeta).</li>
+              <li>En Vercel → su proyecto → Settings → Environment Variables, agregue las variables de ese proveedor y presione «Redeploy».</li>
+              <li>Vuelva a esta página: el medio aparecerá como «Activo» y en el sitio se podrá pagar matrícula, arancel y cuotas.</li>
+            </ol>
+          </div>
+        );
+      })()}
       <div className="grid gap-6 lg:grid-cols-2">
         {Object.values(PROVIDERS).map((p) => (
           <Card key={p.id} title={p.label} actions={p.enabled() ? <Badge color="green">Activo</Badge> : <Badge>No configurado</Badge>}>

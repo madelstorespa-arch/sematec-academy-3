@@ -15,3 +15,12 @@ export function offeringPricing(c: { price: number | string; regular_price?: num
 }
 
 export const KIND_LABEL: Record<string, string> = { curso: 'Curso', carrera: 'Carrera', diplomado: 'Diplomado', taller: 'Taller' };
+
+/** Matrícula + arancel de un curso (misma regla que public.offering_breakdown). */
+export function offeringBreakdown(c: { price: number | string; regular_price?: number | string | null; discount_ends_on?: string | null; enrollment_fee?: number | string | null; installments_count?: number | null }) {
+  const course = offeringPricing(c).current;
+  const fee = Math.max(0, Number(c.enrollment_fee ?? 0) || 0);
+  const n = Math.max(1, Number(c.installments_count ?? 1) || 1);
+  const each = Math.trunc(course / n);
+  return { fee, course, total: fee + course, installments: n, each: each > 0 ? each : course, last: each > 0 ? course - each * (n - 1) : course, canSplit: fee > 0 };
+}

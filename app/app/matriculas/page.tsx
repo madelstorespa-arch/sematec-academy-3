@@ -5,6 +5,8 @@ import { ActionForm, Field, Grid, SelectField } from '@/components/forms';
 import { periodOptions, programOptions, studentOptions } from '@/lib/options';
 import { fmtDate } from '@/lib/format';
 import { enroll, changeStatus } from './actions';
+import { EnrollPricing } from '@/components/enroll-pricing';
+import { offeringPricing } from '@/lib/pricing';
 
 export const metadata = { title: 'Matrículas' };
 
@@ -17,6 +19,11 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
     ctx.supabase.from('organizations').select('base_currency').eq('id', orgId).single(),
     ctx.supabase.from('benefits').select('id, name').eq('organization_id', orgId).eq('status', 'active'),
   ]);
+  const { data: catalog } = await ctx.supabase.from('catalog_offerings')
+    .select('id, title, program_id, period_id, price, regular_price, discount_ends_on, enrollment_fee, installments_count, currency')
+    .eq('organization_id', orgId).order('sort_order').order('title');
+  const offers = (catalog ?? []).map((o: any) => ({ id: o.id, title: o.title, program_id: o.program_id, period_id: o.period_id,
+    price: offeringPricing(o).current, fee: Number(o.enrollment_fee ?? 0), installments: o.installments_count ?? 1, currency: o.currency }));
   const periodo = (await searchParams).periodo ?? periods[0]?.value;
   const { data: rows } = periodo ? await ctx.supabase.from('enrollments')
     .select('id, status, enrolled_at, students(id, first_names, last_names, student_code), programs(code, name), campuses(name)')
@@ -33,18 +40,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
               <SelectField label="Programa" name="program_id" required options={programs} />
               <SelectField label="Periodo" name="period_id" required options={periods} defaultValue={periodo} />
             </Grid>
-            {can(ctx, 'finance.create') && (
-              <fieldset className="rounded-lg border border-slate-200 p-4">
-                <legend className="px-1 text-xs font-bold uppercase text-slate-500">Arancel (opcional)</legend>
-                <Grid cols={4}>
-                  <Field label="Monto total" name="amount" type="number" min={0} step="0.01" />
-                  <Field label="Moneda" name="currency" defaultValue={org?.base_currency ?? 'CLP'} />
-                  <Field label="N° de cuotas" name="installments" type="number" min={1} max={36} defaultValue={10} />
-                  <Field label="Primer vencimiento" name="first_due" type="date" />
-                  <SelectField label="Beca / descuento" name="benefit_id" options={(benefits ?? []).map((b: any) => ({ value: b.id, label: b.name }))} placeholder="Ninguno" />
-                </Grid>
-              </fieldset>
-            )}
+            {can(ctx, 'finance.create') && <EnrollPricing offers={offers} currency={org?.base_currency ?? 'CLP'} benefits={(benefits ?? []) as { id: string; name: string }[]} />}
           </ActionForm>
         </Card>
       )}

@@ -35,11 +35,11 @@ sql("delete from user_files where name in ('foto.png','clase2.webm')")
 sql("delete from system_events where event_type in ('rate:pwreset_ip','rate:pwreset_email','rate:upload')")
 sql("delete from students where student_code = 'EST-RUT'"); sql("delete from applications where applicant_email = 'pasaporte@demo.sematec.test'")
 sql("update auth.users set encrypted_password = extensions.crypt('Sematec-Demo-2026', extensions.gen_salt('bf')) where email like '%demo.sematec.test'")
+sql(f"insert into section_enrollments (organization_id, section_id, student_id, enrollment_id) select '{ORG}', '{SEC}', e.student_id, e.id from enrollments e join students s on s.id = e.student_id where s.organization_id = '{ORG}' and s.user_id is not null on conflict do nothing")
 try:
     aid = sql(f"insert into assessments (organization_id, section_id, name, weight_pct, published) values ('{ORG}', '{SEC}', 'Control notas E2E', 5, true) returning id").splitlines()[0]
     sql(f"insert into grades (organization_id, assessment_id, student_id, grade) select '{ORG}', '{aid}', s.id, 5.5 from students s join auth.users u on u.id = s.user_id where u.email = 'estudiante1.a@demo.sematec.test' on conflict do nothing")
 except Exception: pass  # ya existe o la sección no admite más ponderación
-sql(f"insert into section_enrollments (organization_id, section_id, student_id, enrollment_id) select '{ORG}', '{SEC}', e.student_id, e.id from enrollments e join students s on s.id = e.student_id where s.organization_id = '{ORG}' and s.user_id is not null on conflict do nothing")
 
 with sync_playwright() as pw:
     b = pw.chromium.launch(executable_path=CHROME, headless=True, args=['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream',

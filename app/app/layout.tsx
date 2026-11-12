@@ -17,6 +17,7 @@ import { VersionWatcher } from '@/components/version-watcher';
 import { GlobalSearch } from '@/components/global-search';
 import { ConferenceHost } from '@/components/conference/host';
 import { WindowBar } from '@/components/window-bar';
+import { cardThemeAttrs, resolveCardTheme } from '@/lib/card-theme';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,16 +28,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const items = await buildNav(ctx);
   const locale = prefsOf(ctx.profile).locale ?? 'es';
-  const { data: site } = ctx.orgId
-    ? await ctx.supabase.from('site_settings').select('site_name, tagline, logo_asset_id, primary_color, accent_color').eq('organization_id', ctx.orgId).maybeSingle()
-    : { data: null };
+  const [{ data: site }, { data: cardSetting }] = ctx.orgId
+    ? await Promise.all([
+      ctx.supabase.from('site_settings').select('site_name, tagline, logo_asset_id, primary_color, accent_color').eq('organization_id', ctx.orgId).maybeSingle(),
+      ctx.supabase.from('organization_settings').select('value').eq('organization_id', ctx.orgId).eq('key', 'ui.cards').maybeSingle(),
+    ])
+    : [{ data: null }, { data: null }];
+  const cards = cardThemeAttrs(resolveCardTheme((ctx.profile?.preferences as { cards?: unknown } | null)?.cards, cardSetting?.value));
   const path = (await headers()).get('x-sematec-path') ?? '';
   const blocked = ctx.orgMode === 'aula' && aulaExcluded(path);
   const avatar = ctx.profile?.avatar_asset_id ? `/media/${ctx.profile.avatar_asset_id}` : null;
 
   return (
     <ConferenceHost>
-    <div className="lg:flex" style={brandStyle(site?.primary_color, site?.accent_color)}>
+    <div className="lg:flex" data-cards={cards['data-cards']} data-card-panels={cards['data-card-panels']} style={{ ...brandStyle(site?.primary_color, site?.accent_color), ...cards.style } as React.CSSProperties}>
       <aside className="app-aside sticky top-0 z-30 flex max-h-screen flex-col overflow-y-auto bg-ink px-4 py-3 lg:fixed lg:inset-y-0 lg:w-64 lg:py-5">
         <MobileMenu header={<div className="px-2"><SiteLogo site={site} light /></div>} top={ctx.orgId ? <GlobalSearch items={items} /> : undefined}>
         {ctx.orgs.length > 0 && (

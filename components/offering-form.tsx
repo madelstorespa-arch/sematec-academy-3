@@ -16,6 +16,8 @@ export function OfferingFields({ d = {}, programs, periods, currency }: { d?: Re
         <Field label="Descuento % (opcional)" name="discount_pct" type="number" step="0.01" min={0} max={99} defaultValue={d.discount_pct} placeholder="Ej.: 20" />
         <Field label="Descuento válido hasta (opcional)" name="discount_ends_on" type="date" defaultValue={d.discount_ends_on} />
         <Field label="Moneda" name="currency" required defaultValue={d.currency ?? currency} />
+        <Field label="Matrícula (opcional)" name="enrollment_fee" type="number" step="0.01" min={0} defaultValue={d.enrollment_fee ?? ''} placeholder="Ej.: 50000" />
+        <Field label="Cuotas del arancel (si paga solo la matrícula)" name="installments_count" type="number" min={1} max={36} defaultValue={d.installments_count ?? 1} />
         <Field label="Cupos (vacío = sin límite)" name="capacity" type="number" min={1} defaultValue={d.capacity} />
         <Field label="Duración" name="duration_text" defaultValue={d.duration_text} placeholder="8 semanas · 32 horas" />
         <Field label="Horario" name="schedule_text" defaultValue={d.schedule_text} placeholder="Martes y jueves 19:00" />
@@ -24,7 +26,8 @@ export function OfferingFields({ d = {}, programs, periods, currency }: { d?: Re
         <SelectField label="Periodo" name="period_id" required options={periods} defaultValue={d.period_id} />
         <Field label="Orden en el catálogo" name="sort_order" type="number" defaultValue={d.sort_order ?? 0} />
       </Grid>
-      <p className="text-xs text-slate-500">El precio con descuento y el total ahorrado se calculan solos y se muestran en el sitio. Al vencer la fecha del descuento se cobra el precio normal.</p>
+      <p className="text-xs text-slate-500">El precio con descuento y el total ahorrado se calculan solos y se muestran en el sitio. Al vencer la fecha del descuento se cobra el precio normal.
+        Si indica una <b>matrícula</b>, quien se inscribe en el sitio puede pagar todo (matrícula + arancel) o solo la matrícula y el arancel en las cuotas indicadas, que luego paga en línea desde su portal.</p>
       <TextArea label="Resumen (tarjeta del catálogo)" name="summary" defaultValue={d.summary} rows={2} />
       <TextArea label="Descripción completa" name="description" defaultValue={d.description} rows={6} />
       <label className="flex items-center gap-2 font-semibold"><input type="checkbox" name="is_published" defaultChecked={!!d.is_published} /> Publicado en el sitio web</label>

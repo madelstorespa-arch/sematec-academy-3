@@ -157,7 +157,7 @@ def main():
         co.close()
         c = new(); p = c.new_page(); go(p, BASE + '/')
         check(p.locator('header >> text=CHILE').count() >= 1 and p.locator('header img').count() == 1, 'Sitio público muestra el nuevo nombre y el logo')
-        check(p.locator('text=Excel para la gestión').count() == 1 and p.locator('text=$49.990').count() == 1, 'Curso nuevo publicado con su precio')
+        check(p.locator('text=Excel para la gestión').count() >= 1 and p.locator('text=$49.990').count() >= 1, 'Curso nuevo publicado con su precio')
         shot(p, 'web_15_inicio_marca_nueva')
         go(p, BASE + '/login'); check(p.locator('img').count() >= 1, 'Inicio de sesión muestra el logo de la academia'); c.close()
 

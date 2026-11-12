@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { getContext } from '@/lib/context';
 import { isLocale } from '@/lib/i18n';
 import { fail, guard, num, ok, reqStr, str, ValidationError, type ActionResult } from '@/lib/actions';
+import { readCardForm } from '@/lib/card-theme';
 
 const done = (m: string) => { revalidatePath('/app', 'layout'); return ok(m); };
 /** La configuración de todo el sistema (institución, sedes, salas, reglas) solo la cambia el propietario. */
@@ -88,5 +89,31 @@ export async function savePreferences(fd: FormData): Promise<ActionResult> {
     if (error) return fail(error);
     revalidatePath('/app', 'layout');
     return ok('Su configuración quedó guardada (solo le afecta a usted).');
+  });
+}
+
+// ---------- 🎨 Colores de las tarjetas ----------
+export async function saveCardTheme(fd: FormData): Promise<ActionResult> {
+  return guard(async () => {
+    const scope = String(fd.get('scope') ?? 'personal');
+    if (scope === 'institucion') {
+      const ctx = await ownerCtx();
+      let theme;
+      try { theme = readCardForm(fd); } catch { throw new ValidationError('Elija un estilo y un color válidos.'); }
+      const { data: existing } = await ctx.supabase.from('organization_settings').select('id').eq('organization_id', ctx.orgId!).eq('key', 'ui.cards').maybeSingle();
+      const { error } = existing
+        ? await ctx.supabase.from('organization_settings').update({ value: theme, updated_by: ctx.user.id }).eq('id', existing.id)
+        : await ctx.supabase.from('organization_settings').insert({ organization_id: ctx.orgId, key: 'ui.cards', value: theme, description: 'Colores de las tarjetas del panel', updated_by: ctx.user.id });
+      return error ? fail(error) : done('Colores de las tarjetas guardados para toda la institución.');
+    }
+    const ctx = await getContext();
+    let cards: unknown = null;
+    if (!fd.getAll('card_inherit').includes('on')) {
+      try { cards = readCardForm(fd); } catch { throw new ValidationError('Elija un estilo y un color válidos.'); }
+    }
+    const { error } = await ctx.supabase.rpc('update_my_preferences', { p_patch: { cards } });
+    if (error) return fail(error);
+    revalidatePath('/app', 'layout');
+    return ok(cards ? 'Sus colores de tarjetas quedaron guardados (solo le afectan a usted).' : 'Ahora usa los colores de la institución.');
   });
 }
