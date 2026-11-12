@@ -8,6 +8,9 @@ export type ModField = { key: string; label: string; type: FieldType; required?:
 export type CustomModule = {
   id: string; slug: string; name: string; icon: string; description: string | null; code_prefix: string;
   fields: ModField[]; view_roles: string[]; edit_roles: string[]; show_in_menu: boolean; active: boolean;
+  area?: string | null; catalog_key?: string | null;
+  workflow?: { key: string; label: string; color: string; final?: boolean }[];
+  features?: { self_service?: boolean; assignee?: boolean; due?: boolean; files?: boolean; notify?: boolean; amount?: string; date?: string; public_view?: boolean };
 };
 
 export const slugify = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);

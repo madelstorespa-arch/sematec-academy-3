@@ -8,7 +8,7 @@ import { restoreChange } from '../deshacer-actions';
 import { unhideRecord } from '../hide-actions';
 import { AUDIENCES } from '@/lib/hideable';
 
-const TABLE_LABEL: Record<string, string> = { announcements: 'Anuncio', calendar_events: 'Evento', library_items: 'Biblioteca', job_postings: 'Empleo', surveys: 'Encuesta', catalog_offerings: 'Curso del sitio', offices: 'Oficina', resources: 'Recurso', course_contents: 'Contenido del aula', course_units: 'Unidad del aula', class_materials: 'Material', forum_threads: 'Foro', user_files: 'Archivo', conference_sessions: 'Aula virtual', products: 'Producto', media_assets: 'Imagen', quizzes: 'Evaluación', assignments: 'Tarea', benefits: 'Beneficio' };
+const TABLE_LABEL: Record<string, string> = { announcements: 'Anuncio', calendar_events: 'Evento', library_items: 'Biblioteca', job_postings: 'Empleo', surveys: 'Encuesta', catalog_offerings: 'Curso del sitio', offices: 'Oficina', resources: 'Recurso', course_contents: 'Contenido del aula', course_units: 'Unidad del aula', class_materials: 'Material', forum_threads: 'Foro', user_files: 'Archivo', conference_sessions: 'Aula virtual', products: 'Producto', media_assets: 'Imagen', quizzes: 'Evaluación', assignments: 'Tarea', benefits: 'Beneficio', custom_records: 'Registro de un sistema' };
 const AUD = Object.fromEntries(AUDIENCES);
 
 export const dynamic = 'force-dynamic';

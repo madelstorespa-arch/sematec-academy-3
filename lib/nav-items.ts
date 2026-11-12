@@ -12,6 +12,7 @@ export type MenuCustom = { hidden?: string[]; labels?: Record<string, string> };
 /** Menú completo según los permisos de la persona (sin personalizar). */
 export function baseNav(ctx: Ctx): NavItem[] {
   const items: NavItem[] = [{ href: '/app', label: 'Inicio', icon: '⌂' }, { href: '/app/mapa', label: 'Mapa de la plataforma', icon: '🗺' }];
+  if (ctx.orgId) items.push({ href: '/app/sistemas', label: 'Sistemas', icon: '🧩' });
   if (ctx.studentId) items.push({ href: '/app/mi', label: 'Mi portal', icon: '🎓' });
   if (ctx.isGuardian) items.push({ href: '/app/apoderado', label: 'Mis pupilos', icon: '👪' });
   if (ctx.studentId) items.push({ href: '/app/credencial', label: 'Mi credencial', icon: '🪪' });
