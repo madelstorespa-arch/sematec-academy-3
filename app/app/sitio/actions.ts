@@ -50,6 +50,11 @@ export async function uploadSiteImage(fd: FormData): Promise<ActionResult> {
   });
 }
 
+/** Si la base aún no tiene la actualización «Matricula web», guarda el curso sin matrícula y avisa. */
+const missingFeeCols = (e: { message?: string } | null) => !!e && /enrollment_fee|installments_count/.test(e.message ?? '');
+const withoutFee = (r: Record<string, unknown>) => { const { enrollment_fee, installments_count, ...rest } = r; void enrollment_fee; void installments_count; return rest; };
+const FEE_NOTE = ' Para cobrar matrícula, instale primero la actualización pendiente en «⬆ Actualizar sistema».';
+
 function offeringRow(fd: FormData) {
   const regular = num(fd, 'regular_price') ?? num(fd, 'price');
   if (!regular || regular <= 0) throw new ValidationError('Escriba el precio normal.');
@@ -75,21 +80,27 @@ function offeringRow(fd: FormData) {
 export async function createOffering(fd: FormData): Promise<ActionResult> {
   return guard(async () => {
     const ctx = await getContext();
-    const { error } = await ctx.supabase.from('catalog_offerings').insert({ organization_id: ctx.orgId, ...offeringRow(fd) });
+    const row = offeringRow(fd);
+    let { error } = await ctx.supabase.from('catalog_offerings').insert({ organization_id: ctx.orgId, ...row });
+    const old = missingFeeCols(error);
+    if (old) ({ error } = await ctx.supabase.from('catalog_offerings').insert({ organization_id: ctx.orgId, ...withoutFee(row) }));
     if (error) return fail(error);
     refresh();
-    return ok('Curso creado.');
+    return ok('Curso creado.' + (old && row.enrollment_fee ? FEE_NOTE : ''));
   });
 }
 
 export async function updateOffering(fd: FormData): Promise<ActionResult> {
   return guard(async () => {
     const ctx = await getContext();
-    const { error, count } = await ctx.supabase.from('catalog_offerings').update(offeringRow(fd), { count: 'exact' }).eq('id', reqStr(fd, 'id', 'id'));
+    const row = offeringRow(fd); const id = reqStr(fd, 'id', 'id');
+    let { error, count } = await ctx.supabase.from('catalog_offerings').update(row, { count: 'exact' }).eq('id', id);
+    const old = missingFeeCols(error);
+    if (old) ({ error, count } = await ctx.supabase.from('catalog_offerings').update(withoutFee(row), { count: 'exact' }).eq('id', id));
     if (error) return fail(error);
     if (!count) return fail('No tiene permisos.');
     refresh();
-    return ok('Curso actualizado.');
+    return ok('Curso actualizado.' + (old && row.enrollment_fee ? FEE_NOTE : ''));
   });
 }
 

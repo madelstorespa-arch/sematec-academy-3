@@ -62,7 +62,9 @@ export async function startCheckout(fd: FormData): Promise<ActionResult> {
   const { data, error } = await anonClient().rpc('create_checkout_order', {
     p_offering: v(fd, 'offering_id'), p_provider: provider, p_name: v(fd, 'name'), p_email: v(fd, 'email'), p_phone: v(fd, 'phone'),
     p_doc_country: doc.country, p_doc_type: doc.type, p_doc_number: doc.number,
-    p_tracking_code: v(fd, 'tracking_code') || null, p_plan: v(fd, 'plan') === 'matricula' ? 'matricula' : 'total',
+    p_tracking_code: v(fd, 'tracking_code') || null,
+    // «solo matrícula» requiere la actualización de base de datos «Matricula web»; el pago total funciona igual sin ella
+    ...(v(fd, 'plan') === 'matricula' ? { p_plan: 'matricula' } : {}),
   });
   if (error) return { ok: false, error: explain(error) };
   const o = data as { order_id: string; order_number: number; amount: number; currency: string; title: string };
