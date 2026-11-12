@@ -56,7 +56,7 @@ with sync_playwright() as pw:
     est = o.locator('[data-testid=estado-correo]').inner_text()
     check('Servidor' in est and 'SMTP_PASS' in est and '••••' not in est or 'configurada' in est, '📧 El propietario ve el estado del correo (sin mostrar la clave)')
     check('localhost' not in est.split('Enlaces de los correos')[-1] or 'localhost:3000' in BASE, '📧 Muestra a qué dirección apuntan los enlaces')
-    o.click('button:has-text("Enviarme un correo de prueba")'); msg = status_msg(o)
+    o.click('button:has-text("Enviar correo de prueba")'); msg = status_msg(o)
     check('enviado' in msg or 'No se pudo' in msg or 'servidor' in msg, f'📧 Botón de correo de prueba con resultado claro ({msg[:90]})')
     # Página inexistente y error controlado
     r = o.goto(f'{BASE}/app/m/no-existe-este-modulo'); o.wait_for_load_state('networkidle')

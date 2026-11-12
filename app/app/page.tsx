@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getContext, can } from '@/lib/context';
 import { PageHeader, Stat, Card, Empty } from '@/components/ui';
 import { fmtDateTime, fmtMoney } from '@/lib/format';
+import { mailEnabled } from '@/lib/mailer';
 
 export default async function Dashboard() {
   const ctx = await getContext();
@@ -33,6 +34,12 @@ export default async function Dashboard() {
 
   return (
     <>
+      {(ctx.isOwner || ctx.isPlatformAdmin) && !mailEnabled() && (
+        <div className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" data-testid="aviso-correo">
+          <span className="text-2xl" aria-hidden>📧</span>
+          <span className="min-w-0 flex-1"><b>Los correos todavía no salen de la plataforma.</b> Recuperar contraseña, avisos de inscripción y copias por correo necesitan el correo configurado (Gmail con contraseña de aplicación).</span>
+          <Link href="/app/configuracion?t=institucion#correo" className="btn-primary btn-sm">Configurar y probar el correo</Link>
+        </div>)}
       <section className="relative mb-7 overflow-hidden rounded-3xl bg-gradient-to-br from-ink via-brand-700 to-brand-600 p-6 text-white shadow-xl md:p-8" data-testid="portada-panel">
         <div className="absolute -right-16 -top-20 h-64 w-64 rounded-full bg-accent/30 blur-3xl" aria-hidden />
         <div className="relative flex flex-wrap items-end justify-between gap-4">
@@ -41,6 +48,7 @@ export default async function Dashboard() {
             <h1 className="mt-1 text-3xl font-black tracking-tight md:text-4xl">{`Hola, ${ctx.profile?.full_name?.split(' ')[0] || 'bienvenido'}`}</h1>
             <p className="mt-1 text-sky-100/85">{ctx.org?.display_name ?? 'Administración de la plataforma'}</p>
           </div>
+          <Link href="/app/mapa" className="rounded-xl bg-white/15 px-3 py-2 text-sm font-semibold backdrop-blur hover:bg-white/25" data-testid="atajo-mapa">🗺 Mapa de la plataforma</Link>
           {ctx.orgId && <Link href="/app/configuracion#tarjetas" className="rounded-xl bg-white/15 px-3 py-2 text-sm font-semibold backdrop-blur hover:bg-white/25" data-testid="atajo-colores">🎨 Colores de tarjetas</Link>}
         </div>
         {ctx.orgId && (

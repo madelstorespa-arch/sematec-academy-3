@@ -1,7 +1,7 @@
 import { getContext, can, requireOrg } from '@/lib/context';
 import { OwnerActions } from '@/components/owner-actions';
 import { PageHeader, Card, Badge, Empty } from '@/components/ui';
-import { ActionForm, Field, Grid, SelectField, TextArea } from '@/components/forms';
+import { ActionForm, Field, Grid, SelectField, TextArea, EmailCopy } from '@/components/forms';
 import { fmtDateTime } from '@/lib/format';
 import { createAnnouncement, deleteAnnouncement } from './actions';
 
@@ -38,7 +38,7 @@ export default async function Page() {
                 <Field label="Visible hasta (opcional)" name="expires_at" type="date" />
               </Grid>
               {admin && <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="pinned" /> Fijar arriba</label>}
-            </ActionForm>
+            <EmailCopy /></ActionForm>
           </div>
         </details>
       )}

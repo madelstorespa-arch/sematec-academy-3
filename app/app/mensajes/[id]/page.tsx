@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getContext } from '@/lib/context';
 import { PageHeader, Card } from '@/components/ui';
-import { ActionForm, TextArea } from '@/components/forms';
+import { ActionForm, TextArea, EmailCopy } from '@/components/forms';
 import { fmtDateTime } from '@/lib/format';
 import { sendMessage } from '../actions';
 
@@ -26,7 +26,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <input type="hidden" name="parent_id" value={m.id} />
           <input type="hidden" name="subject" value={m.subject.startsWith('Re: ') ? m.subject : `Re: ${m.subject}`} />
           <TextArea label="Mensaje" name="body" required rows={4} />
-        </ActionForm>
+        <EmailCopy /></ActionForm>
       </Card>
     </>
   );

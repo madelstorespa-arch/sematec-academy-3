@@ -9,7 +9,9 @@ import { startRegistration } from '../actions';
 
 export const metadata = { title: 'Inscripción' };
 
-type Cfg = { enabled: boolean; fee: number; currency: string; title: string; intro: string; ask_birth: boolean; ask_address: boolean; ask_education: boolean; ask_guardian: boolean };
+type Cfg = { enabled: boolean; fee: number; currency: string; title: string; intro: string; ask_birth: boolean; ask_address: boolean; ask_education: boolean; ask_guardian: boolean;
+  ask_program: boolean; shifts: string[]; modalities: string[]; pay_online: boolean; pay_transfer: boolean; pay_office: boolean; bank_info: string; office_info: string;
+  programs: { id: string; name: string; group: string }[] };
 
 export default async function Page() {
   const site = await getPublicSite();
@@ -40,8 +42,28 @@ export default async function Page() {
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 lg:grid-cols-3 lg:px-8">
         <div className="lg:col-span-2">
           {!c?.enabled ? <p className="rounded-xl bg-amber-50 p-5 text-amber-900" data-testid="inscripcion-cerrada">{t('reg.disabled')} <Link className="link" href="/contacto">{t('nav.contact')}</Link></p> : (
-            <CheckoutForm action={startRegistration} offeringId="" providers={fee > 0 ? availableProviders(c.currency) : []} countries={countries ?? []}
-              free={fee <= 0} submitLabel={fee > 0 ? t('reg.pay', { amount: money }) : t('reg.send')}>
+            <CheckoutForm action={startRegistration} offeringId="" providers={fee > 0 && c.pay_online ? availableProviders(c.currency) : []} countries={countries ?? []}
+              free={fee <= 0} submitLabel={fee > 0 ? t('reg.pay', { amount: money }) : t('reg.send')} amountLabel={fee > 0 ? money : undefined}
+              offline={fee > 0 ? [...(c.pay_transfer ? [{ id: 'transfer' as const, info: c.bank_info }] : []), ...(c.pay_office ? [{ id: 'office' as const, info: c.office_info }] : [])] : []}>
+              <fieldset className="space-y-4 rounded-2xl border border-slate-200 p-5" data-testid="eleccion-estudios">
+                <legend className="px-1 text-sm font-bold">{t('reg.choice')}</legend>
+                {c.ask_program !== false && (
+                  <label className="block"><span className="label">{t('reg.program')} *</span>
+                    <select className="input" name="program_id" required defaultValue="" data-testid="elegir-programa">
+                      <option value="" disabled>{t('reg.programPick')}</option>
+                      {[...new Set(c.programs.map((p) => p.group))].map((g) => (
+                        <optgroup key={g} label={g}>{c.programs.filter((p) => p.group === g).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>))}
+                      <option value="otro">{t('reg.programOther')}</option>
+                    </select></label>)}
+                <div className="grid gap-4 md:grid-cols-2">
+                  <fieldset><legend className="label">{t('reg.shift')} *</legend>
+                    <div className="flex flex-wrap gap-2">{c.shifts.map((x, i) => (
+                      <label key={x} className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
+                        <input type="radio" name="shift" value={x} required defaultChecked={i === 0} data-testid={`jornada-${i}`} />{/noche/i.test(x) ? '🌙' : /d[ií]a|ma[ñn]ana/i.test(x) ? '☀️' : '🕑'} {x}</label>))}</div></fieldset>
+                  <label className="block"><span className="label">{t('reg.modality')} *</span>
+                    <select className="input" name="modality" required defaultValue={c.modalities[0]} data-testid="elegir-modalidad">{c.modalities.map((x) => <option key={x}>{x}</option>)}</select></label>
+                </div>
+              </fieldset>
               {(c.ask_birth || c.ask_address || c.ask_education || c.ask_guardian) && (
                 <fieldset className="space-y-4 rounded-2xl border border-slate-200 p-5" data-testid="datos-inscripcion">
                   <legend className="px-1 text-sm font-bold">{t('reg.more')}</legend>

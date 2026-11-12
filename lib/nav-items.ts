@@ -6,12 +6,12 @@ import { prefsOf } from '@/lib/prefs';
 import { aulaExcluded } from '@/lib/platform-mode';
 
 /** Opciones que nunca se pueden ocultar (para no quedar sin acceso). */
-export const LOCKED = new Set(['/app', '/app/perfil', '/app/modulos']);
+export const LOCKED = new Set(['/app', '/app/perfil', '/app/modulos', '/app/mapa']);
 export type MenuCustom = { hidden?: string[]; labels?: Record<string, string> };
 
 /** Menú completo según los permisos de la persona (sin personalizar). */
 export function baseNav(ctx: Ctx): NavItem[] {
-  const items: NavItem[] = [{ href: '/app', label: 'Inicio', icon: '⌂' }];
+  const items: NavItem[] = [{ href: '/app', label: 'Inicio', icon: '⌂' }, { href: '/app/mapa', label: 'Mapa de la plataforma', icon: '🗺' }];
   if (ctx.studentId) items.push({ href: '/app/mi', label: 'Mi portal', icon: '🎓' });
   if (ctx.isGuardian) items.push({ href: '/app/apoderado', label: 'Mis pupilos', icon: '👪' });
   if (ctx.studentId) items.push({ href: '/app/credencial', label: 'Mi credencial', icon: '🪪' });

@@ -50,7 +50,7 @@ def main():
         check(p.locator('[data-testid=cta-inscripcion]').count() == 1 and p.locator('header a[href="/inscripcion"]').count() >= 1, 'El sitio muestra «Inscríbete ahora» y el enlace Inscripción en el menú')
         go(p, f'{BASE}/inscripcion')
         check('15.000' in p.locator('[data-testid=monto-inscripcion]').inner_text(), 'Formulario de inscripción con el monto a pagar')
-        p.fill('input[name=name]', 'Rosa Inscrita Web'); p.fill('input[name=email]', 'rosa.web@demo.sematec.test'); p.fill('input[name=doc_number]', '18.181.818-2')
+        p.select_option('[data-testid=elegir-programa]', index=1); p.fill('input[name=name]', 'Rosa Inscrita Web'); p.fill('input[name=email]', 'rosa.web@demo.sematec.test'); p.fill('input[name=doc_number]', '18.181.818-2')
         p.fill('input[name=birth_date]', '2001-05-04'); p.fill('input[name=address]', 'Av. Siempre Viva 123'); p.fill('input[name=city]', 'Santiago'); p.fill('input[name=education]', 'Enseñanza media')
         p.check('input[name=provider][value=webpay]'); p.check('input[name=consent]'); shot(p, 'grande_01_inscripcion')
         p.click('button:has-text("Pagar")')
@@ -68,7 +68,7 @@ def main():
         # sin costo
         go(o, f'{BASE}/app/inscripciones'); o.fill('input[name=fee]', '0'); o.click('button:has-text("Guardar")'); status_msg(o)
         c = new(); p = c.new_page(); go(p, f'{BASE}/inscripcion')
-        p.fill('input[name=name]', 'Tomás Gratis'); p.fill('input[name=email]', 'tomas.gratis@demo.sematec.test'); p.fill('input[name=doc_number]', '19.191.919-K')
+        p.select_option('[data-testid=elegir-programa]', index=1); p.fill('input[name=name]', 'Tomás Gratis'); p.fill('input[name=email]', 'tomas.gratis@demo.sematec.test'); p.fill('input[name=doc_number]', '19.191.919-K')
         p.check('input[name=consent]'); p.click('button:has-text("Enviar inscripción")')
         p.wait_for_selector('[data-testid=inscripcion-recibida]', timeout=20000)
         check(sql("select source||'|'||amount::int from registrations r join students s on s.id=r.student_id where s.email='tomas.gratis@demo.sematec.test'") == 'web|0', 'Inscripción sin costo: registrado al instante')

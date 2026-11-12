@@ -3,7 +3,7 @@ import { OwnerActions } from '@/components/owner-actions';
 import { notFound } from 'next/navigation';
 import { getContext, requireOrg } from '@/lib/context';
 import { PageHeader, Card, Badge, Empty, Tabs } from '@/components/ui';
-import { ActionForm, Field, Grid, SelectField, TextArea } from '@/components/forms';
+import { ActionForm, Field, Grid, SelectField, TextArea, EmailCopy } from '@/components/forms';
 import { fmtDateTime } from '@/lib/format';
 import { createPost, deletePost, requestAppointment, manageAppointment } from '../actions';
 
@@ -118,7 +118,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
               </Grid>
               <Field label="Motivo" name="topic" required placeholder="Ej.: Revisar mi situación de matrícula" />
               <TextArea label="Detalle (opcional)" name="details" rows={2} />
-            </ActionForm>
+            <EmailCopy /></ActionForm>
           </Card>)}
         {mine.length > 0 && !member && (
           <Card title="Mis citas con esta oficina">
@@ -147,7 +147,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
                       <option value="confirmada">Confirmar</option><option value="realizada">Marcar realizada</option><option value="cancelada">Cancelar</option></select>
                     <input name="starts_at" type="datetime-local" defaultValue={localInput(a.starts_at)} className="input py-1 text-xs" title="Cambiar hora (reprogramar)" />
                     <input name="note" placeholder="Nota (sala, enlace…)" className="input w-40 py-1 text-xs" />
-                  </ActionForm>)}
+                  <EmailCopy /></ActionForm>)}
               </li>))}</ul> : <Empty>No hay citas agendadas.</Empty>}
           </Card>)}
       </div>);

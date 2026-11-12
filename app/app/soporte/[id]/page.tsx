@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getContext, can } from '@/lib/context';
 import { PageHeader, Card, Badge } from '@/components/ui';
-import { ActionForm, Grid, SelectField, TextArea } from '@/components/forms';
+import { ActionForm, Grid, SelectField, TextArea, EmailCopy } from '@/components/forms';
 import { fmtDateTime } from '@/lib/format';
 import { replyTicket, updateTicket } from '../actions';
 import { CATS, ST } from '../labels';
@@ -35,7 +35,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
                 <input type="hidden" name="ticket_id" value={t.id} />
                 <TextArea label="Mensaje" name="body" required rows={4} />
                 {staff && <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="internal" /> Nota interna (no la ve el solicitante)</label>}
-              </ActionForm>
+              <EmailCopy /></ActionForm>
             </Card>) : <p className="text-sm text-slate-500">Este ticket está cerrado. Si el problema continúa, abra una nueva solicitud.</p>}
         </div>
         {staff && (

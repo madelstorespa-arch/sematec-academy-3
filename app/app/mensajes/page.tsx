@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getContext, requireOrg } from '@/lib/context';
 import { PageHeader, Card, Empty, Tabs } from '@/components/ui';
-import { ActionForm, Field, SelectField, TextArea } from '@/components/forms';
+import { ActionForm, Field, SelectField, TextArea, EmailCopy } from '@/components/forms';
 import { fmtDateTime } from '@/lib/format';
 import { sendMessage } from './actions';
 
@@ -29,7 +29,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ v
               <SelectField label="Para" name="recipient_id" options={opts} required defaultValue={para} />
               <Field label="Asunto" name="subject" required />
               <TextArea label="Mensaje" name="body" required rows={5} />
-            </ActionForm>) : <p className="text-sm text-slate-500">Aún no tiene destinatarios disponibles.</p>}
+            <EmailCopy /></ActionForm>) : <p className="text-sm text-slate-500">Aún no tiene destinatarios disponibles.</p>}
         </div>
       </details>
       <Tabs current={sent ? 'enviados' : 'recibidos'} items={[

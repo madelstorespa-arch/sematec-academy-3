@@ -2,9 +2,11 @@ import Link from 'next/link';
 import { ActionForm } from '@/components/forms';
 import { ownerManage } from '@/app/app/owner-actions';
 import { ENTITIES } from '@/lib/entities';
+import { HIDEABLE } from '@/lib/hideable';
+import { HideMenu } from '@/components/hide-menu';
 
 /**
- * Botones del propietario institucional: editar / suspender / reactivar / eliminar / historial.
+ * Botones del propietario institucional: editar / ocultar para… o por… / suspender / reactivar / eliminar / historial.
  * `active` undefined = el registro no se suspende (solo se edita o elimina).
  */
 export function OwnerActions({ table, id, active, path, name = 'este registro', noEdit, afterDelete }: {
@@ -20,6 +22,7 @@ export function OwnerActions({ table, id, active, path, name = 'este registro', 
       {active !== undefined && (active
         ? <ActionForm action={ownerManage} inline submitLabel="⏸ Suspender" submitClass="btn-secondary btn-sm" confirm={`¿Suspender ${name}? Podrá reactivarlo después.`}>{hidden('suspend')}</ActionForm>
         : <ActionForm action={ownerManage} inline submitLabel="▶ Activar" submitClass="btn-secondary btn-sm">{hidden('activate')}</ActionForm>)}
+      {HIDEABLE.has(table) && <HideMenu table={table} id={id} path={path} />}
       <ActionForm action={ownerManage} inline submitLabel="🗑 Eliminar" submitClass="btn-secondary btn-sm text-red-700" confirm={`¿Eliminar ${name}? Quedará en la Papelera por 30 días y podrá restaurarlo.`}>{hidden('delete')}</ActionForm>
       <Link href={`/app/historial/${table}/${id}`} className="btn-secondary btn-sm" title="Historial de versiones">🕘 Historial</Link>
     </span>

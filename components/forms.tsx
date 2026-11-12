@@ -145,3 +145,13 @@ export function Grid({ children, cols = 2 }: { children: ReactNode; cols?: 2 | 3
   const c = { 2: 'md:grid-cols-2', 3: 'md:grid-cols-3', 4: 'md:grid-cols-4' }[cols];
   return <div className={`grid grid-cols-1 gap-4 ${c}`}>{children}</div>;
 }
+
+
+/** ✉ Casilla «Enviar también por correo» (para mensajes, anuncios, solicitudes y respuestas). */
+export function EmailCopy({ defaultChecked = true, label = 'Enviar también por correo' }: { defaultChecked?: boolean; label?: string }) {
+  return (
+    <label className="flex w-fit items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-sm text-sky-900" data-testid="enviar-correo">
+      <input type="checkbox" name="send_email" defaultChecked={defaultChecked} /> ✉ {label}
+    </label>
+  );
+}

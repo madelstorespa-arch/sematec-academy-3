@@ -96,7 +96,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
     <>
       <PageHeader title="⚙ Configuración" subtitle="Cada persona configura lo suyo según su rol. La configuración de todo el sistema es solo del propietario." />
       <Tabs items={tabs} current={t} />
-      <MailStatus />
+      <MailStatus orgId={ctx.orgId} />
       {ctx.isOwner && <Card title="📦 Sus datos y su enlace" className="mb-6">
         <p className="text-sm text-slate-600">Enlace propio de {org.display_name}: <a className="link" href={`/o/${org.slug}`} target="_blank" rel="noreferrer" data-testid="enlace-propio">/o/{org.slug}</a> — compártalo con sus miembros para entrar directo a su plataforma.</p>
         <p className="mt-2 text-sm text-slate-600">Descargue una copia de todos los datos de su organización (usuarios, salas, clases, asistencia, grabaciones, anuncios, archivos y más) en un archivo JSON.</p>

@@ -3,7 +3,7 @@ import { OwnerActions } from '@/components/owner-actions';
 import { notFound } from 'next/navigation';
 import { getContext, can, requireOrg } from '@/lib/context';
 import { PageHeader, Card, Badge, Empty, Stat } from '@/components/ui';
-import { ActionForm, Field, SelectField, TextArea } from '@/components/forms';
+import { ActionForm, Field, SelectField, TextArea, EmailCopy } from '@/components/forms';
 import { fmtDateTime } from '@/lib/format';
 import { createRequest, answerRequest } from './actions';
 
@@ -45,7 +45,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
               <SelectField label="Trámite" name="kind" required defaultValue="cert_alumno_regular" options={Object.entries(KINDS).map(([value, label]) => ({ value, label }))} />
               <Field label="Asunto" name="subject" required placeholder="Ej.: Certificado para la beca municipal" />
               <TextArea label="Detalle (opcional)" name="details" rows={3} />
-            </ActionForm>
+            <EmailCopy /></ActionForm>
           </Card>
         </>)}
       {staff && (
@@ -78,7 +78,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
                       <input type="hidden" name="id" value={r.id} />
                       <SelectField label="Estado" name="status" required defaultValue={r.status === 'recibida' ? 'en_proceso' : r.status} options={Object.entries(ST).map(([value, [label]]) => ({ value, label }))} />
                       <TextArea label="Respuesta al estudiante" name="response" rows={3} />
-                    </ActionForm></div></details>)}
+                    <EmailCopy /></ActionForm></div></details>)}
               </li>))}
           </ul>
         ) : <Empty>{staff ? 'No hay solicitudes.' : 'Aún no ha ingresado solicitudes.'}</Empty>}

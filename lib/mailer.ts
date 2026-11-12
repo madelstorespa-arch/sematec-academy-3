@@ -17,9 +17,19 @@ export function mailConfig() {
 }
 export const mailEnabled = () => { const c = mailConfig(); return !!c.host && !!c.from; };
 
-export async function sendMail(to: string, subject: string, html: string, text: string, attachments?: { filename: string; content: Buffer | Uint8Array; contentType?: string }[]) {
+export type MailMeta = { org?: string | null; kind?: string; by?: string | null };
+
+/** Guarda en el registro de correos si se envió o por qué falló (para revisarlo en Configuración → Correo). */
+async function logMail(to: string, subject: string, status: 'sent' | 'failed' | 'off', error: string | null, meta?: MailMeta) {
+  try {
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    await createAdminClient().from('mail_log').insert({ organization_id: meta?.org ?? null, to_email: to.slice(0, 254), subject: subject.slice(0, 300), kind: meta?.kind ?? 'general', status, error: error?.slice(0, 500) ?? null, sent_by: meta?.by ?? null });
+  } catch { /* el registro nunca impide enviar */ }
+}
+
+export async function sendMail(to: string, subject: string, html: string, text: string, attachments?: { filename: string; content: Buffer | Uint8Array; contentType?: string }[], meta?: MailMeta) {
   const c = mailConfig();
-  if (!c.host || !c.from) throw new Error('El correo no está configurado: en Vercel agregue SMTP_USER (su Gmail) y SMTP_PASS (contraseña de aplicación) y haga «Redeploy».');
+  if (!c.host || !c.from) { await logMail(to, subject, 'off', 'Correo no configurado', meta); throw new Error('El correo no está configurado: en Vercel agregue SMTP_USER (su Gmail) y SMTP_PASS (contraseña de aplicación) y haga «Redeploy».'); }
   if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(to)) throw new Error('El correo del destinatario no es válido.');
   const port = c.port;
   const local = /^(localhost|127\.0\.0\.1)$/.test(c.host);
@@ -33,8 +43,11 @@ export async function sendMail(to: string, subject: string, html: string, text: 
   try {
     await t.sendMail({ from: c.from, to, subject, html, text, attachments: attachments?.map((a) => ({ ...a, content: Buffer.from(a.content) })) });
   } catch (e) {
-    throw new Error(mailErrorText(e));
+    const msg = mailErrorText(e);
+    await logMail(to, subject, 'failed', msg, meta);
+    throw new Error(msg);
   }
+  await logMail(to, subject, 'sent', null, meta);
 }
 
 /** Traduce los errores del servidor de correo a instrucciones claras. */

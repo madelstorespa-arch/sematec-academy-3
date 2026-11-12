@@ -3,6 +3,8 @@ import { revalidatePath } from 'next/cache';
 import { getContext } from '@/lib/context';
 import { fail, guard, num, ok, reqStr, str, type ActionResult } from '@/lib/actions';
 import { localToIso } from '@/lib/lms';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { mailSummary, nameOf, noticeToUsers, usersWithRoles } from '@/lib/notify';
 
 const back = (code: string) => { revalidatePath(`/app/oficinas/${code}`); revalidatePath('/app/oficinas'); };
 
@@ -41,8 +43,15 @@ export async function requestAppointment(fd: FormData): Promise<ActionResult> {
       details: str(fd, 'details'), mode: reqStr(fd, 'mode', 'Modalidad'), starts_at: starts, duration_min: num(fd, 'duration_min') ?? 30,
     });
     if (error) return fail(error);
+    let mail = '';
+    if (fd.get('send_email') === 'on' && ctx.orgId) {
+      const { data: o } = await createAdminClient().from('offices').select('name, code, role_codes').eq('id', String(fd.get('office_id'))).maybeSingle();
+      const staff = o ? (await usersWithRoles(ctx.orgId, (o.role_codes as string[] | null) ?? [])).filter((u) => u !== ctx.user.id) : [];
+      mail = mailSummary(await noticeToUsers(staff, { org: ctx.orgId, kind: 'cita', by: ctx.user.id, subject: `nueva cita en ${o?.name ?? 'la oficina'}`, title: `📅 ${String(fd.get('topic'))}`,
+        text: `${await nameOf(ctx.user.id)} pidió una cita para el ${new Date(starts).toLocaleString('es-CL', { timeZone: 'America/Santiago' })}.\n\n${String(fd.get('details') ?? '')}`, link: { path: `/app/oficinas/${o?.code ?? ''}`, label: 'Confirmar la cita' } }));
+    }
     back(reqStr(fd, 'code', 'oficina'));
-    return ok('Cita solicitada. La oficina la confirmará y le llegará una notificación.');
+    return ok(`Cita solicitada. La oficina la confirmará y le llegará una notificación.${mail}`);
   });
 }
 
@@ -56,6 +65,14 @@ export async function manageAppointment(fd: FormData): Promise<ActionResult> {
     if (error) return fail(error);
     back(reqStr(fd, 'code', 'oficina'));
     const st = String(fd.get('status'));
+    if (fd.get('send_email') === 'on') {
+      const { data: a } = await createAdminClient().from('appointments').select('requester_id, topic, starts_at, staff_note').eq('id', String(fd.get('id'))).maybeSingle();
+      if (a?.requester_id) {
+        const r = await noticeToUsers([a.requester_id], { org: ctx.orgId, kind: 'cita', by: ctx.user.id, subject: `su cita fue ${st}`, title: `📅 ${a.topic}`,
+          text: `Estado: ${st}\nFecha: ${new Date(a.starts_at).toLocaleString('es-CL', { timeZone: 'America/Santiago' })}${a.staff_note ? `\n\n${a.staff_note}` : ''}`, link: { path: `/app/oficinas/${reqStr(fd, 'code', 'oficina')}`, label: 'Ver mi cita' } });
+        return ok(`${st === 'confirmada' ? 'Cita confirmada y notificada.' : st === 'cancelada' ? 'Cita cancelada.' : 'Cita actualizada.'}${mailSummary(r)}`);
+      }
+    }
     return ok(st === 'confirmada' ? 'Cita confirmada y notificada.' : st === 'cancelada' ? 'Cita cancelada.' : 'Cita actualizada.');
   });
 }

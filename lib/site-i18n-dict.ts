@@ -358,7 +358,63 @@ const REG: Record<string, D> = {
   },
 };
 
-export const SITE_DICT: Record<SiteLang, D> = { es: { ...es, ...REG.es }, en: { ...en, ...REG.en }, fr: { ...fr, ...REG.fr }, pt: { ...pt, ...REG.pt } };
+
+// 📝 Inscripción: curso o carrera, jornada, modalidad y formas de pago
+const REG2: Record<string, D> = {
+  es: {
+    'reg.program': 'Curso o carrera de interés', 'reg.programPick': 'Elija una opción', 'reg.programOther': 'Aún no lo decido',
+    'reg.shift': 'Jornada', 'reg.modality': 'Modalidad', 'reg.choice': 'Lo que quiere estudiar',
+    'pay.online': 'Pagar en línea', 'pay.transfer': 'Ya pagué: enviar comprobante', 'pay.transferD': 'Transferencia o depósito: suba la foto o el PDF del comprobante.',
+    'pay.office': 'Pagaré en la oficina', 'pay.officeD': 'Pague de manera presencial; su inscripción queda reservada.',
+    'pay.bank': 'Datos para transferir', 'pay.receipt': 'Comprobante de pago (foto o PDF, máx. 4 MB)', 'pay.reference': 'N° de operación (opcional)',
+    'pay.officeInfo': 'Dónde y cuándo pagar', 'pay.officeDefault': 'Acérquese a la oficina de la institución en horario de atención con su documento de identidad.',
+    'pay.amount': 'Monto a pagar',
+    'reg.sendReceipt': 'Enviar inscripción con comprobante', 'reg.sendOffice': 'Inscribirme y pagar en la oficina',
+    'reg.pending.title': 'Inscripción recibida: en revisión', 'reg.pending.transfer': 'Recibimos su comprobante. Lo verificaremos y le avisaremos por correo cuando quede inscrito.',
+    'reg.pending.office': 'Su inscripción quedó reservada. Acérquese a la oficina a pagar {amount}; al pagar quedará inscrito.',
+    'reg.pending.code': 'Su código de seguimiento: {code}', 'reg.pending.mail': 'Le enviamos un correo con estos datos a {email}.',
+  },
+  en: {
+    'reg.program': 'Course or degree of interest', 'reg.programPick': 'Choose an option', 'reg.programOther': 'I have not decided yet',
+    'reg.shift': 'Schedule', 'reg.modality': 'Modality', 'reg.choice': 'What you want to study',
+    'pay.online': 'Pay online', 'pay.transfer': 'I already paid: send receipt', 'pay.transferD': 'Bank transfer or deposit: upload a photo or PDF of the receipt.',
+    'pay.office': 'I will pay at the office', 'pay.officeD': 'Pay in person; your registration is reserved.',
+    'pay.bank': 'Transfer details', 'pay.receipt': 'Payment receipt (photo or PDF, max. 4 MB)', 'pay.reference': 'Transaction number (optional)',
+    'pay.officeInfo': 'Where and when to pay', 'pay.officeDefault': 'Visit the institution’s office during opening hours with your ID.',
+    'pay.amount': 'Amount to pay',
+    'reg.sendReceipt': 'Submit registration with receipt', 'reg.sendOffice': 'Register and pay at the office',
+    'reg.pending.title': 'Registration received: under review', 'reg.pending.transfer': 'We received your receipt. We will verify it and email you once you are registered.',
+    'reg.pending.office': 'Your registration is reserved. Visit the office to pay {amount}; once paid you will be registered.',
+    'reg.pending.code': 'Your tracking code: {code}', 'reg.pending.mail': 'We sent an email with these details to {email}.',
+  },
+  fr: {
+    'reg.program': 'Formation souhaitée', 'reg.programPick': 'Choisissez une option', 'reg.programOther': 'Je n’ai pas encore décidé',
+    'reg.shift': 'Horaire', 'reg.modality': 'Modalité', 'reg.choice': 'Ce que vous voulez étudier',
+    'pay.online': 'Payer en ligne', 'pay.transfer': 'J’ai déjà payé : envoyer le justificatif', 'pay.transferD': 'Virement ou dépôt : téléversez la photo ou le PDF du justificatif.',
+    'pay.office': 'Je paierai au bureau', 'pay.officeD': 'Payez sur place ; votre inscription est réservée.',
+    'pay.bank': 'Coordonnées bancaires', 'pay.receipt': 'Justificatif de paiement (photo ou PDF, max. 4 Mo)', 'pay.reference': 'N° d’opération (facultatif)',
+    'pay.officeInfo': 'Où et quand payer', 'pay.officeDefault': 'Présentez-vous au bureau de l’établissement aux heures d’ouverture avec votre pièce d’identité.',
+    'pay.amount': 'Montant à payer',
+    'reg.sendReceipt': 'Envoyer l’inscription avec le justificatif', 'reg.sendOffice': 'M’inscrire et payer au bureau',
+    'reg.pending.title': 'Inscription reçue : en cours de vérification', 'reg.pending.transfer': 'Nous avons reçu votre justificatif. Nous le vérifierons et vous préviendrons par e-mail.',
+    'reg.pending.office': 'Votre inscription est réservée. Passez au bureau payer {amount} ; une fois payé, vous serez inscrit.',
+    'reg.pending.code': 'Votre code de suivi : {code}', 'reg.pending.mail': 'Nous avons envoyé un e-mail avec ces informations à {email}.',
+  },
+  pt: {
+    'reg.program': 'Curso ou carreira de interesse', 'reg.programPick': 'Escolha uma opção', 'reg.programOther': 'Ainda não decidi',
+    'reg.shift': 'Turno', 'reg.modality': 'Modalidade', 'reg.choice': 'O que você quer estudar',
+    'pay.online': 'Pagar online', 'pay.transfer': 'Já paguei: enviar comprovante', 'pay.transferD': 'Transferência ou depósito: envie a foto ou o PDF do comprovante.',
+    'pay.office': 'Vou pagar no escritório', 'pay.officeD': 'Pague presencialmente; sua inscrição fica reservada.',
+    'pay.bank': 'Dados para transferência', 'pay.receipt': 'Comprovante de pagamento (foto ou PDF, máx. 4 MB)', 'pay.reference': 'N° da operação (opcional)',
+    'pay.officeInfo': 'Onde e quando pagar', 'pay.officeDefault': 'Vá ao escritório da instituição no horário de atendimento com seu documento.',
+    'pay.amount': 'Valor a pagar',
+    'reg.sendReceipt': 'Enviar inscrição com comprovante', 'reg.sendOffice': 'Inscrever-me e pagar no escritório',
+    'reg.pending.title': 'Inscrição recebida: em análise', 'reg.pending.transfer': 'Recebemos seu comprovante. Vamos verificá-lo e avisaremos por e-mail quando estiver inscrito.',
+    'reg.pending.office': 'Sua inscrição está reservada. Vá ao escritório pagar {amount}; ao pagar, ficará inscrito.',
+    'reg.pending.code': 'Seu código de acompanhamento: {code}', 'reg.pending.mail': 'Enviamos um e-mail com esses dados para {email}.',
+  },
+};
+export const SITE_DICT: Record<SiteLang, D> = { es: { ...es, ...REG.es, ...REG2.es }, en: { ...en, ...REG.en, ...REG2.en }, fr: { ...fr, ...REG.fr, ...REG2.fr }, pt: { ...pt, ...REG.pt, ...REG2.pt } };
 
 export type TFn = (key: string, vars?: Record<string, string | number>) => string;
 export function makeT(lang: SiteLang): TFn {

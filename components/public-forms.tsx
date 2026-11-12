@@ -102,12 +102,17 @@ export function ApplicationForm({ action, offeringId, countries }: { action: Act
 }
 
 /** Formulario de pago: crea el pedido en el servidor y redirige a la página segura del proveedor. */
-export function CheckoutForm({ action, offeringId, providers, countries, trackingCode, children, free, submitLabel }: {
+export type OfflinePay = { id: 'transfer' | 'office'; info: string };
+
+export function CheckoutForm({ action, offeringId, providers, countries, trackingCode, children, free, submitLabel, offline = [], amountLabel }: {
   action: Action; offeringId: string; providers: { id: string; label: string; description: string; banks?: { id: string; name: string }[] }[];
   countries: { code: string; name: string }[]; trackingCode?: string; children?: ReactNode; free?: boolean; submitLabel?: string;
+  /** Formas de pago sin pasarela: enviar comprobante de transferencia o pagar en la oficina. */
+  offline?: OfflinePay[]; amountLabel?: string;
 }) {
   const go = (r: Result) => {
     const red = r.data as { method: 'GET' | 'POST'; url: string; fields?: Record<string, string> };
+    if (!red) return;
     if (red.method === 'GET') { window.location.href = red.url; return; }
     const f = document.createElement('form'); f.method = 'POST'; f.action = red.url;
     Object.entries(red.fields ?? {}).forEach(([k, v]) => { const i = document.createElement('input'); i.type = 'hidden'; i.name = k; i.value = v; f.appendChild(i); });
@@ -115,9 +120,10 @@ export function CheckoutForm({ action, offeringId, providers, countries, trackin
   };
   const { t } = useSiteT();
   const { res, pending, submit } = useSubmit(action, go);
-  const [provider, setProvider] = useState(providers[0]?.id ?? '');
+  const [provider, setProvider] = useState<string>(providers[0]?.id ?? offline[0]?.id ?? '');
   const banks = providers.find((p) => p.id === provider)?.banks;
-  if (!providers.length && !free) return <p className="rounded-lg bg-amber-50 p-4 text-sm text-amber-800" data-testid="pago-no-habilitado">{t('form.notEnabled')}</p>;
+  const off = offline.find((o) => o.id === provider);
+  if (!providers.length && !offline.length && !free) return <p className="rounded-lg bg-amber-50 p-4 text-sm text-amber-800" data-testid="pago-no-habilitado">{t('form.notEnabled')}</p>;
   return (
     <form onSubmit={submit} className="space-y-5">
       <Honeypot /><input type="hidden" name="offering_id" value={offeringId} />
@@ -132,8 +138,26 @@ export function CheckoutForm({ action, offeringId, providers, countries, trackin
               <input type="radio" name="provider" value={p.id} checked={provider === p.id} onChange={() => setProvider(p.id)} required className="mt-1" />
               <span><b>{p.banks ? '🏦 ' : p.id === 'flow' ? '' : '💳 '}{p.label}</b><br /><span className="text-xs text-slate-600">{p.description}</span></span>
             </label>))}
+          {offline.map((o) => (
+            <label key={o.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-300 p-4 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50" data-testid={`pago-${o.id}`}>
+              <input type="radio" name="provider" value={o.id} checked={provider === o.id} onChange={() => setProvider(o.id)} required className="mt-1" />
+              <span><b>{o.id === 'transfer' ? '🧾 ' : '🏢 '}{t(`pay.${o.id}`)}</b><br /><span className="text-xs text-slate-600">{t(`pay.${o.id}D`)}</span></span>
+            </label>))}
         </div>
       </fieldset>}
+      {!free && amountLabel && <p className="rounded-xl bg-slate-50 px-4 py-3 text-sm">{t('pay.amount')}: <b className="text-lg" data-testid="monto-a-pagar">{amountLabel}</b></p>}
+      {!free && off?.id === 'transfer' && (
+        <fieldset className="space-y-3 rounded-2xl border border-brand-200 bg-brand-50/40 p-5" data-testid="datos-transferencia">
+          {off.info && <div><p className="label">{t('pay.bank')}</p><p className="whitespace-pre-line rounded-lg bg-white p-3 text-sm">{off.info}</p></div>}
+          <label className="block"><span className="label">{t('pay.receipt')} *</span>
+            <input className="input" type="file" name="receipt" required accept="image/jpeg,image/png,image/webp,image/heic,application/pdf" data-testid="comprobante" /></label>
+          <In label={t('pay.reference')} name="reference" />
+        </fieldset>)}
+      {!free && off?.id === 'office' && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm" data-testid="datos-oficina">
+          <p className="font-bold">{t('pay.officeInfo')}</p>
+          <p className="mt-1 whitespace-pre-line">{off.info || t('pay.officeDefault')}</p>
+        </div>)}
       {!free && banks && (
         <fieldset>
           <legend className="label">{t('form.chooseBank')} *</legend>
@@ -147,8 +171,8 @@ export function CheckoutForm({ action, offeringId, providers, countries, trackin
         </fieldset>
       )}
       <Consent />
-      <button className="btn-primary w-full py-3 text-base" disabled={pending || res?.ok}>{pending || res?.ok ? (free ? t('form.sending') : t('form.connecting')) : submitLabel ?? t('form.goPay')}</button>
-      {!free && <p className="text-center text-xs text-slate-500">{t('form.secure')}</p>}
+      <button className="btn-primary w-full py-3 text-base" disabled={pending || res?.ok}>{pending || res?.ok ? (free || off ? t('form.sending') : t('form.connecting')) : off ? t(off.id === 'transfer' ? 'reg.sendReceipt' : 'reg.sendOffice') : submitLabel ?? t('form.goPay')}</button>
+      {!free && !off && <p className="text-center text-xs text-slate-500">{t('form.secure')}</p>}
       <Msg r={res?.ok ? null : res} />
     </form>
   );

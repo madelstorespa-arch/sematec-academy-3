@@ -28,3 +28,21 @@ export async function sendRecoveryLink(email: string): Promise<RecoveryResult> {
     `${hi}\n\nPara crear una nueva contraseña abra este enlace (vence en 1 hora):\n${link}\n\nSi usted no lo pidió, ignore este correo.`);
   return 'sent';
 }
+
+/** Correo de bienvenida con enlace para crear la contraseña (cuenta nueva o recién habilitada). */
+export async function sendAccessLink(email: string, o: { org?: string | null; title: string; intro: string }): Promise<{ ok: boolean; error?: string }> {
+  if (!mailEnabled()) return { ok: false, error: 'El correo de la plataforma no está configurado.' };
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin.auth.admin.generateLink({ type: 'recovery', email });
+    if (error || !data?.properties?.hashed_token) return { ok: false, error: error?.message ?? 'No se pudo generar el enlace' };
+    const link = `${env.siteUrl()}/auth/confirm?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=recovery`;
+    const { brandOf, textToMailHtml } = await import('@/lib/notify');
+    const brand = await brandOf(o.org);
+    await sendMail(email, `${brand}: ${o.title}`,
+      mailLayout(brand, o.title, `${textToMailHtml(o.intro)}<p>Su usuario es <b>${email.replace(/[<>&"]/g, '')}</b>. Toque el botón para crear su contraseña (el enlace sirve una vez y vence en 1 hora; después puede pedir otro en «¿Olvidó su contraseña?»).</p>`,
+        { href: link, label: 'Crear mi contraseña' }),
+      `${o.title}\n\n${o.intro}\n\nUsuario: ${email}\nCree su contraseña aquí (vence en 1 hora): ${link}`, undefined, { org: o.org, kind: 'acceso' });
+    return { ok: true };
+  } catch (e) { return { ok: false, error: (e as Error).message }; }
+}

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { OwnerActions } from '@/components/owner-actions';
 import { getContext, can, requireOrg } from '@/lib/context';
 import { PageHeader, Card, Badge, Empty } from '@/components/ui';
-import { ActionForm, Field, Grid, SelectField, TextArea } from '@/components/forms';
+import { ActionForm, Field, Grid, SelectField, TextArea, EmailCopy } from '@/components/forms';
 import { fmtDateTime } from '@/lib/format';
 import { openTicket } from './actions';
 import { CATS, ST } from './labels';
@@ -31,7 +31,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ e
               <SelectField label="Urgencia" name="priority" defaultValue="normal" options={[{ value: 'baja', label: 'Baja' }, { value: 'normal', label: 'Normal' }, { value: 'alta', label: 'Alta' }, { value: 'urgente', label: 'Urgente' }]} />
             </Grid>
             <TextArea label="Describa el problema" name="body" required rows={5} />
-          </ActionForm>
+          <EmailCopy /></ActionForm>
         </div>
       </details>
       {staff && (
