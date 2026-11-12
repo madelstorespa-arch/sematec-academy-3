@@ -20,12 +20,14 @@ export async function sendRecoveryLink(email: string): Promise<RecoveryResult> {
   if (error || !data?.properties?.hashed_token) return 'no_account';
   const link = `${env.siteUrl()}/auth/confirm?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=recovery`;
   const { data: site } = await admin.from('site_settings').select('site_name').limit(1).maybeSingle();
+  const { data: mem } = await admin.from('memberships').select('organization_id').eq('user_id', prof.id).limit(1).maybeSingle();
   const brand = site?.site_name ?? 'SEMATEC ACADEMY';
   const hi = prof.full_name ? `Hola ${prof.full_name.split(' ')[0]},` : 'Hola,';
   await sendMail(email, `${brand}: crear una nueva contraseña`,
     mailLayout(brand, 'Crear una nueva contraseña', `<p>${hi}</p><p>Recibimos una solicitud para restablecer la contraseña de su cuenta. Toque el botón para crear una nueva. El enlace sirve una sola vez y vence en 1 hora.</p>`,
       { href: link, label: 'Crear nueva contraseña' }),
-    `${hi}\n\nPara crear una nueva contraseña abra este enlace (vence en 1 hora):\n${link}\n\nSi usted no lo pidió, ignore este correo.`);
+    `${hi}\n\nPara crear una nueva contraseña abra este enlace (vence en 1 hora):\n${link}\n\nSi usted no lo pidió, ignore este correo.`,
+    undefined, { org: mem?.organization_id ?? null, kind: 'recuperar' });
   return 'sent';
 }
 

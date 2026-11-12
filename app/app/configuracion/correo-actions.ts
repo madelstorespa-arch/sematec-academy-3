@@ -1,10 +1,26 @@
 'use server';
-import { getContext } from '@/lib/context';
-import { mailLayout, sendMail } from '@/lib/mailer';
+import { can, getContext } from '@/lib/context';
+import { mailEnabled, mailLayout, sendMail } from '@/lib/mailer';
 import { env } from '@/lib/env';
-import type { ActionResult } from '@/lib/actions';
+import { fail, guard, ok, type ActionResult } from '@/lib/actions';
 
 /** ✉ Envía un correo de prueba al propietario y muestra el error exacto si falla. */
+/** 🔑 Prueba real de «¿Olvidó su contraseña?» con la cuenta de quien la ejecuta: muestra la causa exacta si falla. */
+export async function testRecoveryMail(): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getContext();
+    if (!ctx.isOwner && !ctx.isPlatformAdmin && !can(ctx, 'settings.admin')) return fail('Solo la administración puede probar el correo.');
+    const to = ctx.user.email ?? '';
+    if (!mailEnabled()) return fail('El correo de la plataforma no está configurado: en Vercel agregue SMTP_USER (su Gmail) y SMTP_PASS (contraseña de aplicación) y haga «Redeploy».');
+    try {
+      const { sendRecoveryLink } = await import('@/lib/recovery');
+      const r = await sendRecoveryLink(to);
+      if (r === 'sent') return ok(`Funciona: se envió un enlace de recuperación a ${to}. Revise su bandeja (y «Spam»). Si lo usa, cambiará su contraseña.`);
+      return fail(r === 'no_account' ? 'Supabase no generó el enlace: revise que SUPABASE_SERVICE_ROLE_KEY esté en Vercel.' : 'Su cuenta no está activa.');
+    } catch (e) { return fail((e as Error).message); }
+  });
+}
+
 export async function sendTestMail(fd?: FormData): Promise<ActionResult> {
   try {
     const ctx = await getContext();

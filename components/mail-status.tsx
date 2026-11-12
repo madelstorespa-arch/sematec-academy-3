@@ -4,7 +4,7 @@ import { mailConfig, mailEnabled } from '@/lib/mailer';
 import { env } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';
 import { fmtDateTime } from '@/lib/format';
-import { sendTestMail } from '@/app/app/configuracion/correo-actions';
+import { sendTestMail, testRecoveryMail } from '@/app/app/configuracion/correo-actions';
 
 /** 📧 Estado del correo saliente (sin mostrar nunca la clave) y botón de prueba. */
 export async function MailStatus({ orgId }: { orgId?: string | null } = {}) {
@@ -30,6 +30,7 @@ export async function MailStatus({ orgId }: { orgId?: string | null } = {}) {
       <div className="mt-3"><ActionForm action={sendTestMail} submitLabel="✉ Enviar correo de prueba" submitClass="btn-secondary btn-sm">
         <label className="block text-sm"><span className="label">Enviar la prueba a (vacío = a mí)</span><input className="input" type="email" name="to" placeholder="persona@correo.cl" data-testid="prueba-correo-a" /></label>
       </ActionForm></div>
+      <div className="mt-2"><ActionForm action={testRecoveryMail} submitLabel="🔑 Probar «¿Olvidó su contraseña?» con mi cuenta" submitClass="btn-secondary btn-sm" /></div>
       <details className="mt-4" open={!!log?.length}>
         <summary className="cursor-pointer text-sm font-semibold">📬 Últimos correos enviados ({log?.length ?? 0})</summary>
         {log?.length ? (
