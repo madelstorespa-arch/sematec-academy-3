@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { env } from '@/lib/env';
 import { safeNext } from '@/lib/safe-redirect';
-import { sendRecoveryLink } from '@/lib/recovery';
+import { sendRecoveryTo, type Account } from '@/lib/recovery';
 import { getPublicSite } from '@/lib/site';
 import type { ActionResult } from '@/lib/actions';
 
@@ -91,9 +91,12 @@ export async function requestReset(fd: FormData): Promise<ActionResult> {
   } catch { /* si la verificación falla se continúa */ }
   try {
     const { data: acc } = await admin.rpc('find_account', { p_identifier: raw });
-    const email = (acc as { email: string | null }[] | null)?.[0]?.email ?? (raw.includes('@') ? raw.toLowerCase() : null);
+    const account = (acc as Account[] | null)?.[0];
+    // Sin cuenta o cuenta no activa: misma respuesta (no se revela si el correo existe)
+    if (!account) return generic;
+    const email = account.login_email ?? account.email;
     if (!email) return generic;
-    const r = await sendRecoveryLink(email);
+    const r = await sendRecoveryTo(account);
     if (r === 'mail_off') {
       // Sin correo propio configurado: lo intenta Supabase (solo llega si el proyecto tiene su propio SMTP configurado)
       const supabase = await createClient();

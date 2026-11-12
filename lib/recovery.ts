@@ -13,21 +13,44 @@ export type RecoveryResult = 'sent' | 'no_account' | 'not_allowed' | 'mail_off';
 export async function sendRecoveryLink(email: string): Promise<RecoveryResult> {
   if (!mailEnabled()) return 'mail_off';
   const admin = createAdminClient();
-  const { data: prof } = await admin.from('profiles').select('id, full_name, status, status_reason').ilike('email', email).maybeSingle();
-  if (!prof) return 'no_account';
-  if (prof.status !== 'active' && !(prof.status === 'locked' && String(prof.status_reason ?? '').startsWith('Bloqueo por intentos fallidos'))) return 'not_allowed';
-  const { data, error } = await admin.auth.admin.generateLink({ type: 'recovery', email });
-  if (error || !data?.properties?.hashed_token) return 'no_account';
+  const { data } = await admin.rpc('find_account', { p_identifier: email });
+  const acc = (data as Account[] | null)?.[0];
+  if (!acc) return 'no_account';
+  return sendRecoveryTo(acc);
+}
+
+export type Account = { user_id: string; email: string | null; full_name: string | null; status: string; organization_id: string | null; login_email: string | null; send_to: string | null };
+
+/** ¿La cuenta puede recuperar su contraseña? Activa, o bloqueada solo por intentos fallidos. */
+export async function canRecover(userId: string) {
+  const { data: prof } = await createAdminClient().from('profiles').select('status, status_reason').eq('id', userId).maybeSingle();
+  return !!prof && (prof.status === 'active' || (prof.status === 'locked' && String(prof.status_reason ?? '').startsWith('Bloqueo por intentos fallidos')));
+}
+
+/**
+ * Envía el enlace para crear una nueva contraseña a una cuenta activa.
+ * El enlace se genera con el correo de inicio de sesión y se envía al correo registrado que escribió la persona
+ * (perfil, ficha de estudiante, profesor o funcionario) o, si escribió su RUT, al correo principal de la cuenta.
+ */
+export async function sendRecoveryTo(acc: Account): Promise<RecoveryResult> {
+  if (!mailEnabled()) return 'mail_off';
+  if (!(await canRecover(acc.user_id))) return 'not_allowed';
+  const admin = createAdminClient();
+  const login = acc.login_email ?? acc.email;
+  const to = acc.send_to ?? acc.email ?? login;
+  if (!login || !to) return 'no_account';
+  const { data, error } = await admin.auth.admin.generateLink({ type: 'recovery', email: login });
+  if (error || !data?.properties?.hashed_token) throw new Error(`No se pudo generar el enlace de recuperación: ${error?.message ?? 'sin respuesta de Supabase'}`);
   const link = `${env.siteUrl()}/auth/confirm?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=recovery`;
   const { data: site } = await admin.from('site_settings').select('site_name').limit(1).maybeSingle();
-  const { data: mem } = await admin.from('memberships').select('organization_id').eq('user_id', prof.id).limit(1).maybeSingle();
   const brand = site?.site_name ?? 'SEMATEC ACADEMY';
-  const hi = prof.full_name ? `Hola ${prof.full_name.split(' ')[0]},` : 'Hola,';
-  await sendMail(email, `${brand}: crear una nueva contraseña`,
-    mailLayout(brand, 'Crear una nueva contraseña', `<p>${hi}</p><p>Recibimos una solicitud para restablecer la contraseña de su cuenta. Toque el botón para crear una nueva. El enlace sirve una sola vez y vence en 1 hora.</p>`,
+  const hi = acc.full_name ? `Hola ${acc.full_name.split(' ')[0]},` : 'Hola,';
+  const user = login.toLowerCase() !== to.toLowerCase() ? `<p>Su usuario para entrar es <b>${login.replace(/[<>&"]/g, '')}</b>.</p>` : '';
+  await sendMail(to, `${brand}: crear una nueva contraseña`,
+    mailLayout(brand, 'Crear una nueva contraseña', `<p>${hi}</p><p>Recibimos una solicitud para restablecer la contraseña de su cuenta. Toque el botón para crear una nueva. El enlace sirve una sola vez y vence en 1 hora.</p>${user}`,
       { href: link, label: 'Crear nueva contraseña' }),
-    `${hi}\n\nPara crear una nueva contraseña abra este enlace (vence en 1 hora):\n${link}\n\nSi usted no lo pidió, ignore este correo.`,
-    undefined, { org: mem?.organization_id ?? null, kind: 'recuperar' });
+    `${hi}\n\nPara crear una nueva contraseña abra este enlace (vence en 1 hora):\n${link}\n${user ? `\nSu usuario para entrar es ${login}.\n` : ''}\nSi usted no lo pidió, ignore este correo.`,
+    undefined, { org: acc.organization_id, kind: 'recuperar' });
   return 'sent';
 }
 

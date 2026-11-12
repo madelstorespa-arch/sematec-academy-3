@@ -16,7 +16,7 @@ export async function testRecoveryMail(): Promise<ActionResult> {
       const { sendRecoveryLink } = await import('@/lib/recovery');
       const r = await sendRecoveryLink(to);
       if (r === 'sent') return ok(`Funciona: se envió un enlace de recuperación a ${to}. Revise su bandeja (y «Spam»). Si lo usa, cambiará su contraseña.`);
-      return fail(r === 'no_account' ? 'Supabase no generó el enlace: revise que SUPABASE_SERVICE_ROLE_KEY esté en Vercel.' : 'Su cuenta no está activa.');
+      return fail(r === 'no_account' ? 'No se encontró su cuenta por correo: revise que la actualización de base de datos «Recuperar todos correos» esté instalada.' : 'Su cuenta no está activa.');
     } catch (e) { return fail((e as Error).message); }
   });
 }
