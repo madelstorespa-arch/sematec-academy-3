@@ -48,3 +48,11 @@ export function brandStyle(primary = '#1f45c8', accent = '#10b5a3'): React.CSSPr
     ['--color-brand-50' as any]: shade(primary, 0.93), ['--color-brand-100' as any]: shade(primary, 0.85), ['--color-accent' as any]: accent,
   };
 }
+
+/** ¿La institución tiene abierta la inscripción general en el sitio? */
+export async function registrationOpen(orgId: string) {
+  try {
+    const { data } = await anonClient().rpc('registration_info', { p_org: orgId });
+    return !!(data as { enabled?: boolean } | null)?.enabled;
+  } catch { return false; }
+}

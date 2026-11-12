@@ -306,13 +306,65 @@ const pt: D = {
   'about.title': 'Sobre {name}', 'about.mission': 'Missão', 'about.vision': 'Visão',
 };
 
-export const SITE_DICT: Record<SiteLang, D> = { es, en, fr, pt };
+// 📝 Inscripción general
+const REG: Record<string, D> = {
+  es: {
+    'nav.register': 'Inscripción', 'home.ctaRegister': 'Inscríbete ahora',
+    'reg.intro': 'Complete sus datos para quedar registrado como estudiante. Después podrá matricularse en cualquier curso o carrera sin volver a llenar el formulario.',
+    'reg.fee': 'Monto de la inscripción', 'reg.free': 'Inscripción sin costo', 'reg.more': 'Información adicional',
+    'reg.birth': 'Fecha de nacimiento', 'reg.address': 'Dirección', 'reg.city': 'Ciudad / comuna', 'reg.education': 'Estudios previos',
+    'reg.guardian': 'Apoderado (si es menor de edad)', 'reg.guardianPhone': 'Teléfono del apoderado', 'reg.how': '¿Cómo nos conoció?', 'reg.notes': 'Comentarios',
+    'reg.pay': 'Pagar {amount} e inscribirme', 'reg.send': 'Enviar inscripción',
+    'reg.disabled': 'La inscripción en línea aún no está habilitada. Escríbanos desde Contacto.',
+    'reg.step1': 'Completa el formulario', 'reg.step2': 'Paga la inscripción', 'reg.step3': 'Quedas registrado como estudiante', 'reg.step4': 'Elige tu curso y te matriculamos',
+    'reg.done.title': '¡Inscripción recibida!', 'reg.done.text': 'Ya está registrado como estudiante. Cuando elija su curso o carrera lo matriculamos sin volver a pedir sus datos.',
+    'reg.done.access': 'Para entrar a la plataforma use «¿Olvidó su contraseña?» con el correo {email} y cree su contraseña.', 'reg.done.courses': 'Ver cursos',
+  },
+  en: {
+    'nav.register': 'Registration', 'home.ctaRegister': 'Register now',
+    'reg.intro': 'Fill in your details to be registered as a student. Later you can enroll in any course or degree without filling in the form again.',
+    'reg.fee': 'Registration fee', 'reg.free': 'Free registration', 'reg.more': 'Additional information',
+    'reg.birth': 'Date of birth', 'reg.address': 'Address', 'reg.city': 'City', 'reg.education': 'Previous studies',
+    'reg.guardian': 'Guardian (if under 18)', 'reg.guardianPhone': 'Guardian’s phone', 'reg.how': 'How did you hear about us?', 'reg.notes': 'Comments',
+    'reg.pay': 'Pay {amount} and register', 'reg.send': 'Submit registration',
+    'reg.disabled': 'Online registration is not enabled yet. Write to us from Contact.',
+    'reg.step1': 'Fill in the form', 'reg.step2': 'Pay the registration fee', 'reg.step3': 'You are registered as a student', 'reg.step4': 'Choose your course and we enroll you',
+    'reg.done.title': 'Registration received!', 'reg.done.text': 'You are now registered as a student. When you choose your course or degree, we will enroll you without asking for your details again.',
+    'reg.done.access': 'To sign in, use “Forgot your password?” with the email {email} and create your password.', 'reg.done.courses': 'See courses',
+  },
+  fr: {
+    'nav.register': 'Inscription', 'home.ctaRegister': 'Inscrivez-vous',
+    'reg.intro': 'Saisissez vos informations pour être enregistré comme étudiant. Ensuite, vous pourrez vous inscrire à n’importe quelle formation sans remplir à nouveau le formulaire.',
+    'reg.fee': 'Frais d’inscription', 'reg.free': 'Inscription gratuite', 'reg.more': 'Informations complémentaires',
+    'reg.birth': 'Date de naissance', 'reg.address': 'Adresse', 'reg.city': 'Ville', 'reg.education': 'Études antérieures',
+    'reg.guardian': 'Responsable légal (si mineur)', 'reg.guardianPhone': 'Téléphone du responsable', 'reg.how': 'Comment nous avez-vous connus ?', 'reg.notes': 'Commentaires',
+    'reg.pay': 'Payer {amount} et m’inscrire', 'reg.send': 'Envoyer l’inscription',
+    'reg.disabled': 'L’inscription en ligne n’est pas encore activée. Écrivez-nous depuis Contact.',
+    'reg.step1': 'Remplissez le formulaire', 'reg.step2': 'Payez l’inscription', 'reg.step3': 'Vous êtes enregistré comme étudiant', 'reg.step4': 'Choisissez votre formation et nous vous inscrivons',
+    'reg.done.title': 'Inscription reçue !', 'reg.done.text': 'Vous êtes enregistré comme étudiant. Quand vous choisirez votre formation, nous vous inscrirons sans redemander vos informations.',
+    'reg.done.access': 'Pour vous connecter, utilisez « Mot de passe oublié ? » avec l’e-mail {email} et créez votre mot de passe.', 'reg.done.courses': 'Voir les formations',
+  },
+  pt: {
+    'nav.register': 'Inscrição', 'home.ctaRegister': 'Inscreva-se agora',
+    'reg.intro': 'Preencha seus dados para ficar registrado como aluno. Depois você poderá se matricular em qualquer curso sem preencher o formulário novamente.',
+    'reg.fee': 'Valor da inscrição', 'reg.free': 'Inscrição gratuita', 'reg.more': 'Informações adicionais',
+    'reg.birth': 'Data de nascimento', 'reg.address': 'Endereço', 'reg.city': 'Cidade', 'reg.education': 'Estudos anteriores',
+    'reg.guardian': 'Responsável (se menor de idade)', 'reg.guardianPhone': 'Telefone do responsável', 'reg.how': 'Como nos conheceu?', 'reg.notes': 'Comentários',
+    'reg.pay': 'Pagar {amount} e me inscrever', 'reg.send': 'Enviar inscrição',
+    'reg.disabled': 'A inscrição online ainda não está habilitada. Escreva pelo Contato.',
+    'reg.step1': 'Preencha o formulário', 'reg.step2': 'Pague a inscrição', 'reg.step3': 'Você fica registrado como aluno', 'reg.step4': 'Escolha seu curso e nós matriculamos você',
+    'reg.done.title': 'Inscrição recebida!', 'reg.done.text': 'Você já está registrado como aluno. Quando escolher seu curso, faremos sua matrícula sem pedir seus dados novamente.',
+    'reg.done.access': 'Para entrar na plataforma, use “Esqueceu a senha?” com o e-mail {email} e crie sua senha.', 'reg.done.courses': 'Ver cursos',
+  },
+};
+
+export const SITE_DICT: Record<SiteLang, D> = { es: { ...es, ...REG.es }, en: { ...en, ...REG.en }, fr: { ...fr, ...REG.fr }, pt: { ...pt, ...REG.pt } };
 
 export type TFn = (key: string, vars?: Record<string, string | number>) => string;
 export function makeT(lang: SiteLang): TFn {
   const d = SITE_DICT[lang] ?? es;
   return (key, vars) => {
-    let s = d[key] ?? es[key] ?? key;
+    let s = d[key] ?? SITE_DICT.es[key] ?? key;
     if (vars) for (const [k, v] of Object.entries(vars)) s = s.replaceAll(`{${k}}`, String(v));
     return s;
   };

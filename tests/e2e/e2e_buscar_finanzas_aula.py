@@ -185,7 +185,7 @@ with sync_playwright() as pw:
     check(True, '🖍 Cierra la pizarra para todos')
 
     # Encuesta
-    t.click('[data-testid=boton-encuesta]'); t.fill('input[name=pregunta]', '¿Se entendió la clase?')
+    t.click('[data-testid=boton-mas-escritorio]'); t.click('[data-testid=boton-encuesta]'); t.fill('input[name=pregunta]', '¿Se entendió la clase?')
     t.locator('[data-testid=encuesta-panel] button:has-text("Sí / No / Más o menos")').click(); t.locator('button:has-text("Lanzar encuesta")').click()
     e.wait_for_selector('[data-testid=encuesta-voto]', timeout=15000); e.locator('[data-testid=encuesta-voto] button:has-text("Sí")').first.click()
     wait_text(t, '[data-testid=encuesta-resultados]', '1 voto')
@@ -195,7 +195,7 @@ with sync_playwright() as pw:
     check('100%' in e.locator('[data-testid=encuesta-voto]').inner_text(), '📊 El profesor muestra los resultados a todos')
 
     # Enlace para invitados
-    t.click('[data-testid=boton-invitar]'); t.click('[data-testid=crear-enlace]')
+    t.click('[data-testid=boton-mas-escritorio]'); t.click('[data-testid=boton-invitar]'); t.click('[data-testid=crear-enlace]')
     t.wait_for_selector('[data-testid=enlace-invitado]', timeout=15000)
     link = t.locator('[data-testid=enlace-invitado]').first.input_value()
     check('/invitado/' in link, f'🔗 El profesor genera el enlace para invitados ({link[:45]}…)')
@@ -211,7 +211,7 @@ with sync_playwright() as pw:
     gp.wait_for_selector('.lk-video-conference', timeout=30000)
     check(sql(f"select full_name || '|' || document_number || '|' || position || '|' || institution from conference_guests where session_id = '{sess}'") == 'Carla Invitada|22.222.222-2|Gerente de RR. HH.|Empresa Demo',
           '🔗 El invitado entra con su nombre, RUT, cargo e institución (queda registrado)')
-    t.click('footer button:has-text("Personas")')
+    t.click('[data-testid=boton-participantes]')
     t.wait_for_selector('[data-testid=personas] >> text=Carla Invitada', timeout=20000)
     li = t.locator('[data-testid=personas] li:has-text("Carla Invitada")').inner_text()
     check('Invitado' in li and 'Gerente de RR. HH.' in li, '👥 El profesor ve al invitado con su cargo e institución')

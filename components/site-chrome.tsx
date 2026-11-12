@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { Site } from '@/lib/site';
 import { mediaUrl } from '@/lib/site';
 import { getT } from '@/lib/site-i18n';
+import { registrationOpen } from '@/lib/site';
 import { LangSwitcher } from '@/components/site-lang';
 import { MobileNav } from '@/components/site-mobile-nav';
 
@@ -25,7 +26,8 @@ export function SiteLogo({ site, light = false }: { site: Pick<Site, 'site_name'
 
 export async function PublicHeader({ site }: { site: Site | null }) {
   const t = await getT();
-  const links: [string, string][] = [['/', t('nav.home')], ['/cursos', t('nav.courses')], ['/tienda', `🛒 ${(site as any)?.store_name ?? 'SEMATEC VENTA'}`], ['/nosotros', t('nav.about')], ['/contacto', t('nav.contact')], ['/estado', t('nav.status')]];
+  const reg = site ? await registrationOpen(site.organization_id) : false;
+  const links: [string, string][] = [['/', t('nav.home')], ['/cursos', t('nav.courses')], ...(reg ? [['/inscripcion', `📝 ${t('nav.register')}`] as [string, string]] : []), ['/tienda', `🛒 ${(site as any)?.store_name ?? 'SEMATEC VENTA'}`], ['/nosotros', t('nav.about')], ['/contacto', t('nav.contact')], ['/estado', t('nav.status')]];
   return (
     <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-lg">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 lg:px-8">

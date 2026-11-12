@@ -31,7 +31,7 @@ with sync_playwright() as pw:
     shot(p, 'aula_celular_mas')
     p.click('[data-testid=boton-anfitrion]'); p.wait_for_selector('[data-testid=panel-anfitrion]')
     check(p.locator('[data-testid=mas-opciones]').count() == 0, '📱 Al elegir una opción, el menú «Más» se cierra solo')
-    p.click('button[aria-label="Cerrar panel"]'); p.click('button[aria-label=Personas]'); p.wait_for_selector('[data-testid=personas]')
+    p.click('button[aria-label="Cerrar panel"]'); p.click('button[aria-label=Participantes]'); p.wait_for_selector('[data-testid=personas]')
     check(True, '📱 Personas y Chat siguen a un toque')
     check(p.locator('[data-testid=minimizar] svg').count() == 1, '📱 El botón Minimizar usa un ícono que se ve en todos los celulares')
     pc.close()

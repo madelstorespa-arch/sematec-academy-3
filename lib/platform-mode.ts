@@ -5,7 +5,7 @@
 export const AULA_EXCLUDED = [
   '/app/finanzas', '/app/tienda', '/app/sucursales', '/app/boletas', '/app/pagar', '/app/personal', '/app/inventario',
   '/app/reservas', '/app/punto-estudiantil', '/app/egresados', '/app/empleos', '/app/oficinas', '/app/admision',
-  '/app/matriculas', '/app/credencial', '/app/apoderado', '/app/reportes',
+  '/app/matriculas', '/app/inscripciones', '/app/credencial', '/app/apoderado', '/app/reportes',
 ];
 
 export const aulaExcluded = (path: string) => AULA_EXCLUDED.some((p) => path === p || path.startsWith(p + '/'));

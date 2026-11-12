@@ -84,9 +84,9 @@ with sync_playwright() as pw:
     check('Le toca a' in e.locator('[data-testid=elegido]').inner_text(), '🎲 Elegir al azar: todos ven a quién le toca')
 
     # Mensaje privado
-    e.click('footer button:has-text("Personas")'); e.locator('[data-testid=personas] li:has-text("Profesor") [data-testid=privado]').first.click()
+    e.click('[data-testid=boton-participantes]'); e.locator('[data-testid=personas] li:has-text("Profesor") [data-testid=privado]').first.click()
     e.fill('[data-testid=privado-texto]', 'Profe, ¿puedo salir 5 minutos?'); e.click('[data-testid=personas] button:has-text("Enviar")')
-    t.click('footer button:has-text("Chat")'); t.wait_for_selector('[data-testid=privados] >> text=puedo salir', timeout=15000)
+    t.click('[data-testid=boton-chat]'); t.wait_for_selector('[data-testid=privados] >> text=puedo salir', timeout=15000)
     check(e.locator('[data-testid=chat-mensajes] >> text=puedo salir').count() == 0, '✉ Mensaje privado: solo lo ve el destinatario (no aparece en el chat general)')
 
     # Asistencia
@@ -100,7 +100,7 @@ with sync_playwright() as pw:
     src = token_sources(e)
     check('MICROPHONE' not in [str(x).upper() for x in src] and 'microphone' not in src and 1 not in src and 2 not in src or len(src) == 1, f'⚙ Micrófonos apagados: el servidor de video ya no deja hablar a los participantes ({src})')
     check(len(token_sources(t)) >= 3, '⚙ El anfitrión sigue pudiendo hablar y compartir')
-    e.click('footer button:has-text("Chat")'); until(lambda: e.locator('text=desactivó el chat').count() > 0, msg='chat off')
+    e.click('[data-testid=boton-chat]'); until(lambda: e.locator('text=desactivó el chat').count() > 0, msg='chat off')
     check(True, '💬 Chat desactivado para los participantes al instante')
     until(lambda: t.locator('[data-testid=politica-mic]').is_enabled(), msg='listo'); t.locator('[data-testid=politica-mic]').click(); until(lambda: sql(f"select room_policy->>'mic' from conference_sessions where id = '{sess}'") == 'true', msg='mic'); until(lambda: t.locator('[data-testid=politica-chat]').is_enabled(), msg='listo'); t.locator('[data-testid=politica-chat]').click()
     until(lambda: sql(f"select concat(room_policy->>'mic', room_policy->>'chat') from conference_sessions where id = '{sess}'") == 'truetrue', timeout=45, msg='restaurar')

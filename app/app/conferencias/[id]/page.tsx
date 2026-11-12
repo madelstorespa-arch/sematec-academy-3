@@ -1,3 +1,4 @@
+import { DownloadMenu } from '@/components/download-menu';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getContext, can } from '@/lib/context';
@@ -87,7 +88,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
                 <span className="mt-1 flex flex-wrap gap-2">
                   <a className="btn-secondary btn-sm" href={`/app/conferencias/grabacion/${r.id}/ver`}>▶ Ver</a>
                   {canManage && <>
-                    <a className="btn-secondary btn-sm" href={`/app/conferencias/grabacion/${r.id}?descargar=1`}>⬇ Descargar</a>
+                    <DownloadMenu href={`/app/conferencias/grabacion/${r.id}?descargar=1`} name={r.filename} mime={r.filename.endsWith('.mp4') ? 'video/mp4' : 'video/webm'} />
                     <RecordingShare id={r.id} title={s.title} />
                     <a className="btn-secondary btn-sm" href={`/app/conferencias/grabacion/${r.id}/editar`}>✂ {r.group_id ? 'Unir / cortar' : 'Cortar'}</a>
                     <ActionForm action={deleteRecording} inline submitLabel="🗑" submitClass="btn-secondary btn-sm" confirm="¿Eliminar la grabación definitivamente?"><input type="hidden" name="id" value={r.id} /></ActionForm>

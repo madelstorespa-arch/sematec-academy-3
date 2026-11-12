@@ -42,7 +42,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <ConferenceHost>
     <div className="lg:flex" data-cards={cards['data-cards']} data-card-panels={cards['data-card-panels']} style={{ ...brandStyle(site?.primary_color, site?.accent_color), ...cards.style } as React.CSSProperties}>
-      <aside className="app-aside sticky top-0 z-30 flex max-h-screen flex-col overflow-y-auto bg-ink px-4 py-3 lg:fixed lg:inset-y-0 lg:w-64 lg:py-5">
+      <aside className="app-aside sticky top-0 z-30 flex max-h-screen flex-col overflow-y-auto bg-gradient-to-b from-ink via-ink to-[#0f2352] px-4 py-3 shadow-xl lg:fixed lg:inset-y-0 lg:w-72 lg:py-6">
         <MobileMenu header={<div className="px-2"><SiteLogo site={site} light /></div>} top={ctx.orgId ? <GlobalSearch items={items} /> : undefined}>
         {ctx.orgs.length > 0 && (
           <form action={switchOrg} className="mt-5 px-1">
@@ -70,7 +70,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
         </MobileMenu>
       </aside>
-      <main data-density={(ctx.profile?.preferences as { density?: string } | null)?.density === 'compacta' ? 'compacta' : undefined} className="app-main min-w-0 flex-1 px-3 pb-16 pt-4 lg:ml-64 lg:px-8 lg:pt-5">
+      <main data-density={(ctx.profile?.preferences as { density?: string } | null)?.density === 'compacta' ? 'compacta' : undefined} className="app-main min-w-0 flex-1 px-3 pb-16 pt-4 lg:ml-72 lg:px-10 lg:pt-6">
         <PageTranslator locale={locale} />
         <WindowBar items={items} locale={locale} setLocale={setMyLocale} />
         <OfflineBar userId={ctx.user.id} warmUrls={items.map((i) => i.href)} />

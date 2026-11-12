@@ -102,9 +102,9 @@ export function ApplicationForm({ action, offeringId, countries }: { action: Act
 }
 
 /** Formulario de pago: crea el pedido en el servidor y redirige a la página segura del proveedor. */
-export function CheckoutForm({ action, offeringId, providers, countries, trackingCode, children }: {
+export function CheckoutForm({ action, offeringId, providers, countries, trackingCode, children, free, submitLabel }: {
   action: Action; offeringId: string; providers: { id: string; label: string; description: string; banks?: { id: string; name: string }[] }[];
-  countries: { code: string; name: string }[]; trackingCode?: string; children?: ReactNode;
+  countries: { code: string; name: string }[]; trackingCode?: string; children?: ReactNode; free?: boolean; submitLabel?: string;
 }) {
   const go = (r: Result) => {
     const red = r.data as { method: 'GET' | 'POST'; url: string; fields?: Record<string, string> };
@@ -117,14 +117,14 @@ export function CheckoutForm({ action, offeringId, providers, countries, trackin
   const { res, pending, submit } = useSubmit(action, go);
   const [provider, setProvider] = useState(providers[0]?.id ?? '');
   const banks = providers.find((p) => p.id === provider)?.banks;
-  if (!providers.length) return <p className="rounded-lg bg-amber-50 p-4 text-sm text-amber-800" data-testid="pago-no-habilitado">{t('form.notEnabled')}</p>;
+  if (!providers.length && !free) return <p className="rounded-lg bg-amber-50 p-4 text-sm text-amber-800" data-testid="pago-no-habilitado">{t('form.notEnabled')}</p>;
   return (
     <form onSubmit={submit} className="space-y-5">
       <Honeypot /><input type="hidden" name="offering_id" value={offeringId} />
       {trackingCode && <input type="hidden" name="tracking_code" value={trackingCode} />}
       <PersonFields countries={countries} withDoc={!trackingCode} />
       {children}
-      <fieldset>
+      {!free && <fieldset>
         <legend className="label">{t('form.payMethod')} *</legend>
         <div className="grid gap-3 md:grid-cols-2">
           {providers.map((p, i) => (
@@ -133,8 +133,8 @@ export function CheckoutForm({ action, offeringId, providers, countries, trackin
               <span><b>{p.banks ? '🏦 ' : p.id === 'flow' ? '' : '💳 '}{p.label}</b><br /><span className="text-xs text-slate-600">{p.description}</span></span>
             </label>))}
         </div>
-      </fieldset>
-      {banks && (
+      </fieldset>}
+      {!free && banks && (
         <fieldset>
           <legend className="label">{t('form.chooseBank')} *</legend>
           <p className="mb-2 text-xs text-slate-500">{t('form.bankHelp')}</p>
@@ -147,8 +147,8 @@ export function CheckoutForm({ action, offeringId, providers, countries, trackin
         </fieldset>
       )}
       <Consent />
-      <button className="btn-primary w-full py-3 text-base" disabled={pending || res?.ok}>{pending || res?.ok ? t('form.connecting') : t('form.goPay')}</button>
-      <p className="text-center text-xs text-slate-500">{t('form.secure')}</p>
+      <button className="btn-primary w-full py-3 text-base" disabled={pending || res?.ok}>{pending || res?.ok ? (free ? t('form.sending') : t('form.connecting')) : submitLabel ?? t('form.goPay')}</button>
+      {!free && <p className="text-center text-xs text-slate-500">{t('form.secure')}</p>}
       <Msg r={res?.ok ? null : res} />
     </form>
   );

@@ -53,15 +53,17 @@ with sync_playwright() as pw:
     check(re.search(r'\d:\d\d', e.locator('[data-testid=temporizador]').inner_text()) is not None, '⏱ El estudiante ve la cuenta regresiva del anfitrión')
 
     # Subtítulos para todos
-    if t.locator('[data-testid=boton-subtitulos]').count():
+    if t.locator('[data-testid=cc-todos]').count():
         t.click('[data-testid=cc-todos]')
+        e.click('[data-testid=boton-mas-escritorio]')
         until(lambda: 'Quitar subtítulos' in e.locator('[data-testid=boton-subtitulos]').inner_text(), msg='subtítulos activos en el estudiante')
+        e.click('[data-testid=boton-mas-escritorio]')
         check(True, '💬 El anfitrión activa los subtítulos en vivo para todos')
         t.click('[data-testid=cc-todos]')
     shot(t, 'aula_pro_anfitrion')
 
     # Destacar para todos
-    t.click('footer button:has-text("Personas")')
+    t.click('[data-testid=boton-participantes]')
     t.wait_for_selector('[data-testid=personas] li:has-text("Estudiante")', timeout=15000)
     t.locator('[data-testid=personas] li:has-text("Estudiante") [data-testid=destacar]').first.click()
     e.wait_for_selector('[data-testid=destacado]', timeout=15000)
@@ -116,7 +118,7 @@ with sync_playwright() as pw:
     # Invitado externo en sala de espera
     t.click('[data-testid=boton-anfitrion]'); t.wait_for_selector('[data-testid=panel-anfitrion]'); t.click('[data-testid=toggle-espera]')
     until(lambda: sql(f"select waiting_room from conference_sessions where id = '{sess}'") == 't', msg='sala de espera activa')
-    t.click('[data-testid=boton-invitar]'); t.click('[data-testid=crear-enlace]')
+    t.click('[data-testid=boton-mas-escritorio]'); t.click('[data-testid=boton-invitar]'); t.click('[data-testid=crear-enlace]')
     t.wait_for_selector('[data-testid=enlace-invitado]', timeout=15000)
     link = t.locator('[data-testid=enlace-invitado]').first.input_value()
     gc = b.new_context(viewport={'width': 1280, 'height': 800}, permissions=['camera', 'microphone']); gp = gc.new_page()

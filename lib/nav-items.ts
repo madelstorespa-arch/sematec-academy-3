@@ -21,6 +21,7 @@ export function baseNav(ctx: Ctx): NavItem[] {
   if (can(ctx, 'teachers.view')) items.push({ href: '/app/profesores', label: 'Profesores', icon: '🧑‍🏫' });
   if (can(ctx, 'academic.view')) items.push({ href: '/app/academico', label: 'Carreras y asignaturas', icon: '🏛' });
   if (can(ctx, 'sections.view') || can(ctx, 'grades.view')) items.push({ href: '/app/secciones', label: 'Secciones y notas', icon: '📝' });
+  if (can(ctx, 'students.view')) items.push({ href: '/app/inscripciones', label: 'Inscripciones', icon: '🖊' });
   if (can(ctx, 'enrollments.view')) items.push({ href: '/app/matriculas', label: 'Matrículas', icon: '🗂' });
   if (can(ctx, 'finance.view')) items.push({ href: '/app/finanzas', label: 'Finanzas', icon: '💳' });
   if (can(ctx, 'store.view') || can(ctx, 'store.create')) items.push({ href: '/app/tienda', label: 'SEMATEC VENTA', icon: '🛒' });
@@ -31,6 +32,7 @@ export function baseNav(ctx: Ctx): NavItem[] {
   if (ctx.orgId) items.push(
     { href: '/app/anuncios', label: 'Anuncios', icon: '📢' },
     { href: '/app/mensajes', label: 'Mensajes', icon: '✉' },
+    { href: '/app/oficina', label: 'Oficina (Word, Excel…)', icon: '💼' },
     { href: '/app/biblioteca', label: 'Biblioteca', icon: '📖' },
     { href: '/app/soporte', label: 'Soporte técnico', icon: '🛟' },
   );

@@ -13,6 +13,7 @@ import { uploadRecording } from '@/lib/recordings-client';
 import { uploadUserFile } from '@/components/file-uploader';
 import { useConference, type Conn, type RoomOpts } from '@/components/conference/context';
 import { MiniDock, canDocPip, openPipWindow } from './mini';
+import { EvalBanner, EvalPanel, useEvalLaunch } from './eval';
 import { useBoard, Whiteboard } from './whiteboard';
 import { usePolls, PollPanel, PollCard } from './poll';
 import { InvitePanel } from './invite';
@@ -125,9 +126,9 @@ export function RoomShell({ conn: main, opts, view, onMinimize, onExpand, onLeav
 }
 
 type Floating = { id: number; emoji: string; left: number; from: string };
-type Panel = 'chat' | 'people' | 'effects' | 'poll' | 'invite' | 'host' | 'groups' | 'tools' | 'notes' | 'qa' | 'apps' | 'attendance' | 'roomcfg' | 'mysettings' | null;
+type Panel = 'chat' | 'people' | 'eval' | 'effects' | 'poll' | 'invite' | 'host' | 'groups' | 'tools' | 'notes' | 'qa' | 'apps' | 'attendance' | 'roomcfg' | 'mysettings' | null;
 const PANEL_TITLE: Record<string, string> = { effects: '🖼 Fondo y efectos', poll: '📊 Encuesta en vivo', invite: '🔗 Invitar a personas externas', host: '🛡 Controles del anfitrión', groups: '👥 Salas de grupos',
-  tools: '🧰 Herramientas', notes: '📝 Notas compartidas', qa: '❓ Preguntas y respuestas', apps: '📱 Apps y enlaces', attendance: '📋 Asistencia', roomcfg: '⚙ Configuración de la sala', mysettings: '🎛 Mis ajustes' };
+  eval: '📝 Evaluación y calificación', tools: '🧰 Herramientas', notes: '📝 Notas compartidas', qa: '❓ Preguntas y respuestas', apps: '📱 Apps y enlaces', attendance: '📋 Asistencia', roomcfg: '⚙ Configuración de la sala', mysettings: '🎛 Mis ajustes' };
 
 /** Pantalla angosta (celular): los controles se agrupan para no llenar la pantalla. */
 function useNarrow() {
@@ -171,6 +172,8 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
   const [boardHidden, setBoardHidden] = useState(false);
   const narrow = useNarrow();
   const [more, setMore] = useState(false);
+  const [moreDesk, setMoreDesk] = useState(false);
+  const evals = useEvalLaunch();
   const [, force] = useState(0);
   const mod = conn.moderator;
   const elapsed = useElapsed();
@@ -183,7 +186,7 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
     else setUnread(chat.chatMessages.filter((m, i) => i >= seen.current && m.from?.identity !== localParticipant.identity).length);
   }, [chat.chatMessages, panel, localParticipant.identity, view]);
   useEffect(() => { if (board.open) setBoardHidden(false); }, [board.open]);
-  useEffect(() => { setMore(false); }, [panel]);
+  useEffect(() => { setMore(false); setMoreDesk(false); }, [panel]);
 
   // Repintar cuando cambian atributos (mano levantada) o permisos
   useEffect(() => {
@@ -337,6 +340,7 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
         <span className="flex shrink-0 items-center gap-2 text-xs">
           {recBy && <span className="animate-pulse rounded bg-red-600 px-2 py-0.5 font-bold">● GRABANDO</span>}
           <span className="opacity-70">{participants.length} 👥<span className="hidden sm:inline"> · {CONF_ROLES[conn.role] ?? conn.role}</span></span>
+          <button className="hidden rounded-lg bg-white/10 px-2 py-1 hover:bg-white/20 sm:inline-flex" onClick={() => setLayout(layout === 'grid' ? 'speaker' : 'grid')} data-testid="boton-vista" title="Cambiar la vista">{layout === 'grid' ? '▦ Vista galería' : '🗣 Vista orador'}</button>
           {group > 0 && <button className="rounded-lg bg-emerald-600 px-2 py-1 hover:bg-emerald-500" onClick={onMain} data-testid="volver-principal">↩ Sala principal</button>}
           {onMinimize && <button className="rounded-lg bg-white/10 px-2 py-1 hover:bg-white/20" onClick={onMinimize} title="Minimizar: siga navegando por el sistema sin salir de la clase" data-testid="minimizar"><span className="flex items-center gap-1"><IconMin /><span className="hidden sm:inline">Minimizar</span></span></button>}
           {(canDocPip() || onMinimize || isMobile) && <button className="rounded-lg bg-white/10 px-2 py-1 hover:bg-white/20" onClick={openPip} title="Ventana flotante: use otras apps sin salir de la clase" data-testid="flotante">⧉<span className="hidden sm:inline"> Flotante</span></button>}
@@ -390,6 +394,7 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
           {showBoard && <Whiteboard board={board} title={title} />}
           <ToolBanners tools={tools} />
           <PollCard polls={polls} />
+          {!mod && <EvalBanner launched={evals.launched} onClose={evals.dismiss} />}
           <CaptionsOverlay cc={cc} />
           <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
             {floating.map((f) => (
@@ -420,6 +425,7 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
             {panel === 'groups' && <GroupsPanel sessionId={sessionId} me={localParticipant.identity} say={say} onVisit={(c, g) => onGroup(c, g)}
               people={participants.map((p) => { let r = ''; try { r = JSON.parse(p.metadata || '{}').role ?? ''; } catch { /* */ } return { identity: p.identity, name: p.name || 'Participante', mod: ['organizer', 'moderator', 'teacher'].includes(r) }; })} />}
             {panel === 'effects' && <EffectsPanel say={say} />}
+            {panel === 'eval' && <EvalPanel sessionId={sessionId} participants={participants} onLaunch={evals.launch} say={say} />}
             {panel === 'poll' && <PollPanel polls={polls} />}
             {panel === 'invite' && <InvitePanel sessionId={sessionId} title={title} />}
           </aside>)}
@@ -461,6 +467,7 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
         {mod
           ? <button className={btn(board.open)} onClick={() => (board.open ? board.hide() : board.show())} data-testid="boton-pizarra">🖍 {board.open ? 'Cerrar pizarra' : 'Pizarra'}</button>
           : board.open && <button className={btn(showBoard)} onClick={() => setBoardHidden(!boardHidden)}>🖍 {showBoard ? 'Ver videos' : 'Ver pizarra'}</button>}
+        {!guest && <button className={btn(panel === 'eval')} onClick={() => toggle('eval')} data-testid="boton-evaluacion">📝 Evaluación</button>}
         {mod && <button className={btn(panel === 'poll')} onClick={() => toggle('poll')} data-testid="boton-encuesta">📊 Encuesta</button>}
         {mod && !guest && <button className={btn(panel === 'invite')} onClick={() => toggle('invite')} data-testid="boton-invitar">🔗 Invitar</button>}
         {cc.supported && <button className={btn(cc.show)} data-testid="boton-subtitulos" title="Subtítulos en vivo (transcribe su voz para todos)"
@@ -473,44 +480,59 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
         <button className="lk-button" onClick={() => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {})}>⛶ Pantalla completa</button>
         </div>
       </>)}
-      <footer className={`flex items-center justify-center border-t border-white/10 bg-[#0c0c10] px-2 py-2 ${narrow ? 'relative z-40 gap-1' : 'flex-wrap gap-1 sm:gap-2'}`} data-testid="barra-controles">
-        <span className="flex items-center"><TrackToggle source={Track.Source.Microphone} showIcon aria-label="Micrófono">{narrow ? null : 'Micrófono'}</TrackToggle>{!narrow && <MediaDeviceMenu kind="audioinput" />}</span>
-        <span className="flex items-center"><TrackToggle source={Track.Source.Camera} showIcon aria-label="Cámara">{narrow ? null : 'Cámara'}</TrackToggle>{!narrow && <MediaDeviceMenu kind="videoinput" />}</span>
+      <footer className={`zbar flex items-center border-t border-white/10 bg-[#1a1a1a] px-2 py-1.5 ${narrow ? 'relative z-40 justify-center gap-1' : 'justify-between gap-1'}`} data-testid="barra-controles">
+        <span className={narrow ? 'contents' : 'flex w-[13rem] shrink-0 items-center'}>
+          <span className="zsplit flex items-center"><TrackToggle source={Track.Source.Microphone} showIcon aria-label="Micrófono" data-testid="boton-microfono">{narrow ? null : <span className="zlbl">{localParticipant.isMicrophoneEnabled ? 'Silenciar' : 'Activar audio'}</span>}</TrackToggle>{!narrow && <MediaDeviceMenu kind="audioinput" />}</span>
+          <span className="zsplit flex items-center"><TrackToggle source={Track.Source.Camera} showIcon aria-label="Cámara" data-testid="boton-camara">{narrow ? null : <span className="zlbl">{localParticipant.isCameraEnabled ? 'Detener video' : 'Iniciar video'}</span>}</TrackToggle>{!narrow && <MediaDeviceMenu kind="videoinput" />}</span>
+        </span>
         {narrow ? (<>
-          <button className={btn(panel === 'chat')} onClick={() => toggle('chat')} aria-label="Chat">💬{unread > 0 && <span className="ml-1 rounded-full bg-red-600 px-1.5 text-xs">{unread}</span>}</button>
-          <button className={btn(panel === 'people')} onClick={() => toggle('people')} aria-label="Personas">👥{hands.length > 0 && <span className="ml-1 rounded-full bg-amber-500 px-1.5 text-xs">{hands.length}</span>}</button>
+          <button className={btn(panel === 'chat')} onClick={() => toggle('chat')} aria-label="Chat" data-testid="boton-chat">💬{unread > 0 && <span className="ml-1 rounded-full bg-red-600 px-1.5 text-xs">{unread}</span>}</button>
+          <button className={btn(panel === 'people')} onClick={() => toggle('people')} aria-label="Participantes" data-testid="boton-participantes">👥{hands.length > 0 && <span className="ml-1 rounded-full bg-amber-500 px-1.5 text-xs">{hands.length}</span>}</button>
           <button className={btn(more)} onClick={() => setMore((v) => !v)} aria-expanded={more} data-testid="boton-mas">⋯ Más</button>
         </>) : (<>
+        <span className="zgroup flex flex-1 items-center justify-center gap-0.5">
+        {mod && !group && <ZB icon="🛡" label="Seguridad" active={panel === 'host'} onClick={() => toggle('host')} testid="boton-anfitrion" />}
+        <ZB icon="👥" label="Participantes" active={panel === 'people'} onClick={() => toggle('people')} testid="boton-participantes" count={participants.length}
+          badge={hands.length > 0 ? <span className="zbadge bg-amber-500">✋{hands.length}</span> : null} />
+        <ZB icon="💬" label="Chat" active={panel === 'chat'} onClick={() => toggle('chat')} testid="boton-chat"
+          badge={unread > 0 ? <span className="zbadge bg-red-600">{unread}</span> : null} />
         {canShare && <ShareButton say={say} onFail={() => isMobile && setShareHelp(true)} onCamOff={() => { restoreCam.current = true; }} />}
-        {sharePerm && !canShare && <button className="lk-button" onClick={() => setShareHelp(true)} data-testid="compartir-celular">📲 Compartir pantalla</button>}
-        {(isMobile || !canDisplayCapture()) && <button className="lk-button" onClick={flipCamera} title="Cambiar entre cámara frontal y trasera">🔄 Cámara</button>}
-        <button className={btn(panel === 'effects')} onClick={() => toggle('effects')} title="Desenfoque y fondos virtuales">🖼 Fondo</button>
+        {sharePerm && !canShare && <ZB icon="📲" label="Compartir pantalla" onClick={() => setShareHelp(true)} testid="compartir-celular" />}
+        {mod && recording && !guest && <Recorder sessionId={sessionId} title={title} say={say} broadcast={(on) => { sendRec(enc.encode(on ? '1' : '0'), { reliable: true }); setRecBy(on ? (localParticipant.name ?? 'Usted') : null); }} />}
+        {mod && !group && !guest && <ZB icon="🔲" label="Grupos" active={panel === 'groups'} onClick={() => toggle('groups')} testid="boton-grupos" />}
         {tools.can('reactions') && <span className="relative">
-          <button className="lk-button" onClick={() => setShowReactions((v) => !v)} title="Reacciones">😀 Reaccionar</button>
+          <ZB icon="😀" label="Reacciones" active={showReactions} onClick={() => setShowReactions((v) => !v)} testid="boton-reacciones"
+            badge={hand ? <span className="zbadge bg-amber-500">✋</span> : null} />
           {showReactions && (
-            <span className="absolute bottom-12 left-1/2 z-20 flex -translate-x-1/2 gap-1 rounded-xl bg-[#222] p-2 shadow-xl">
-              {REACTIONS.map((e) => <button key={e} className="rounded p-1 text-2xl hover:bg-white/10" onClick={() => react(e)} aria-label={`Reaccionar ${e}`}>{e}</button>)}
+            <span className="absolute bottom-16 left-1/2 z-30 w-max -translate-x-1/2 rounded-2xl bg-[#232323] p-2 shadow-2xl" data-testid="menu-reacciones">
+              <span className="flex gap-1">{REACTIONS.map((e) => <button key={e} className="rounded-lg p-1.5 text-2xl hover:bg-white/10" onClick={() => react(e)} aria-label={`Reaccionar ${e}`}>{e}</button>)}</span>
+              <button className="mt-1 w-full rounded-lg bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20" onClick={() => { toggleHand(); setShowReactions(false); }}>{hand ? '✋ Bajar la mano' : '✋ Levantar la mano'}</button>
             </span>)}
         </span>}
-        <button className={btn(hand)} onClick={toggleHand}>{hand ? '✋ Bajar la mano' : '✋ Levantar la mano'}</button>
-        <button className={btn(panel === 'chat')} onClick={() => toggle('chat')}>
-          💬 Chat{unread > 0 && <span className="ml-1 rounded-full bg-red-600 px-1.5 text-xs">{unread}</span>}</button>
-        <button className={btn(panel === 'people')} onClick={() => toggle('people')}>👥 Personas{hands.length > 0 && <span className="ml-1 rounded-full bg-amber-500 px-1.5 text-xs">{hands.length}</span>}</button>
+        {!tools.can('reactions') && <ZB icon="✋" label={hand ? 'Bajar la mano' : 'Levantar la mano'} active={hand} onClick={toggleHand} />}
+        {!guest && <ZB icon="📝" label="Evaluación" active={panel === 'eval'} onClick={() => toggle('eval')} testid="boton-evaluacion" />}
         {mod
-          ? <button className={btn(board.open)} onClick={() => (board.open ? board.hide() : board.show())} data-testid="boton-pizarra">🖍 {board.open ? 'Cerrar pizarra' : 'Pizarra'}</button>
-          : board.open && <button className={btn(showBoard)} onClick={() => setBoardHidden(!boardHidden)}>🖍 {showBoard ? 'Ver videos' : 'Ver pizarra'}</button>}
-        {mod && <button className={btn(panel === 'poll')} onClick={() => toggle('poll')} data-testid="boton-encuesta">📊 Encuesta</button>}
-        {mod && !guest && <button className={btn(panel === 'invite')} onClick={() => toggle('invite')} data-testid="boton-invitar">🔗 Invitar</button>}
-        {cc.supported && <button className={btn(cc.show)} data-testid="boton-subtitulos" title="Subtítulos en vivo (transcribe su voz para todos)"
-          onClick={() => { const on = !cc.show; cc.setShow(on); cc.setMine(on); if (on) say('💬 Subtítulos activados: lo que usted diga aparecerá escrito para todos.'); }}>💬 {cc.show ? 'Quitar subtítulos' : 'Subtítulos'}</button>}
-        {mod && !group && <button className={btn(panel === 'host')} onClick={() => toggle('host')} data-testid="boton-anfitrion">🛡 Anfitrión</button>}
-        {mod && !group && !guest && <button className={btn(panel === 'groups')} onClick={() => toggle('groups')} data-testid="boton-grupos">👥 Grupos</button>}
-        <button className={btn(['tools', 'notes', 'qa', 'apps', 'attendance', 'roomcfg', 'mysettings'].includes(panel ?? ''))} onClick={() => toggle('tools')} data-testid="boton-herramientas">🧰 Herramientas{tools.qa.some((q) => !q.answered) && <span className="ml-1 rounded-full bg-blue-500 px-1.5 text-xs">{tools.qa.filter((q) => !q.answered).length}</span>}</button>
-        <button className="lk-button" onClick={() => setLayout(layout === 'grid' ? 'speaker' : 'grid')} title="Cambiar vista">{layout === 'grid' ? '🗣 Vista orador' : '▦ Vista galería'}</button>
-        {mod && recording && !guest && <Recorder sessionId={sessionId} title={title} say={say} broadcast={(on) => { sendRec(enc.encode(on ? '1' : '0'), { reliable: true }); setRecBy(on ? (localParticipant.name ?? 'Usted') : null); }} />}
-        <button className="lk-button" onClick={() => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {})}>⛶ Pantalla completa</button>
+          ? <ZB icon="🖍" label={board.open ? 'Cerrar pizarra' : 'Pizarra'} active={board.open} onClick={() => (board.open ? board.hide() : board.show())} testid="boton-pizarra" />
+          : board.open && <ZB icon="🖍" label={showBoard ? 'Ver videos' : 'Ver pizarra'} active={showBoard} onClick={() => setBoardHidden(!boardHidden)} />}
+        <ZB icon="🧰" label="Herramientas" active={['tools', 'notes', 'qa', 'apps', 'attendance', 'roomcfg', 'mysettings'].includes(panel ?? '')} onClick={() => toggle('tools')} testid="boton-herramientas"
+          badge={tools.qa.some((q) => !q.answered) ? <span className="zbadge bg-blue-500">{tools.qa.filter((q) => !q.answered).length}</span> : null} />
+        <span className="relative">
+          <ZB icon="⋯" label="Más" active={moreDesk} onClick={() => setMoreDesk((v) => !v)} testid="boton-mas-escritorio" />
+          {moreDesk && (
+            <span className="absolute bottom-16 right-0 z-30 flex w-64 flex-col rounded-2xl bg-[#232323] p-1.5 text-left text-sm shadow-2xl" data-testid="menu-mas">
+              <MI onClick={() => toggle('effects')} testid="boton-fondo">🖼 Fondo y efectos</MI>
+              {mod && <MI onClick={() => toggle('poll')} testid="boton-encuesta">📊 Encuesta</MI>}
+              {mod && !guest && <MI onClick={() => toggle('invite')} testid="boton-invitar">🔗 Invitar</MI>}
+              {cc.supported && <MI testid="boton-subtitulos" onClick={() => { const on = !cc.show; cc.setShow(on); cc.setMine(on); setMoreDesk(false); if (on) say('💬 Subtítulos activados: lo que usted diga aparecerá escrito para todos.'); }}>💬 {cc.show ? 'Quitar subtítulos' : 'Subtítulos'}</MI>}
+              <MI onClick={() => { setLayout(layout === 'grid' ? 'speaker' : 'grid'); setMoreDesk(false); }}>{layout === 'grid' ? '🗣 Vista orador' : '▦ Vista galería'}</MI>
+              {(isMobile || !canDisplayCapture()) && <MI onClick={() => { flipCamera(); setMoreDesk(false); }}>🔄 Cambiar cámara</MI>}
+              {(canDocPip() || onMinimize || isMobile) && <MI onClick={() => { setMoreDesk(false); openPip(); }}>⧉ Ventana flotante</MI>}
+              <MI onClick={() => { setMoreDesk(false); (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {}); }}>⛶ Pantalla completa</MI>
+            </span>)}
+        </span>
+        </span>
         </>)}
-        <DisconnectButton>Salir</DisconnectButton>
+        <span className={narrow ? 'contents' : 'flex w-[13rem] shrink-0 justify-end'}><DisconnectButton data-testid="boton-salir">Salir</DisconnectButton></span>
       </footer>
     </div>
     {(mini || pip) && (
@@ -518,6 +540,19 @@ function Stage({ sessionId, title, recording, chatEnabled, orgId, sectionId, gue
         pip={pip} onPip={openPip} onClosePip={closePip} onExpand={onExpand} canShare={canShare} />)}
     </>
   );
+}
+
+/** Botón de la barra inferior (ícono arriba y texto abajo, como en las videollamadas profesionales). */
+function ZB({ icon, label, onClick, active, testid, badge, count }: { icon: string; label: string; onClick: () => void; active?: boolean; testid?: string; badge?: React.ReactNode; count?: number }) {
+  return (
+    <button className={`lk-button zbtn ${active ? 'lk-button-active' : ''}`} onClick={onClick} data-testid={testid}>
+      <span className="zicon relative" aria-hidden>{icon}{count != null && <span className="zcount">{count}</span>}{badge}</span>
+      <span className="zlbl">{label}</span>
+    </button>
+  );
+}
+function MI({ children, onClick, testid }: { children: React.ReactNode; onClick: () => void; testid?: string }) {
+  return <button className="rounded-lg px-3 py-2 text-left hover:bg-white/10" onClick={onClick} data-testid={testid}>{children}</button>;
 }
 
 /** 🖥 Compartir pantalla con calidad a elección, audio y mensajes claros si el sistema bloquea el permiso. */
@@ -554,7 +589,7 @@ function ShareButton({ say, onFail, onCamOff }: { say: (m: string) => void; onFa
   if (sharing) return <button className="lk-button lk-button-active" onClick={() => localParticipant.setScreenShareEnabled(false)} data-testid="dejar-compartir">⏹ Dejar de compartir</button>;
   return (
     <span className="relative">
-      <button className="lk-button" disabled={busy} onClick={() => setOpen((v) => !v)}>🖥 Compartir pantalla</button>
+      <button className="lk-button zbtn zshare" disabled={busy} onClick={() => setOpen((v) => !v)} data-testid="boton-compartir"><span className="zicon" aria-hidden>🖥</span><span className="zlbl">Compartir pantalla</span></button>
       {open && (
         <span className="absolute bottom-12 left-1/2 z-30 block w-[min(92vw,22rem)] -translate-x-1/2 rounded-xl bg-[#222] p-4 text-left text-sm shadow-2xl" data-testid="opciones-compartir">
           <b>¿Qué quiere compartir?</b>
@@ -932,7 +967,7 @@ function Recorder({ sessionId, title, say, broadcast }: { sessionId: string; tit
     </span>);
   if (state === 'idle' || state === 'setup') return (
     <span className="relative">
-      <button className="lk-button" onClick={() => setState(state === 'setup' ? 'idle' : 'setup')}>⏺ Grabar</button>
+      <button className="lk-button zbtn" onClick={() => setState(state === 'setup' ? 'idle' : 'setup')} data-testid="boton-grabar"><span className="zicon text-red-500" aria-hidden>⏺</span><span className="zlbl">Grabar</span></button>
       {state === 'setup' && (
         <span className="absolute bottom-12 left-1/2 z-30 block w-[min(92vw,26rem)] -translate-x-1/2 rounded-xl bg-[#222] p-4 text-left text-sm shadow-2xl" data-testid="opciones-grabacion">
           <b>¿Qué quiere grabar?</b>

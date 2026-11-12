@@ -186,7 +186,7 @@ with sync_playwright() as pw:
     check(mob.locator('[data-testid=ayuda-compartir]').count() == 1 and mob.locator('button:has-text("Mostrar con la cámara trasera")').count() == 1, 'Celular: «Compartir pantalla» ofrece cámara trasera y enviar archivos')
     mob.locator('button:has-text("Enviar foto, video o archivo al chat")').click()
     mob.locator('[data-testid=adjuntar-chat]').set_input_files(f'{MEDIA}/foto.png')
-    t.click('footer button:has-text("Chat")')
+    t.click('[data-testid=boton-chat]')
     t.wait_for_selector('[data-testid=chat-mensajes] a:has-text("📎 foto.png")', timeout=30000)
     check(True, 'Celular envía una foto al chat y el profesor la recibe como enlace')
     # Grabación guardada en tiempo real (partes de 6 s en la prueba)
@@ -216,7 +216,7 @@ with sync_playwright() as pw:
     check('Recorte listo' in ed.locator('[role=status]').last.inner_text(), '✂ Corta un tramo del video')
     # Permisos: el estudiante solo ve
     go(e, f'{BASE}/app/conferencias/{sess}')
-    check(e.locator('[data-testid=grabacion]').count() >= 2 and e.locator('[data-testid=grabacion] a:has-text("Descargar")').count() == 0
+    check(e.locator('[data-testid=grabacion]').count() >= 2 and e.locator('[data-testid=grabacion] [data-testid=descargar-como]').count() == 0
           and e.locator('[data-testid=grabacion] a:has-text("Cortar")').count() == 0 and e.locator('[data-testid=grabacion] button:has-text("Enviar")').count() == 0,
           'Estudiante: solo «Ver» (sin descargar, enviar ni cortar)')
     go(e, f'{BASE}/app/conferencias/grabacion/{first}/editar'); check('/ver' in e.url, 'El estudiante no entra al editor')
@@ -225,7 +225,7 @@ with sync_playwright() as pw:
     r = e.request.post(f'{BASE}/api/grabaciones/subir', data=json.dumps({'session': sess, 'size': 10, 'mime': 'video/webm', 'source': first}), headers={'Content-Type': 'application/json'})
     check(r.status == 403, 'El estudiante no puede guardar recortes')
     go(o, f'{BASE}/app/conferencias/{sess}')
-    check(o.locator('[data-testid=grabacion] a:has-text("Descargar")').count() >= 1, 'El propietario está autorizado (descargar, enviar, cortar)')
+    check(o.locator('[data-testid=grabacion] [data-testid=descargar-como]').count() >= 1, 'El propietario está autorizado (descargar, enviar, cortar)')
     b.close()
 
 print(f"\n{sum(1 for r in results if r[0])}/{len(results)} verificaciones OK")

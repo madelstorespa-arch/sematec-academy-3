@@ -24,8 +24,9 @@ with sync_playwright() as pw:
 
     go(t, f'{BASE}/app/conferencias/sala/{sess}'); t.click('button:has-text("Entrar a la sala")')
     t.wait_for_selector('.lk-video-conference', timeout=30000)
-    for lbl in ['Micrófono', 'Cámara', 'Fondo', 'Reaccionar', 'Levantar la mano', 'Chat', 'Personas', 'Vista orador', 'Grabar', 'Salir']:
-        check(t.locator(f'button:has-text("{lbl}")').count() >= 1, f'Control «{lbl}» disponible para el anfitrión')
+    for lbl, sel in [('Silenciar', 'boton-microfono'), ('Detener video', 'boton-camara'), ('Seguridad', 'boton-anfitrion'), ('Participantes', 'boton-participantes'), ('Chat', 'boton-chat'),
+                     ('Reacciones', 'boton-reacciones'), ('Evaluación', 'boton-evaluacion'), ('Grupos', 'boton-grupos'), ('Pizarra', 'boton-pizarra'), ('Más', 'boton-mas-escritorio'), ('Vista', 'boton-vista'), ('Grabar', 'boton-grabar'), ('Salir', 'boton-salir')]:
+        check(t.locator(f'[data-testid={sel}]').count() >= 1, f'Barra estilo Zoom: «{lbl}» disponible para el anfitrión')
     check(t.locator('button:has-text("Compartir pantalla")').count() == 1, 'El anfitrión puede compartir pantalla')
 
     ec = new(); e = login(ec, 'estudiante1.a@demo.sematec.test')
@@ -35,31 +36,31 @@ with sync_playwright() as pw:
     check(e.locator('button:has-text("Grabar")').count() == 0, 'El estudiante no ve el botón Grabar')
     e.wait_for_selector('footer button:has-text("Compartir pantalla")', timeout=15000)
     check(e.locator('button:has-text("Compartir pantalla")').count() == 1, 'Todos los participantes pueden compartir pantalla (por defecto)')
-    e.locator('button:has-text("Cámara")').first.click(); t.locator('button:has-text("Cámara")').first.click()
-    e.locator('button:has-text("Micrófono")').first.click()
+    e.locator('[data-testid=boton-camara]').first.click(); t.locator('[data-testid=boton-camara]').first.click()
+    e.locator('[data-testid=boton-microfono]').first.click()
     t.locator('.lk-participant-tile').nth(1).wait_for(timeout=30000)
     check(t.locator('.lk-participant-tile').count() >= 2, 'Profesor y estudiante con video en la sala')
 
     # Chat con emojis
-    e.click('footer button:has-text("Chat")'); e.click('button[aria-label="Emojis"]'); e.locator('button:has-text("👋")').first.click()
+    e.click('[data-testid=boton-chat]'); e.click('button[aria-label="Emojis"]'); e.locator('button:has-text("👋")').first.click()
     e.fill('input[aria-label="Mensaje del chat"]', e.input_value('input[aria-label="Mensaje del chat"]') + ' Hola profe'); e.click('button:has-text("Enviar")')
-    t.wait_for_selector('footer button:has-text("Chat") span', timeout=15000)
-    check(t.locator('footer button:has-text("Chat") span').inner_text() == '1', 'Aviso de mensaje nuevo en el chat')
-    t.click('footer button:has-text("Chat")'); t.wait_for_selector('[data-testid=chat-mensajes] >> text=Hola profe', timeout=15000)
+    t.wait_for_selector('[data-testid=boton-chat] .zbadge', timeout=15000)
+    check(t.locator('[data-testid=boton-chat] .zbadge').inner_text() == '1', 'Aviso de mensaje nuevo en el chat')
+    t.click('[data-testid=boton-chat]'); t.wait_for_selector('[data-testid=chat-mensajes] >> text=Hola profe', timeout=15000)
     check(t.locator('[data-testid=chat-mensajes] >> text=👋 Hola profe').count() == 1, 'Chat en vivo con emojis entre estudiante y profesor')
 
     # Reacción y mano levantada
-    e.click('button:has-text("Reaccionar")'); e.click('button[aria-label="Reaccionar 👏"]')
+    e.click('[data-testid=boton-reacciones]'); e.click('button[aria-label="Reaccionar 👏"]')
     t.wait_for_selector('.reaction-float:has-text("👏")', timeout=10000); check(True, 'Reacción 👏 aparece en la pantalla del profesor')
-    e.click('button:has-text("Levantar la mano")')
+    e.click('[data-testid=boton-reacciones]'); e.click('[data-testid=menu-reacciones] button:has-text(\"Levantar la mano\")')
     t.wait_for_selector('[data-testid=manos]:has-text("Estudiante")', timeout=15000); check(True, 'El profesor ve la mano levantada')
     shot(t, 'aula_virtual_profesor')
 
     # Controles del anfitrión
-    t.click('footer button:has-text("Personas")'); t.wait_for_selector('[data-testid=personas] >> text=Estudiante', timeout=10000)
+    t.click('[data-testid=boton-participantes]'); t.wait_for_selector('[data-testid=personas] >> text=Estudiante', timeout=10000)
     row = t.locator('[data-testid=personas] li:has-text("Estudiante")').first
     row.locator('button:has-text("Silenciar")').click(); time.sleep(3)
-    check(e.locator('button:has-text("Micrófono")').first.get_attribute('aria-pressed') == 'false', 'El anfitrión silencia el micrófono del estudiante')
+    check(e.locator('[data-testid=boton-microfono]').first.get_attribute('aria-pressed') == 'false', 'El anfitrión silencia el micrófono del estudiante')
     row.locator('button:has-text("Bajar mano")').click()
     t.wait_for_selector('[data-testid=manos]', state='detached', timeout=15000); check(True, 'El anfitrión baja la mano del estudiante')
     row.locator('button:has-text("Quitar pantalla")').click()
@@ -69,7 +70,7 @@ with sync_playwright() as pw:
     shot(e, 'aula_virtual_estudiante')
 
     # Fondos virtuales
-    e.click('footer button:has-text("Fondo")'); e.wait_for_selector('[data-testid=efectos], aside:has-text("no permite fondos")', timeout=10000)
+    e.click('[data-testid=boton-mas-escritorio]'); e.click('[data-testid=boton-fondo]'); e.wait_for_selector('[data-testid=efectos], aside:has-text("no permite fondos")', timeout=10000)
     check(e.locator('[data-testid=efectos] img').count() >= 6 or e.locator('text=no permite fondos').count() == 1, 'Panel de fondos: desenfoque, 6 fondos y «Mi imagen»')
     if e.locator('[data-testid=efectos] button:has-text("Desenfoque suave")').count():
         e.click('[data-testid=efectos] button:has-text("Desenfoque suave")'); time.sleep(3)
@@ -79,7 +80,7 @@ with sync_playwright() as pw:
               'Desenfoque: motor local cargado' + (' (modelo de internet bloqueado solo en el entorno de pruebas)' if failed else ' y aplicado'))
     shot(e, 'aula_virtual_fondos')
     # Expulsar
-    t.click('footer button:has-text("Personas")') if t.locator('[data-testid=personas]').count() == 0 else None
+    t.click('[data-testid=boton-participantes]') if t.locator('[data-testid=personas]').count() == 0 else None
     t.once('dialog', lambda d: d.accept()); t.locator('[data-testid=personas] li:has-text("Estudiante") button:has-text("Expulsar")').click()
     e.wait_for_selector('button:has-text("Entrar a la sala")', timeout=20000); check(True, 'El anfitrión expulsa a un participante')
 

@@ -1,3 +1,4 @@
+import { DownloadMenu } from '@/components/download-menu';
 import { getContext, requireOrg } from '@/lib/context';
 import { PageHeader, Card, Empty, Badge, Tabs } from '@/components/ui';
 import { ActionForm } from '@/components/forms';
@@ -110,7 +111,7 @@ export default async function ArchivosPage({ searchParams }: { searchParams: Pro
                 <p className="flex flex-wrap gap-1"><Badge color="blue">{VIS[f.visibility]}{f.sections ? ` ${f.sections.courses?.name ?? ''}` : ''}</Badge>
                   {f.deleted_at && <Badge color="red">Eliminado {fmtDateTime(f.deleted_at)}{f.remover ? ` por ${f.remover.full_name}` : ''}</Badge>}</p>
                 <div className="flex flex-wrap gap-1 pt-2">
-                  <a className="btn-secondary btn-sm" href={`/app/archivos/ver/${f.id}?descargar=1`}>⬇ Descargar</a>
+                  <DownloadMenu href={`/app/archivos/ver/${f.id}?descargar=1`} name={f.name} mime={f.mime_type} fileId={f.deleted_at ? undefined : f.id} />
                   {!f.deleted_at && f.owner_id === ctx.user.id && (
                     <details className="w-full text-xs"><summary className="cursor-pointer text-slate-500" data-testid="opciones-archivo">📂 Mover o renombrar</summary>
                       <ActionForm action={moveFile} inline submitLabel="Mover" submitClass="btn-secondary btn-sm" resetOnSuccess={false}>

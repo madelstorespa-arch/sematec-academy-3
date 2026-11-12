@@ -80,3 +80,49 @@ export async function startCheckout(fd: FormData): Promise<ActionResult> {
     return { ok: false, error: 'No fue posible conectar con el medio de pago. No se realizó ningún cobro; intente nuevamente o elija otro medio.' };
   }
 }
+
+const FORM_KEYS = ['birth_date', 'address', 'city', 'education', 'guardian_name', 'guardian_phone', 'how_found', 'notes'] as const;
+
+/** 📝 Inscripción general desde el sitio: paga la inscripción (o la envía si no tiene costo) y queda registrado como estudiante. */
+export async function startRegistration(fd: FormData): Promise<ActionResult> {
+  if (!human(fd)) return { ok: false, error: 'Solicitud inválida.' };
+  if (!fd.get('consent')) return { ok: false, error: 'Debe aceptar los términos y la política de privacidad.' };
+  const site = await getPublicSite();
+  if (!site) return { ok: false, error: 'Sitio no disponible.' };
+  const doc = publicDoc(fd, true);
+  if ('error' in doc) return { ok: false, error: doc.error };
+  const email = v(fd, 'email').toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { ok: false, error: 'Escriba un correo válido.' };
+  if (v(fd, 'name').length < 3) return { ok: false, error: 'Escriba su nombre completo.' };
+  const form = Object.fromEntries(FORM_KEYS.map((k) => [k, v(fd, k).slice(0, 500)]).filter(([, x]) => x));
+  const { data: cfg } = await anonClient().rpc('registration_info', { p_org: site.organization_id });
+  const c = cfg as { enabled: boolean; fee: number; currency: string; title: string } | null;
+  if (!c?.enabled) return { ok: false, error: 'La inscripción en línea no está habilitada.' };
+  if (Number(c.fee) <= 0) {
+    try {
+      const { ensureBuyerUser } = await import('@/lib/payments');
+      const user = await ensureBuyerUser(email, v(fd, 'name'), `inscripcion:${Date.now()}`);
+      const { error } = await createAdminClient().rpc('register_web_free', {
+        p_org: site.organization_id, p_user: user, p_name: v(fd, 'name'), p_email: email, p_phone: v(fd, 'phone'),
+        p_doc_country: doc.country, p_doc_type: doc.type, p_doc_number: doc.number, p_form: form,
+      });
+      if (error) return { ok: false, error: explain(error) };
+      return { ok: true, message: '¡Inscripción recibida!', data: { method: 'GET', url: `/inscripcion/lista?correo=${encodeURIComponent(email)}` } };
+    } catch (e) { console.error(e); return { ok: false, error: 'No se pudo registrar la inscripción. Intente nuevamente.' }; }
+  }
+  const provider = v(fd, 'provider') as ProviderId;
+  const { data, error } = await anonClient().rpc('create_registration_order', {
+    p_org: site.organization_id, p_provider: provider, p_name: v(fd, 'name'), p_email: email, p_phone: v(fd, 'phone'),
+    p_doc_country: doc.country, p_doc_type: doc.type, p_doc_number: doc.number, p_form: form,
+  });
+  if (error) return { ok: false, error: explain(error) };
+  const o = data as { order_id: string; order_number: number; amount: number; currency: string; title: string };
+  try {
+    const start = await startPayment(provider, { id: o.order_id, number: o.order_number, amount: Number(o.amount), currency: o.currency, title: o.title, email, name: v(fd, 'name'), bank: v(fd, 'bank') || undefined });
+    return { ok: true, message: 'Redirigiendo al pago seguro…', data: start.redirect };
+  } catch (e) {
+    console.error(e);
+    await createAdminClient().rpc('mark_order_result', { p_order: o.order_id, p_provider: provider, p_reference: null, p_paid: false, p_amount: 0, p_currency: o.currency, p_status: 'start_error', p_payload: { error: String(e) } });
+    return { ok: false, error: 'No fue posible conectar con el medio de pago. No se realizó ningún cobro; intente nuevamente o elija otro medio.' };
+  }
+}

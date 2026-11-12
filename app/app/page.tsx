@@ -33,12 +33,36 @@ export default async function Dashboard() {
 
   return (
     <>
-      <PageHeader title={`Hola, ${ctx.profile?.full_name?.split(' ')[0] || 'bienvenido'}`} subtitle={ctx.org?.display_name ?? 'Administración de la plataforma'}
-        actions={ctx.orgId ? <Link href="/app/configuracion#tarjetas" className="btn-secondary btn-sm" data-testid="atajo-colores">🎨 Colores de tarjetas</Link> : undefined} />
+      <section className="relative mb-7 overflow-hidden rounded-3xl bg-gradient-to-br from-ink via-brand-700 to-brand-600 p-6 text-white shadow-xl md:p-8" data-testid="portada-panel">
+        <div className="absolute -right-16 -top-20 h-64 w-64 rounded-full bg-accent/30 blur-3xl" aria-hidden />
+        <div className="relative flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold capitalize text-sky-200">{new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Santiago' })}</p>
+            <h1 className="mt-1 text-3xl font-black tracking-tight md:text-4xl">{`Hola, ${ctx.profile?.full_name?.split(' ')[0] || 'bienvenido'}`}</h1>
+            <p className="mt-1 text-sky-100/85">{ctx.org?.display_name ?? 'Administración de la plataforma'}</p>
+          </div>
+          {ctx.orgId && <Link href="/app/configuracion#tarjetas" className="rounded-xl bg-white/15 px-3 py-2 text-sm font-semibold backdrop-blur hover:bg-white/25" data-testid="atajo-colores">🎨 Colores de tarjetas</Link>}
+        </div>
+        {ctx.orgId && (
+          <div className="relative mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {([
+              can(ctx, 'students.create') && ['/app/inscripciones', '📝', 'Inscribir'],
+              can(ctx, 'enrollments.create') && ['/app/matriculas', '🗂', 'Matricular'],
+              (ctx.teacherId || ctx.studentId || can(ctx, 'sections.view')) && ['/app/aula', '📚', 'Aula'],
+              (can(ctx, 'conferences.view') || ctx.teacherId || ctx.studentId) && ['/app/conferencias', '🎥', 'Clases en vivo'],
+              ['/app/oficina', '💼', 'Oficina'],
+              can(ctx, 'finance.view') && ['/app/finanzas', '💳', 'Finanzas'],
+              ctx.studentId && ['/app/mi', '🎓', 'Mi portal'],
+              ['/app/archivos', '📁', 'Mis archivos'],
+            ].filter(Boolean) as [string, string, string][]).slice(0, 6).map(([href, icon, label]) => (
+              <Link key={href} href={href} className="flex items-center gap-3 rounded-2xl bg-white/10 px-4 py-3 font-semibold backdrop-blur transition hover:-translate-y-0.5 hover:bg-white/20">
+                <span className="text-2xl" aria-hidden>{icon}</span>{label}</Link>))}
+          </div>)}
+      </section>
       {ctx.isPlatformAdmin && !ctx.org && (
         <Card title="🌎 Plataformas para otras organizaciones"><p className="text-sm">Cree aulas virtuales separadas para institutos, asociaciones u organizaciones, o apruebe las que se registran, en <Link className="link" href="/app/instituciones" data-testid="plataformas-aula">Plataformas y organizaciones</Link>.</p></Card>
       )}
-      {stats.length > 0 && <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-3">{stats.map((s) => <Stat key={s.label} {...s} />)}</div>}
+      {stats.length > 0 && <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-3 2xl:grid-cols-6">{stats.map((s) => <Stat key={s.label} {...s} />)}</div>}
       <div className="grid gap-6 lg:grid-cols-2">
         <Card title="Próximas clases y conferencias">
           {sessions && sessions.length > 0 ? (

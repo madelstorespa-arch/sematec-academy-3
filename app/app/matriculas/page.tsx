@@ -10,7 +10,7 @@ import { offeringPricing } from '@/lib/pricing';
 
 export const metadata = { title: 'Matrículas' };
 
-export default async function Page({ searchParams }: { searchParams: Promise<{ periodo?: string }> }) {
+export default async function Page({ searchParams }: { searchParams: Promise<{ periodo?: string; estudiante?: string }> }) {
   const ctx = await getContext();
   requirePerm(ctx, 'enrollments.view');
   const orgId = requireOrg(ctx);
@@ -36,7 +36,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
         <Card title="Nueva matrícula" className="mb-6">
           <ActionForm action={enroll} submitLabel="Matricular">
             <Grid cols={3}>
-              <SelectField label="Estudiante" name="student_id" required options={students} />
+              <SelectField label="Estudiante" name="student_id" required options={students} defaultValue={(await searchParams).estudiante} />
               <SelectField label="Programa" name="program_id" required options={programs} />
               <SelectField label="Periodo" name="period_id" required options={periods} defaultValue={periodo} />
             </Grid>

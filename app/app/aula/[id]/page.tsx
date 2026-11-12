@@ -1,11 +1,15 @@
 import Link from 'next/link';
 import { OwnerActions } from '@/components/owner-actions';
+import { DownloadMenu } from '@/components/download-menu';
 import { getContext } from '@/lib/context';
 import { loadSection } from '@/lib/aula';
 import { PageHeader, Card, Badge, Empty, Tabs } from '@/components/ui';
 import { ActionForm, Field, Grid, SelectField, TextArea } from '@/components/forms';
 import { fmtDateTime } from '@/lib/format';
 import { ACCEPT } from '@/lib/lms';
+import { createAssessment, saveGrades, togglePublish } from '../../secciones/actions';
+import { Stat } from '@/components/ui';
+import { fmtNum } from '@/lib/format';
 import { addContent, addUnit, createAssignment, createQuiz, createThread, deleteContent, submitAssignment, createExternalEval, deleteExternalEval } from '../actions';
 
 export const metadata = { title: 'Curso' };
@@ -29,6 +33,9 @@ export default async function Page({ params, searchParams }: { params: Promise<{
       ctx.supabase.from('library_items').select('id, title, author, file_id, url').or(`section_id.eq.${id},course_id.eq.${s.course_id}`)
         .or('file_id.not.is.null,url.not.is.null').order('title').limit(30),
     ]);
+    const fileIds = (contents ?? []).map((c: any) => c.file_id).filter(Boolean);
+    const { data: lf } = fileIds.length ? await ctx.supabase.from('lms_files').select('id, filename, mime_type').in('id', fileIds) : { data: [] as any[] };
+    const meta = new Map((lf ?? []).map((f: any) => [f.id, f]));
     const groups = [...(units ?? []), { id: null, title: 'Otros contenidos' }];
     body = (
       <>
@@ -68,6 +75,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
                     <p className="font-semibold">{KIND[c.kind]} {c.file_id ? <a className="link" href={`/app/aula/archivo/${c.file_id}`}>{c.title}</a> : c.url ? <a className="link" href={c.url} target="_blank" rel="noopener noreferrer">{c.title} ↗</a> : c.title}</p>
                     {manager && <ActionForm action={deleteContent} inline submitLabel="✕" submitClass="btn-secondary btn-sm" confirm="¿Eliminar este contenido?">{hidden}<input type="hidden" name="id" value={c.id} /></ActionForm>}
                   </div>
+                  {c.file_id && meta.get(c.file_id) && <div className="mt-2"><DownloadMenu href={`/app/aula/archivo/${c.file_id}`} name={meta.get(c.file_id).filename} mime={meta.get(c.file_id).mime_type} /></div>}
                   {c.body && <p className="mt-1 whitespace-pre-line text-sm text-slate-600">{c.body}</p>}
                   {ctx.isOwner && <div className="mt-2"><OwnerActions table="course_contents" id={c.id} active={c.published} path={`/app/aula/${id}`} name={`«${c.title}»`} /></div>}
                 </li>))}</ul> : <p className="text-sm text-slate-500">Sin contenidos aún.</p>}
@@ -187,6 +195,112 @@ export default async function Page({ params, searchParams }: { params: Promise<{
       </>);
   }
 
+  if (tab === 'evaluacion') {
+    const { data: sec } = await ctx.supabase.from('sections').select('grades_closed_at, grade_scales(min_grade, max_grade, passing_grade, decimals)').eq('id', id).maybeSingle();
+    const gs = (sec?.grade_scales ?? { min_grade: 1, max_grade: 7, passing_grade: 4, decimals: 1 }) as any;
+    const closed = !!sec?.grades_closed_at;
+    const { data: list } = await ctx.supabase.from('assessments').select('id, name, weight_pct, published, due_on').eq('section_id', id).order('due_on', { nullsFirst: false }).order('created_at');
+    const items = list ?? [];
+    const totalW = items.reduce((a: number, x: any) => a + Number(x.weight_pct), 0);
+    
+    const [{ data: tasks }, { data: quizzes }] = await Promise.all([
+      ctx.supabase.from('assignments').select('id, title, due_at').eq('section_id', id).order('due_at'),
+      ctx.supabase.from('quizzes').select('id, title, opens_at, closes_at, published').eq('section_id', id).order('opens_at'),
+    ]);
+    const openQuizzes = (quizzes ?? []).filter((q: any) => q.published && Date.parse(q.opens_at) <= Date.now() && Date.parse(q.closes_at) > Date.now());
+    if (manager) {
+      const [{ data: roster }, { data: grades }, { data: subs }] = await Promise.all([
+        ctx.supabase.from('section_enrollments').select('student_id, students(id, first_names, last_names)').eq('section_id', id).neq('status', 'dropped'),
+        items.length ? ctx.supabase.from('grades').select('assessment_id, student_id, grade').in('assessment_id', items.map((a: any) => a.id)) : Promise.resolve({ data: [] as any[] }),
+        tasks?.length ? ctx.supabase.from('submissions').select('assignment_id, score').in('assignment_id', tasks.map((t: any) => t.id)) : Promise.resolve({ data: [] as any[] }),
+      ]);
+      const students = (roster ?? []).map((r: any) => r.students).filter(Boolean).sort((a: any, b: any) => a.last_names.localeCompare(b.last_names));
+      const g = (a: string, st: string) => (grades ?? []).find((x: any) => x.assessment_id === a && x.student_id === st);
+      const avg = (st: string) => {
+        let sum = 0, w = 0;
+        for (const a of items) { const v = g(a.id, st); if (v) { sum += Number(v.grade) * Number(a.weight_pct); w += Number(a.weight_pct); } }
+        return w ? sum / w : null;
+      };
+      const avgs = students.map((x: any) => avg(x.id)).filter((v: number | null): v is number => v != null);
+      const pending = (subs ?? []).filter((x: any) => x.score == null).length;
+      body = (
+        <div className="space-y-6" data-testid="evaluacion-calificacion">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <Stat label="Evaluaciones" value={items.length} hint={`Ponderación total ${fmtNum(totalW, 0)} %`} />
+            <Stat label="Promedio del curso" value={avgs.length ? fmtNum(avgs.reduce((a, b) => a + b, 0) / avgs.length, gs.decimals) : '—'} hint={`Escala ${gs.min_grade}–${gs.max_grade}, aprueba con ${gs.passing_grade}`} />
+            <Stat label="Bajo la nota de aprobación" value={avgs.filter((v) => v < Number(gs.passing_grade)).length} />
+            <Stat label="Entregas por calificar" value={pending} href={`${base}?t=tareas`} />
+          </div>
+          {totalW !== 100 && items.length > 0 && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">La ponderación suma {fmtNum(totalW, 1)} %: ajústela para que sume 100 %.</p>}
+          <Card title={`✍ Libro de notas · ${students.length} estudiante(s)`} actions={closed ? <Badge color="gray">Acta cerrada</Badge> : <Badge color="green">Acta abierta</Badge>}>
+            {!items.length ? <Empty>Cree la primera evaluación abajo.</Empty> : !students.length ? <Empty>Sin estudiantes inscritos.</Empty> : (
+              <ActionForm action={saveGrades} offline={{ key: 'notas', label: 'Planilla de notas' }} submitLabel="Guardar notas" resetOnSuccess={false} hideSubmit={closed}>
+                <input type="hidden" name="section_id" value={id} />
+                <div className="overflow-x-auto"><table className="table" data-testid="libro-notas">
+                  <thead><tr><th>Estudiante</th>{items.map((a: any) => <th key={a.id} className="text-center">{a.name}<br /><span className="font-normal normal-case">{fmtNum(a.weight_pct, 0)} % · {a.published ? 'visible' : 'oculta'}</span></th>)}<th className="text-center">Promedio</th></tr></thead>
+                  <tbody>{students.map((x: any) => {
+                    const p = avg(x.id);
+                    return (
+                      <tr key={x.id}><td className="whitespace-nowrap">{x.last_names}, {x.first_names}</td>
+                        {items.map((a: any) => <td key={a.id} className="text-center"><input name={`g_${a.id}_${x.id}`} defaultValue={g(a.id, x.id)?.grade ?? ''} disabled={closed} inputMode="decimal" className="input w-20 text-center" aria-label={`Nota ${a.name} ${x.first_names}`} /></td>)}
+                        <td className={`text-center font-bold ${p != null && p < Number(gs.passing_grade) ? 'text-red-600' : ''}`}>{p != null ? fmtNum(p, gs.decimals) : '—'}</td></tr>);
+                  })}</tbody></table></div>
+              </ActionForm>)}
+          </Card>
+          <div className="grid gap-6 xl:grid-cols-2">
+            {!closed && <Card title="+ Nueva evaluación">
+              <ActionForm action={createAssessment} submitLabel="Crear evaluación">
+                <input type="hidden" name="section_id" value={id} />
+                <Field label="Nombre" name="name" required placeholder="Prueba 1, Trabajo grupal, Participación…" />
+                <Grid><Field label="Ponderación %" name="weight_pct" type="number" step="0.5" min={0.5} max={100} required /><Field label="Fecha" name="due_on" type="date" /></Grid>
+                <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="published" defaultChecked /> Visible para los estudiantes</label>
+              </ActionForm>
+              <p className="mt-3 text-xs text-slate-500">Las tareas y los exámenes en línea pueden enviar su nota directo a una de estas evaluaciones.</p>
+            </Card>}
+            <Card title="Evaluaciones">
+              {items.length ? <ul className="divide-y divide-slate-100">{items.map((a: any) => (
+                <li key={a.id} className="flex items-center justify-between gap-2 py-2 text-sm">
+                  <span><b>{a.name}</b> · {fmtNum(a.weight_pct, 0)} %{a.due_on ? ` · ${a.due_on}` : ''}</span>
+                  <ActionForm action={togglePublish} inline submitLabel={a.published ? 'Ocultar' : 'Publicar'} submitClass="btn-secondary btn-sm">
+                    <input type="hidden" name="id" value={a.id} /><input type="hidden" name="section_id" value={id} /><input type="hidden" name="published" value={String(!a.published)} />
+                  </ActionForm></li>))}</ul> : <Empty>Sin evaluaciones.</Empty>}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Link className="btn-secondary btn-sm" href={`${base}?t=tareas`}>📝 Tareas</Link>
+                <Link className="btn-secondary btn-sm" href={`${base}?t=examenes`}>✅ Exámenes</Link>
+                <Link className="btn-secondary btn-sm" href={`/app/secciones/${id}?t=notas`}>📒 Acta y cierre</Link>
+              </div>
+            </Card>
+          </div>
+        </div>);
+    } else {
+      const { data: mine } = ctx.studentId && items.length ? await ctx.supabase.from('grades').select('assessment_id, grade').eq('student_id', ctx.studentId).in('assessment_id', items.map((a: any) => a.id)) : { data: [] as any[] };
+      const rows = items.map((a: any) => ({ ...a, grade: (mine ?? []).find((m: any) => m.assessment_id === a.id)?.grade ?? null }));
+      const done = rows.filter((r: any) => r.grade != null);
+      const w = done.reduce((s2: number, r: any) => s2 + Number(r.weight_pct), 0);
+      const avg = w ? done.reduce((s2: number, r: any) => s2 + Number(r.grade) * Number(r.weight_pct), 0) / w : null;
+      const upcoming = (tasks ?? []).filter((t: any) => Date.parse(t.due_at) > Date.now());
+      body = (
+        <div className="space-y-6" data-testid="evaluacion-calificacion">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Stat label="Mi promedio" value={<span data-testid="mi-promedio-aula">{avg != null ? fmtNum(avg, gs.decimals) : '—'}</span>} hint={`Aprueba con ${gs.passing_grade}`} />
+            <Stat label="Evaluaciones con nota" value={`${done.length} / ${rows.length}`} />
+            <Stat label="Exámenes abiertos ahora" value={openQuizzes.length} href={`${base}?t=examenes`} />
+          </div>
+          <Card title="Mis notas">
+            {rows.length ? <table className="table"><thead><tr><th>Evaluación</th><th>Ponderación</th><th>Nota</th></tr></thead>
+              <tbody>{rows.map((r: any) => <tr key={r.id}><td>{r.name}</td><td>{fmtNum(r.weight_pct, 0)} %</td>
+                <td className={r.grade != null && Number(r.grade) < Number(gs.passing_grade) ? 'font-bold text-red-600' : 'font-bold'}>{r.grade != null ? fmtNum(r.grade, gs.decimals) : '—'}</td></tr>)}</tbody></table>
+              : <Empty>El profesor aún no publica evaluaciones.</Empty>}
+          </Card>
+          {(openQuizzes.length > 0 || upcoming.length > 0) && <Card title="Por rendir y entregar">
+            <ul className="space-y-2 text-sm">
+              {openQuizzes.map((q: any) => <li key={q.id} className="flex items-center justify-between gap-2">✅ {q.title}<Link className="btn-primary btn-sm" href={`${base}/examen/${q.id}/rendir`}>Rendir</Link></li>)}
+              {upcoming.map((t: any) => <li key={t.id} className="flex items-center justify-between gap-2">📝 {t.title}<span className="text-xs text-slate-500">entrega {fmtDateTime(t.due_at)}</span></li>)}
+            </ul></Card>}
+        </div>);
+    }
+  }
+
   if (tab === 'foro') {
     const { data: threads } = await ctx.supabase.from('forum_threads').select('*, forum_posts(count)').eq('section_id', id)
       .order('pinned', { ascending: false }).order('last_post_at', { ascending: false });
@@ -212,7 +326,8 @@ export default async function Page({ params, searchParams }: { params: Promise<{
       <Link href="/app/aula" className="link text-sm">← Mis cursos</Link>
       <div className="mt-4"><Tabs current={tab} items={[
         { key: 'contenidos', label: '📚 Contenidos', href: base }, { key: 'tareas', label: '📝 Tareas', href: `${base}?t=tareas` },
-        { key: 'examenes', label: '✅ Exámenes', href: `${base}?t=examenes` }, { key: 'foro', label: '💬 Foro', href: `${base}?t=foro` }]} /></div>
+        { key: 'examenes', label: '✅ Exámenes', href: `${base}?t=examenes` }, { key: 'evaluacion', label: '🎯 Evaluación y calificación', href: `${base}?t=evaluacion` },
+        { key: 'foro', label: '💬 Foro', href: `${base}?t=foro` }]} /></div>
       {body}
     </>
   );

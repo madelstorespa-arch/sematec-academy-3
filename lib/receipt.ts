@@ -6,7 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { fmtDateTime, fmtMoney, PAY_METHODS } from '@/lib/format';
 import { docLabel } from '@/lib/identity';
 
-export const CONCEPT_LABEL: Record<string, string> = { tuition: 'Arancel', enrollment_fee: 'Matrícula', exam_fee: 'Derecho de examen', certificate_fee: 'Certificado', other: 'Otro' };
+export const CONCEPT_LABEL: Record<string, string> = { tuition: 'Arancel', enrollment_fee: 'Matrícula', registration_fee: 'Inscripción', exam_fee: 'Derecho de examen', certificate_fee: 'Certificado', other: 'Otro' };
 
 export type Receipt = {
   id: string; number: string; kind: 'payment' | 'refund'; status: string; amount: number; currency: string; paidAt: string;

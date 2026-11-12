@@ -3,7 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { getContext } from '@/lib/context';
 import { fail, guard, num, ok, reqStr, str, type ActionResult } from '@/lib/actions';
 
-const refresh = (id?: string | null) => { revalidatePath('/app/secciones', 'layout'); if (id) revalidatePath(`/app/secciones/${id}`); };
+const refresh = (id?: string | null) => { revalidatePath('/app/secciones', 'layout'); if (id) { revalidatePath(`/app/secciones/${id}`); revalidatePath(`/app/aula/${id}`); } };
 
 export async function createSection(fd: FormData): Promise<ActionResult> {
   return guard(async () => {

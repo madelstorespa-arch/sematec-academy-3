@@ -78,17 +78,23 @@ async function fulfill(orderId: string) {
     if (payId) { const { emailReceipt } = await import('@/lib/receipt-access'); await emailReceipt(String(payId), o.buyer_email); }
     return;
   }
-  let userId: string | null = null;
-  const { data: prof } = await admin.from('profiles').select('id').eq('email', o.buyer_email).maybeSingle();
-  if (prof) userId = prof.id;
-  else {
-    const { data, error } = await admin.auth.admin.createUser({
-      email: o.buyer_email, email_confirm: true, password: crypto.randomBytes(24).toString('base64url') + 'aA1!',
-      user_metadata: { full_name: o.buyer_name, created_from_order: orderId },
-    });
-    if (error || !data.user) throw new Error(error?.message ?? 'No se pudo crear la cuenta');
-    userId = data.user.id;
-  }
-  const { error } = await admin.rpc('fulfill_checkout_order', { p_order: orderId, p_user: userId });
+  const userId = await ensureBuyerUser(o.buyer_email, o.buyer_name, orderId);
+  // 📝 Inscripción general: queda registrado como estudiante (sin curso), listo para matricular
+  const { error } = o.kind === 'registration'
+    ? await admin.rpc('fulfill_registration_order', { p_order: orderId, p_user: userId })
+    : await admin.rpc('fulfill_checkout_order', { p_order: orderId, p_user: userId });
   if (error) throw new Error(error.message);
+}
+
+/** Cuenta de la persona que paga o se inscribe (la crea si no existe; luego define su contraseña con el enlace seguro). */
+export async function ensureBuyerUser(email: string, name: string, ref: string): Promise<string> {
+  const admin = createAdminClient();
+  const { data: prof } = await admin.from('profiles').select('id').eq('email', email.toLowerCase()).maybeSingle();
+  if (prof) return prof.id as string;
+  const { data, error } = await admin.auth.admin.createUser({
+    email: email.toLowerCase(), email_confirm: true, password: crypto.randomBytes(24).toString('base64url') + 'aA1!',
+    user_metadata: { full_name: name, created_from_order: ref },
+  });
+  if (error || !data.user) throw new Error(error?.message ?? 'No se pudo crear la cuenta');
+  return data.user.id;
 }

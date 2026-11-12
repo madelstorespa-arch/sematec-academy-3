@@ -4,6 +4,7 @@ import { offeringAvailability } from '@/lib/availability';
 import { CourseCard } from '@/components/course-card';
 import { PriceTag } from '@/components/price-tag';
 import { getT } from '@/lib/site-i18n';
+import { registrationOpen } from '@/lib/site';
 
 const FEAT_ICONS = ['🎥', '📱', '🎓', '🔒', '🔎', '🧭'];
 
@@ -25,6 +26,7 @@ export default async function Home() {
   const featured = courses[0];
   const avail = await offeringAvailability(site.organization_id);
   const hero = mediaUrl(site.hero_asset_id);
+  const reg = await registrationOpen(site.organization_id);
   const areas = new Set((all ?? []).map((c: any) => c.category || c.kind || 'curso')).size;
   const stats: [string, string][] = [
     [String(all?.length ?? 0), t('home.stat.courses')],
@@ -55,6 +57,7 @@ export default async function Home() {
             {site.hero_subtitle && <p className="mt-6 max-w-2xl text-lg text-sky-100/85 md:text-xl" translate="yes">{site.hero_subtitle}</p>}
             <div className="mt-9 flex flex-wrap gap-3">
               <Link href="/cursos" className="btn bg-white px-6 py-3 text-base text-ink shadow-lg hover:bg-sky-50">{t('home.ctaCourses')}</Link>
+              {reg && <Link href="/inscripcion" className="btn bg-accent px-6 py-3 text-base text-white shadow-lg hover:opacity-90" data-testid="cta-inscripcion">📝 {t('home.ctaRegister')}</Link>}
               <Link href="/contacto" className="btn border border-white/40 px-6 py-3 text-base text-white hover:bg-white/10">{t('home.ctaContact')}</Link>
               <Link href="/estado" className="btn px-4 py-3 text-base text-sky-100 underline-offset-4 hover:underline">{t('home.ctaStatus')} →</Link>
             </div>
