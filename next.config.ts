@@ -5,6 +5,8 @@ const origin = (u?: string) => { try { return u ? new URL(u).origin : ''; } catc
 const wsOrigin = (u?: string) => origin(u?.replace(/^http/, 'ws'));
 const supabase = origin(process.env.NEXT_PUBLIC_SUPABASE_URL);
 const livekit = origin(process.env.NEXT_PUBLIC_LIVEKIT_URL?.replace(/^ws/, 'http'));
+// Servidor ONLYOFFICE opcional (editor de Office con formato exacto)
+const onlyoffice = process.env.ONLYOFFICE_JWT_SECRET ? origin(process.env.ONLYOFFICE_URL) : '';
 const list = (...xs: (string | undefined)[]) => [...new Set(xs.filter(Boolean))].join(' ');
 // Medios de pago a los que el navegador puede enviar formularios (redirección al pago)
 const payForms = list('https://*.transbank.cl', 'https://*.flow.cl', 'https://*.mercadopago.cl', 'https://*.mercadopago.com',
@@ -12,17 +14,17 @@ const payForms = list('https://*.transbank.cl', 'https://*.flow.cl', 'https://*.
 const csp = [
   "default-src 'self'",
   // Next.js necesita scripts en línea propios; se prohíbe eval y cualquier script de otro sitio
-  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'", // WebAssembly local para fondos virtuales
+  `script-src ${list("'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", onlyoffice)}`, // WebAssembly local para fondos virtuales
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
   `connect-src ${list("'self'", supabase, wsOrigin(process.env.NEXT_PUBLIC_SUPABASE_URL), livekit, wsOrigin(livekit), 'https://*.livekit.cloud', 'wss://*.livekit.cloud',
-    'https://storage.googleapis.com' /* modelo de segmentación de fondos (datos, no código) */)}`,
+    'https://storage.googleapis.com' /* modelo de segmentación de fondos (datos, no código) */, onlyoffice, wsOrigin(onlyoffice))}`,
   `media-src ${list("'self'", 'blob:', supabase)}`,
   "worker-src 'self' blob:",
   "manifest-src 'self'",
   // 📱 Apps dentro del aula virtual (solo servicios educativos conocidos)
-  "frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com https://player.vimeo.com https://docs.google.com https://drive.google.com https://www.canva.com https://view.genial.ly https://*.genial.ly https://www.geogebra.org https://www.desmos.com https://phet.colorado.edu https://padlet.com https://*.padlet.com https://forms.office.com https://onedrive.live.com https://www.mentimeter.com https://www.menti.com https://wordwall.net https://scratch.mit.edu https://www.loom.com https://www.figma.com https://embed.figma.com",
+  `frame-src ${list("'self'", onlyoffice)} https://www.youtube-nocookie.com https://www.youtube.com https://player.vimeo.com https://docs.google.com https://drive.google.com https://www.canva.com https://view.genial.ly https://*.genial.ly https://www.geogebra.org https://www.desmos.com https://phet.colorado.edu https://padlet.com https://*.padlet.com https://forms.office.com https://onedrive.live.com https://www.mentimeter.com https://www.menti.com https://wordwall.net https://scratch.mit.edu https://www.loom.com https://www.figma.com https://embed.figma.com`,
   "object-src 'none'",
   "base-uri 'self'",
   `form-action ${list("'self'", payForms)}`,

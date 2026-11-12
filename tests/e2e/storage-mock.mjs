@@ -52,5 +52,29 @@ http.createServer(async (req, res) => {
     for (const x of prefixes ?? []) fs.rmSync(path.join(ROOT, m[1], x), { force: true });
     return send(res, 200, (prefixes ?? []).map((name) => ({ name })));
   }
+  // Listar, copiar, subir y descargar con la clave de servicio (Oficina / ONLYOFFICE)
+  if (req.method === 'POST' && (m = p.match(/^\/object\/list\/([^/]+)$/))) {
+    const { prefix = '', search = '', limit = 100 } = JSON.parse((await body(req)).toString() || '{}');
+    const dir = path.join(ROOT, m[1], prefix);
+    const names = fs.existsSync(dir) ? fs.readdirSync(dir).filter((n) => !search || n.includes(search)).slice(0, limit) : [];
+    return send(res, 200, names.map((name) => ({ name, id: name, metadata: { size: fs.statSync(path.join(dir, name)).size } })));
+  }
+  if (req.method === 'POST' && p === '/object/copy') {
+    const { bucketId, sourceKey, destinationKey } = JSON.parse((await body(req)).toString() || '{}');
+    const src = path.join(ROOT, bucketId, sourceKey); const dst = path.join(ROOT, bucketId, destinationKey);
+    if (!fs.existsSync(src)) return send(res, 404, { statusCode: '404', error: 'not_found', message: 'Object not found' });
+    fs.mkdirSync(path.dirname(dst), { recursive: true }); fs.copyFileSync(src, dst);
+    return send(res, 200, { Key: `${bucketId}/${destinationKey}` });
+  }
+  if (req.method === 'POST' && (m = p.match(/^\/object\/(?!sign\/|upload\/|list\/)(.+)$/))) {
+    const data = filePart(await body(req), req.headers['content-type']);
+    const f = path.join(ROOT, m[1]); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, data);
+    return send(res, 200, { Key: m[1] });
+  }
+  if (req.method === 'GET' && (m = p.match(/^\/object\/(?:authenticated\/)?(?!sign\/|upload\/|list\/)(.+)$/))) {
+    const f = path.join(ROOT, m[1]);
+    if (!fs.existsSync(f)) return send(res, 404, { statusCode: '404', error: 'not_found', message: 'Object not found' });
+    res.writeHead(200, { 'content-type': 'application/octet-stream' }); return fs.createReadStream(f).pipe(res);
+  }
   send(res, 404, { error: 'no route ' + req.method + ' ' + p });
 }).listen(5001, () => console.log('storage mock 5001'));

@@ -1,10 +1,12 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { addr, colName, computeWorkbook, display, loadEngine, newSheet, parseAddr, SHEET_FORMATS, exportWorkbook, type CellStyle, type Sheet, type Workbook, type Value } from '@/lib/office/sheet';
+import { addr, colName, computeWorkbook, condStyle, display, loadEngine, newSheet, parseAddr, SHEET_FORMATS, exportWorkbook, visibleRows, type CellStyle, type CondRule, type Sheet, type Workbook, type Value } from '@/lib/office/sheet';
 import { sheetTemplate } from '@/lib/office/templates';
 import { OfficeBar, useAutosave, useMenus, type OfficeDocProps } from './shell';
 
-const DEF_W = 96; const ROW_H = 24; const MAX_ROWS = 2000; const MAX_COLS = 60;
+const DEF_W = 96; const ROW_H = 24; const MAX_ROWS = 10000; const MAX_COLS = 60; const BUFFER = 20;
+const OPS: [CondRule['op'], string][] = [['>', 'Mayor que'], ['<', 'Menor que'], ['>=', 'Mayor o igual que'], ['<=', 'Menor o igual que'], ['=', 'Igual a'], ['<>', 'Distinto de'], ['contains', 'Contiene el texto'], ['empty', 'Está vacía']];
+const COND_COLORS: [string, string, string][] = [['#fee2e2', '#991b1b', 'Rojo claro'], ['#dcfce7', '#166534', 'Verde claro'], ['#fef9c3', '#854d0e', 'Amarillo'], ['#dbeafe', '#1e40af', 'Azul claro']];
 const COLORS = ['#000000', '#c00000', '#e11d48', '#ea580c', '#ca8a04', '#16a34a', '#0d9488', '#1f45c8', '#7c3aed', '#64748b'];
 const FILLS = ['', '#fef9c3', '#dcfce7', '#dbeafe', '#fce7f3', '#ffedd5', '#e2e8f0', '#1f45c8', '#16a34a', '#c00000'];
 type Sel = { r: number; c: number; r2: number; c2: number };
@@ -67,8 +69,10 @@ export function SheetEditor({ doc }: { doc: OfficeDocProps }) {
   const barMove = useRef<[number, number] | 'cancel' | undefined>(undefined);
   const [ready, setReady] = useState(false);
   const [chart, setChart] = useState(false);
+  const [scroll, setScroll] = useState({ top: 0, h: 640 });
+  const [cond, setCond] = useState<{ op: CondRule['op']; v: string; color: number }>({ op: '<', v: '4', color: 0 });
   const hist = useRef<{ past: Workbook[]; future: Workbook[] }>({ past: [], future: [] });
-  const save = useAutosave(doc.id, doc.canEdit);
+  const save = useAutosave(doc);
   const menus = useMenus<HTMLDivElement>();
   const grid = useRef<HTMLDivElement>(null);
   const drag = useRef(false);
@@ -99,6 +103,30 @@ export function SheetEditor({ doc }: { doc: OfficeDocProps }) {
   const n = norm(sel);
   const eachSel = (f: (k: string, r: number, c: number) => void) => { for (let r = n.r1; r <= n.r2; r++) for (let c = n.c1; c <= n.c2; c++) f(addr(r, c), r, c); };
   const styleSel = (patch: Partial<CellStyle>) => { const ch: Record<string, { s: CellStyle }> = {}; eachSel((k) => { ch[k] = { s: { ...(sheet.cells[k]?.s ?? {}), ...patch } }; }); setCells(ch); };
+  const borders = (mode: 'all' | 'outer' | 'bottom' | 'none') => {
+    const ch: Record<string, { s: CellStyle }> = {};
+    eachSel((k, r, c) => {
+      const bd = mode === 'none' ? undefined : mode === 'all' ? { t: true, b: true, l: true, r: true }
+        : mode === 'bottom' ? { ...(sheet.cells[k]?.s?.bd ?? {}), b: r === n.r2 || undefined }
+          : { ...(sheet.cells[k]?.s?.bd ?? {}), t: r === n.r1 || undefined, b: r === n.r2 || undefined, l: c === n.c1 || undefined, r: c === n.c2 || undefined };
+      const clean = bd && Object.values(bd).some(Boolean) ? bd : undefined;
+      ch[k] = { s: { ...(sheet.cells[k]?.s ?? {}), bd: clean } };
+    });
+    setCells(ch);
+  };
+  const toggleFilter = () => updateSheet((s) => {
+    if (s.filter) { const { filter, ...rest } = s; void filter; return rest; }
+    let c2 = n.c2; if (n.c1 === n.c2) { while (c2 + 1 < s.cols && s.cells[addr(n.r1, c2 + 1)]?.v) c2++; }
+    return { ...s, filter: { row: n.r1, c1: n.c1, c2, q: {} } };
+  });
+  const setFilterQ = (c: number, q: string) => setWb((b) => {
+    const next = { sheets: b.sheets.map((s, i) => (i === si && s.filter ? { ...s, filter: { ...s.filter, q: { ...s.filter.q, [c]: q } } } : s)) };
+    save.change(titleRef.current, { wb: next }); return next;
+  });
+  const addCond = () => {
+    const [bg, color] = COND_COLORS[cond.color];
+    updateSheet((s) => ({ ...s, cond: [...(s.cond ?? []), { range: `${addr(n.r1, n.c1)}:${addr(n.r2, n.c2)}`, op: cond.op, v: cond.v, bg, color }].slice(-30) }));
+  };
   const cur = sheet.cells[addr(sel.r, sel.c)];
   const st = cur?.s ?? {};
   const commitEdit = (raw: string | null, move?: [number, number]) => {
@@ -175,6 +203,23 @@ export function SheetEditor({ doc }: { doc: OfficeDocProps }) {
     window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
   };
   const rowsShown = Math.min(sheet.rows, MAX_ROWS);
+  const rowList = useMemo(() => visibleRows(sheet, vals, rowsShown), [sheet, vals, rowsShown]);
+  const vStart = Math.max(0, Math.floor(scroll.top / ROW_H) - BUFFER);
+  const vEnd = Math.min(rowList.length, vStart + Math.ceil(scroll.h / ROW_H) + BUFFER * 2);
+  // Mantiene la celda activa a la vista al moverse con el teclado
+  useEffect(() => {
+    const g = grid.current; if (!g) return;
+    const i = rowList.indexOf(sel.r2); if (i < 0) return;
+    const top = i * ROW_H; const head = ROW_H + 2;
+    if (top < g.scrollTop) g.scrollTop = top;
+    else if (top + ROW_H + head > g.scrollTop + g.clientHeight) g.scrollTop = top + ROW_H + head - g.clientHeight;
+  }, [sel.r2, rowList]);
+  const shut = (e: React.MouseEvent) => { const d = (e.currentTarget as HTMLElement).closest('details'); if (d) d.open = false; };
+  const visibleSheets = wb.sheets.map((x, i) => ({ x, i })).filter(({ x }) => !x.hidden);
+  const moveSheet = (d: -1 | 1) => { const j = si + d; if (j < 0 || j >= wb.sheets.length) return; const arr = [...wb.sheets]; [arr[si], arr[j]] = [arr[j], arr[si]]; commit({ sheets: arr }); setSi(j); };
+  const dupSheet = () => { let k = 2; while (wb.sheets.some((x) => x.name === `${sheet.name} (${k})`)) k++; const copy: Sheet = JSON.parse(JSON.stringify(sheet)); copy.name = `${sheet.name} (${k})`.slice(0, 31); copy.hidden = false; const arr = [...wb.sheets]; arr.splice(si + 1, 0, copy); commit({ sheets: arr }); setSi(si + 1); };
+  const hideSheet = () => { if (visibleSheets.length < 2) { alert('Debe quedar al menos una hoja visible.'); return; } commit({ sheets: wb.sheets.map((x, i) => (i === si ? { ...x, hidden: true } : x)) }); setSi(visibleSheets.find(({ i }) => i !== si)!.i); };
+  const renameSheet = () => { const nm = prompt('Nombre de la hoja', sheet.name)?.trim().slice(0, 31); if (nm && !wb.sheets.some((x, j) => j !== si && x.name === nm)) commit({ sheets: wb.sheets.map((x, j) => (j === si ? { ...x, name: nm } : x)) }); };
   const tb = (on: () => void, label: React.ReactNode, title: string, active?: boolean, testid?: string) =>
     <button type="button" title={title} aria-label={title} onMouseDown={(e) => e.preventDefault()} onClick={on} data-testid={testid} disabled={!doc.canEdit}
       className={`grid h-8 min-w-8 place-items-center rounded-md px-1.5 text-sm disabled:opacity-40 ${active ? 'bg-emerald-100 text-emerald-800' : 'text-slate-700 hover:bg-slate-100'}`}>{label}</button>;
@@ -182,7 +227,7 @@ export function SheetEditor({ doc }: { doc: OfficeDocProps }) {
   const nums = (() => { const xs: number[] = []; eachSel((k) => { const v = vals[k]; if (typeof v === 'number') xs.push(v); }); return xs; })();
   return (
     <div>
-      <OfficeBar doc={doc} title={title} setTitle={setTitle} status={save.status} msg={save.msg} formats={SHEET_FORMATS} saveExt="xlsx" exportAs={(f) => exportWorkbook(wb, title, f, si)} />
+      <OfficeBar doc={doc} title={title} setTitle={setTitle} save={save} formats={SHEET_FORMATS} saveExt="xlsx" exportAs={(f) => exportWorkbook(wb, title, f, si)} />
       <div ref={menus} className="flex flex-wrap items-center gap-0.5 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm" data-testid="cinta-excel">
         {tb(undo, '↶', 'Deshacer')}{tb(redo, '↷', 'Rehacer')}<span className="mx-1 h-6 w-px bg-slate-200" />
         {tb(() => styleSel({ b: !st.b }), <b>N</b>, 'Negrita', st.b, 'celda-negrita')}{tb(() => styleSel({ i: !st.i }), <i>K</i>, 'Cursiva', st.i)}{tb(() => styleSel({ u: !st.u }), <u>S</u>, 'Subrayado', st.u)}
@@ -201,6 +246,21 @@ export function SheetEditor({ doc }: { doc: OfficeDocProps }) {
         {tb(() => shiftCells('row', sel.r, 1), '+ fila', 'Insertar fila')}{tb(() => shiftCells('row', sel.r, -1), '− fila', 'Eliminar fila')}
         {tb(() => shiftCells('col', sel.c, 1), '+ col.', 'Insertar columna')}{tb(() => shiftCells('col', sel.c, -1), '− col.', 'Eliminar columna')}
         {tb(() => sortSel(true), 'A→Z', 'Ordenar ascendente')}{tb(() => sortSel(false), 'Z→A', 'Ordenar descendente')}
+        <details className="relative"><summary className="grid h-8 cursor-pointer list-none place-items-center rounded-md px-2 text-sm hover:bg-slate-100" title="Bordes" data-testid="menu-bordes">▦ Bordes</summary>
+          <div className="absolute z-30 mt-1 w-48 rounded-lg border bg-white p-1 text-sm shadow-lg">
+            {([['all', 'Todos los bordes'], ['outer', 'Borde exterior'], ['bottom', 'Borde inferior'], ['none', 'Sin bordes']] as const).map(([m, l]) => <button key={m} className="block w-full rounded px-3 py-1.5 text-left hover:bg-slate-100 disabled:opacity-40" disabled={!doc.canEdit} onClick={() => borders(m)} data-testid={`bordes-${m}`}>{l}</button>)}</div></details>
+        {tb(toggleFilter, sheet.filter ? '⏷ Quitar filtro' : '⏷ Filtro', 'Filtrar filas (use la fila seleccionada como encabezado)', !!sheet.filter, 'boton-filtro')}
+        <details className="relative"><summary className="grid h-8 cursor-pointer list-none place-items-center rounded-md px-2 text-sm hover:bg-slate-100" title="Formato condicional" data-testid="menu-condicional">🎯 Formato condicional</summary>
+          <div className="absolute z-30 mt-1 w-80 space-y-2 rounded-lg border bg-white p-3 text-sm shadow-lg">
+            <p className="text-xs text-slate-500">Se aplica a {selLabel}. Pinta las celdas que cumplan:</p>
+            <div className="flex gap-2"><select className="input h-8 flex-1" value={cond.op} onChange={(e) => setCond({ ...cond, op: e.target.value as CondRule['op'] })} data-testid="condicional-op">{OPS.map(([o, l]) => <option key={o} value={o}>{l}</option>)}</select>
+              {cond.op !== 'empty' && <input className="input h-8 w-24" value={cond.v} onChange={(e) => setCond({ ...cond, v: e.target.value })} data-testid="condicional-valor" />}</div>
+            <div className="flex gap-1">{COND_COLORS.map(([bg, fg, l], i) => <button key={bg} className={`rounded px-2 py-1 text-xs ${cond.color === i ? 'ring-2 ring-slate-500' : ''}`} style={{ background: bg, color: fg }} onClick={() => setCond({ ...cond, color: i })}>{l}</button>)}</div>
+            <button className="btn-primary btn-sm w-full" disabled={!doc.canEdit} onClick={addCond} data-testid="condicional-agregar">Agregar regla</button>
+            {(sheet.cond ?? []).length > 0 && <ul className="divide-y divide-slate-100 text-xs" data-testid="lista-reglas">{(sheet.cond ?? []).map((r, i) => (
+              <li key={i} className="flex items-center gap-2 py-1"><span className="h-3 w-3 rounded" style={{ background: r.bg }} /><span className="flex-1">{r.range}: {OPS.find((o) => o[0] === r.op)?.[1].toLowerCase()} {r.op === 'empty' ? '' : r.v}</span>
+                {doc.canEdit && <button className="text-red-600" onClick={() => updateSheet((x) => ({ ...x, cond: (x.cond ?? []).filter((_, j) => j !== i) }))}>✕</button>}</li>))}</ul>}
+          </div></details>
         <button type="button" className="grid h-8 place-items-center rounded-md px-2 text-sm hover:bg-slate-100" onClick={() => setChart((v) => !v)} data-testid="boton-grafico">📊 Gráfico</button>
       </div>
       <div className="mt-2 flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1">
@@ -210,7 +270,15 @@ export function SheetEditor({ doc }: { doc: OfficeDocProps }) {
           onChange={(e) => setEdit(e.target.value)} onFocus={() => { setInBar(true); setEdit(cur?.v ?? ''); }} onBlur={() => { setInBar(false); const m = barMove.current; barMove.current = undefined; if (m === 'cancel') { setEdit(null); return; } if (edit !== null) commitEdit(edit, m); }}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); barMove.current = [1, 0]; e.currentTarget.blur(); } else if (e.key === 'Escape') { barMove.current = 'cancel'; grid.current?.focus(); } }} />
       </div>
-      <div ref={grid} tabIndex={0} onKeyDown={onKey} onPaste={(e) => { if (edit === null && doc.canEdit) { e.preventDefault(); paste(e.clipboardData.getData('text')); } }}
+      {sheet.filter && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-xs" data-testid="barra-filtro">
+          <b className="text-emerald-800">⏷ Filtro (encabezados en la fila {sheet.filter.row + 1}):</b>
+          {Array.from({ length: sheet.filter.c2 - sheet.filter.c1 + 1 }, (_, i) => sheet.filter!.c1 + i).map((c) => (
+            <label key={c} className="flex items-center gap-1">{display(vals[addr(sheet.filter!.row, c)] ?? null) || colName(c)}
+              <input className="h-7 w-28 rounded border border-emerald-300 bg-white px-1" placeholder="contiene…" value={sheet.filter!.q[c] ?? ''} onChange={(e) => setFilterQ(c, e.target.value)} data-testid={`filtro-${colName(c)}`} /></label>))}
+          <span className="ml-auto text-emerald-800" data-testid="filtro-resultado">{rowList.filter((r) => r > sheet.filter!.row && Object.keys(sheet.cells).some((k) => parseAddr(k)?.[0] === r)).length} fila(s) visibles</span>
+        </div>)}
+      <div ref={grid} tabIndex={0} onKeyDown={onKey} onScroll={(e) => { const t = e.currentTarget; setScroll({ top: t.scrollTop, h: t.clientHeight }); }} onPaste={(e) => { if (edit === null && doc.canEdit) { e.preventDefault(); paste(e.clipboardData.getData('text')); } }}
         className="mt-2 max-h-[70vh] overflow-auto rounded-lg border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-emerald-400" data-testid="grilla">
         <table className="border-collapse text-sm" style={{ tableLayout: 'fixed' }} onMouseUp={() => { drag.current = false; }}>
           <colgroup><col style={{ width: 44 }} />{Array.from({ length: sheet.cols }, (_, c) => <col key={c} style={{ width: widths(c) }} />)}</colgroup>
@@ -219,15 +287,17 @@ export function SheetEditor({ doc }: { doc: OfficeDocProps }) {
               <th key={c} className={`sticky top-0 z-10 select-none border border-slate-300 px-1 text-xs font-medium ${c >= n.c1 && c <= n.c2 ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-100 text-slate-600'}`}
                 onClick={() => setSel({ r: 0, c, r2: sheet.rows - 1, c2: c })}>
                 <span className="relative block">{colName(c)}<span className="absolute -right-1 top-0 h-full w-2 cursor-col-resize" onMouseDown={(e) => { e.stopPropagation(); startResize(c, e.clientX); }} /></span></th>))}</tr></thead>
-          <tbody>{Array.from({ length: rowsShown }, (_, r) => (
+          <tbody>{vStart > 0 && <tr style={{ height: vStart * ROW_H }} aria-hidden />}{rowList.slice(vStart, vEnd).map((r) => (
             <tr key={r} style={{ height: ROW_H }}>
               <td className={`sticky left-0 z-10 select-none border border-slate-300 text-center text-xs ${r >= n.r1 && r <= n.r2 ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-100 text-slate-500'}`} onClick={() => setSel({ r, c: 0, r2: r, c2: sheet.cols - 1 })}>{r + 1}</td>
               {Array.from({ length: sheet.cols }, (_, c) => {
-                const k = addr(r, c); const cell = sheet.cells[k]; const s = cell?.s; const v = vals[k] ?? null;
+                const k = addr(r, c); const cell = sheet.cells[k]; const v = vals[k] ?? null;
+                const cs = sheet.cond?.length ? condStyle(sheet, r, c, v) : undefined; const s = cs ? { ...cell?.s, ...Object.fromEntries(Object.entries(cs).filter(([, x]) => x !== undefined)) } as CellStyle : cell?.s;
+                const B = '1px solid #0f172a';
                 const active = r === sel.r && c === sel.c; const inSel = r >= n.r1 && r <= n.r2 && c >= n.c1 && c <= n.c2;
                 return (
                   <td key={c} className={`overflow-hidden whitespace-nowrap border border-slate-200 px-1 ${active ? 'outline outline-2 -outline-offset-2 outline-emerald-600' : ''} ${inSel && !active ? 'bg-emerald-50' : ''}`}
-                    style={{ background: !inSel || active ? s?.bg : undefined, color: typeof v === 'object' && v ? '#c00000' : s?.color, fontWeight: s?.b ? 700 : undefined, fontStyle: s?.i ? 'italic' : undefined, textDecoration: s?.u ? 'underline' : undefined, textAlign: s?.align ?? (typeof v === 'number' ? 'right' : 'left') }}
+                    style={{ borderTop: s?.bd?.t ? B : undefined, borderBottom: s?.bd?.b ? B : undefined, borderLeft: s?.bd?.l ? B : undefined, borderRight: s?.bd?.r ? B : undefined, background: !inSel || active ? s?.bg : undefined, color: typeof v === 'object' && v ? '#c00000' : s?.color, fontWeight: s?.b ? 700 : undefined, fontStyle: s?.i ? 'italic' : undefined, textDecoration: s?.u ? 'underline' : undefined, textAlign: s?.align ?? (typeof v === 'number' ? 'right' : 'left') }}
                     onMouseDown={(e) => { if (edit !== null) commitEdit(edit); drag.current = true; setSel(e.shiftKey ? { ...sel, r2: r, c2: c } : { r, c, r2: r, c2: c }); }}
                     onMouseEnter={() => { if (drag.current) setSel((x) => ({ ...x, r2: r, c2: c })); }}
                     onDoubleClick={() => doc.canEdit && setEdit(cell?.v ?? '')} data-cell={k}>
@@ -236,21 +306,33 @@ export function SheetEditor({ doc }: { doc: OfficeDocProps }) {
                       onBlur={() => commitEdit(edit)} /> : display(v, s)}
                   </td>);
               })}
-            </tr>))}</tbody>
+            </tr>))}{vEnd < rowList.length && <tr style={{ height: (rowList.length - vEnd) * ROW_H }} aria-hidden />}</tbody>
         </table>
-        {doc.canEdit && sheet.rows < MAX_ROWS && <button className="m-2 text-xs text-emerald-700 hover:underline" onClick={() => updateSheet((s) => ({ ...s, rows: Math.min(MAX_ROWS, s.rows + 50) }))}>+ 50 filas</button>}
+        {doc.canEdit && sheet.rows < MAX_ROWS && <span className="m-2 flex gap-3 text-xs"><button className="text-emerald-700 hover:underline" onClick={() => updateSheet((s) => ({ ...s, rows: Math.min(MAX_ROWS, s.rows + 50) }))}>+ 50 filas</button><button className="text-emerald-700 hover:underline" onClick={() => updateSheet((s) => ({ ...s, rows: Math.min(MAX_ROWS, s.rows + 1000) }))} data-testid="mas-filas">+ 1000 filas</button><span className="text-slate-400">{sheet.rows} filas</span></span>}
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-1 text-sm" data-testid="hojas">
-        {wb.sheets.map((s, i) => (
+        {visibleSheets.map(({ x: s, i }) => (
           <button key={i} className={`rounded-t-md border-x border-b-2 px-3 py-1 ${i === si ? 'border-emerald-600 bg-white font-semibold text-emerald-800' : 'border-transparent text-slate-600 hover:bg-slate-100'}`}
             onClick={() => { setSi(i); setSel({ r: 0, c: 0, r2: 0, c2: 0 }); }}
-            onDoubleClick={() => { if (!doc.canEdit) return; const nm = prompt('Nombre de la hoja', s.name)?.trim().slice(0, 31); if (nm && !wb.sheets.some((x, j) => j !== i && x.name === nm)) commit({ sheets: wb.sheets.map((x, j) => (j === i ? { ...x, name: nm } : x)) }); }}>{s.name}</button>))}
-        {doc.canEdit && <button className="rounded px-2 py-1 text-emerald-700 hover:bg-emerald-50" onClick={() => { let k = wb.sheets.length + 1; while (wb.sheets.some((s) => s.name === `Hoja${k}`)) k++; commit({ sheets: [...wb.sheets, newSheet(`Hoja${k}`)] }); setSi(wb.sheets.length); }} data-testid="nueva-hoja">＋</button>}
+            onDoubleClick={() => { if (doc.canEdit && i === si) renameSheet(); }} data-testid="pestana-hoja">{s.name}</button>))}
+        {doc.canEdit && (
+          <details className="relative"><summary className="cursor-pointer list-none rounded px-2 py-1 text-slate-600 hover:bg-slate-100" title="Opciones de la hoja" data-testid="opciones-hoja">⋯</summary>
+            <div className="absolute bottom-full left-0 z-30 mb-1 w-48 rounded-lg border bg-white p-1 shadow-lg">
+              <button className="block w-full rounded px-3 py-1.5 text-left hover:bg-slate-100" onClick={(e) => { shut(e); renameSheet(); }}>✏ Cambiar nombre</button>
+              <button className="block w-full rounded px-3 py-1.5 text-left hover:bg-slate-100" onClick={(e) => { shut(e); dupSheet(); }} data-testid="duplicar-hoja">📑 Duplicar</button>
+              <button className="block w-full rounded px-3 py-1.5 text-left hover:bg-slate-100" onClick={(e) => { shut(e); moveSheet(-1); }} data-testid="hoja-izquierda">← Mover a la izquierda</button>
+              <button className="block w-full rounded px-3 py-1.5 text-left hover:bg-slate-100" onClick={(e) => { shut(e); moveSheet(1); }} data-testid="hoja-derecha">→ Mover a la derecha</button>
+              <button className="block w-full rounded px-3 py-1.5 text-left hover:bg-slate-100" onClick={(e) => { shut(e); hideSheet(); }} data-testid="ocultar-hoja">🙈 Ocultar</button>
+            </div></details>)}
+        {wb.sheets.some((x) => x.hidden) && (
+          <select className="h-7 rounded border border-slate-200 text-xs" value="" onChange={(e) => { const j = Number(e.target.value); commit({ sheets: wb.sheets.map((x, k) => (k === j ? { ...x, hidden: false } : x)) }); setSi(j); }} aria-label="Mostrar hoja oculta" data-testid="mostrar-hoja">
+            <option value="">Mostrar hoja oculta…</option>{wb.sheets.map((x, j) => x.hidden && <option key={j} value={j}>{x.name}</option>)}</select>)}
+        {doc.canEdit && <button className="rounded px-2 py-1 text-emerald-700 hover:bg-emerald-50" onClick={() => { let k = wb.sheets.length + 1; while (wb.sheets.some((s) => s.name === `Hoja${k}`)) k++; commit({ sheets: [...wb.sheets, newSheet(`Hoja${k}`)] }); setSi(wb.sheets.length); }} data-testid="nueva-hoja" title="Nueva hoja">＋</button>}
         {doc.canEdit && wb.sheets.length > 1 && <button className="ml-2 rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50" onClick={() => { if (confirm(`¿Eliminar la hoja «${sheet.name}»?`)) { commit({ sheets: wb.sheets.filter((_, j) => j !== si) }); setSi(0); } }}>Eliminar hoja</button>}
         <span className="ml-auto text-xs text-slate-500" data-testid="resumen-seleccion">{nums.length > 1 && `Suma: ${display(nums.reduce((a, b) => a + b, 0))} · Promedio: ${display(nums.reduce((a, b) => a + b, 0) / nums.length)} · Recuento: ${nums.length}`}</span>
       </div>
       {chart && <Chart sheet={sheet} vals={vals} sel={sel} onClose={() => setChart(false)} />}
-      <p className="mt-2 text-xs text-slate-500">Fórmulas como en Excel, también en español: =SUMA(A1:A10), =PROMEDIO(…), =SI(B2&gt;=4;&quot;Aprobado&quot;;&quot;Reprobado&quot;), =BUSCARV(…). Copie y pegue desde Excel o Google Sheets.</p>
+      <p className="mt-2 text-xs text-slate-500">Fórmulas como en Excel, también en español: =SUMA(A1:A10), =PROMEDIO(…), =SI(B2&gt;=4;&quot;Aprobado&quot;;&quot;Reprobado&quot;), =BUSCARV(…), =BUSCARX(…). Copie y pegue desde Excel o Google Sheets.</p>
     </div>
   );
 }

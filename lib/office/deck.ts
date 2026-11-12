@@ -11,9 +11,15 @@ export type El = {
   text?: string; font?: string; size?: number; color?: string; b?: boolean; i?: boolean; u?: boolean;
   align?: 'left' | 'center' | 'right'; valign?: 'top' | 'middle' | 'bottom';
   fill?: string; stroke?: string; strokeW?: number; shape?: 'rect' | 'round' | 'ellipse' | 'triangle' | 'line' | 'arrow' | 'star'; src?: string; opacity?: number;
+  /** Rotación en grados, bloqueo (no se mueve) y animación de entrada al presentar. */
+  rot?: number; lock?: boolean; anim?: 'none' | 'fade' | 'fly' | 'zoom';
 };
-export type Page = { id: string; bg: string; bg2?: string; els: El[]; notes?: string };
-export type Deck = { kind: 'slides' | 'pub'; w: number; h: number; pages: Page[] };
+export type Page = { id: string; bg: string; bg2?: string; els: El[]; notes?: string; hidden?: boolean; transition?: 'none' | 'fade' | 'slide' | 'zoom' };
+export type Deck = { kind: 'slides' | 'pub'; w: number; h: number; pages: Page[]; grid?: boolean };
+/** Cuadrícula de ajuste (puntos). */
+export const GRID = 10;
+/** Sangrado para imprenta: 3 mm. */
+export const BLEED = 8.5;
 
 export const SLIDE_FORMATS: Fmt[] = [
   { id: 'pptx', label: 'PowerPoint (.pptx)', ext: 'pptx', mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' },
@@ -23,6 +29,7 @@ export const SLIDE_FORMATS: Fmt[] = [
 ];
 export const PUB_FORMATS: Fmt[] = [
   { id: 'pdf', label: 'PDF para imprimir', ext: 'pdf', mime: 'application/pdf' },
+  { id: 'pdf-imprenta', label: 'PDF para imprenta', ext: 'pdf', mime: 'application/pdf', hint: 'Con sangrado de 3 mm y marcas de corte' },
   { id: 'png', label: 'Imagen PNG', ext: 'png', mime: 'image/png' },
   { id: 'jpg', label: 'Imagen JPG', ext: 'jpg', mime: 'image/jpeg' },
   { id: 'pptx', label: 'PowerPoint (.pptx)', ext: 'pptx', mime: SLIDE_FORMATS[0].mime },
@@ -108,6 +115,42 @@ export function newDeck(kind: 'slides' | 'pub', size = kind === 'slides' ? 'slid
     p.els.push(T({ x: 40, y: h * 0.12, w: w - 80, h: 40, text: 'Te invitamos a', size: 20, i: true, color: '#9d174d', align: 'center', font: 'Georgia' }));
     p.els.push(T({ x: 40, y: h * 0.2, w: w - 80, h: 110, text: 'Ceremonia de titulación', size: 40, b: true, color: '#831843', align: 'center', font: 'Georgia', valign: 'middle' }));
     p.els.push(T({ x: 60, y: h * 0.45, w: w - 120, h: 120, text: 'Viernes 12 de diciembre · 19:00 h\nAuditorio principal', size: 18, color: '#500724', align: 'center' }));
+  } else if (template === 'calendario') {
+    const now = new Date(); const y = now.getFullYear(); const m = now.getMonth();
+    const MES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][m];
+    p.els.push(S({ x: 0, y: 0, w, h: 110, fill: '#1f45c8' }));
+    p.els.push(T({ x: 30, y: 26, w: w - 60, h: 60, text: `${MES} ${y}`, size: 38, b: true, color: '#ffffff', valign: 'middle' }));
+    const gx = 30, gy = 140, cw = (w - 60) / 7, ch = (h - gy - 60) / 6;
+    ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].forEach((d, i) => p.els.push(T({ x: gx + i * cw, y: gy - 26, w: cw, h: 22, text: d, size: 12, b: true, color: i > 4 ? '#b91c1c' : '#334155', align: 'center' })));
+    const first = (new Date(y, m, 1).getDay() + 6) % 7; const days = new Date(y, m + 1, 0).getDate();
+    for (let k = 0; k < 42; k++) {
+      const r = Math.floor(k / 7), c = k % 7, n = k - first + 1;
+      p.els.push(S({ x: gx + c * cw, y: gy + r * ch, w: cw, h: ch, fill: n >= 1 && n <= days ? '#ffffff' : '#f1f5f9', stroke: '#cbd5e1', strokeW: 1 }));
+      if (n >= 1 && n <= days) p.els.push(T({ x: gx + c * cw + 4, y: gy + r * ch + 3, w: cw - 8, h: 20, text: String(n), size: 12, b: true, color: c > 4 ? '#b91c1c' : '#0f172a', align: 'right' }));
+    }
+    p.els.push(T({ x: 30, y: h - 46, w: w - 60, h: 24, text: 'Institución · Calendario académico', size: 11, color: '#64748b', align: 'center' }));
+  } else if (template === 'triptico' || template === 'folleto') {
+    const cols = template === 'triptico' ? 3 : 2; const cw = w / cols;
+    const titles = template === 'triptico' ? [['Contacto', 'Dirección\nTeléfono\nCorreo\nRedes sociales'], ['Nuestra institución', 'Breve presentación de la institución, misión y valores.'], ['NOMBRE DEL PROGRAMA', 'Modalidad · Duración · Certificación']]
+      : [['¿Quiénes somos?', 'Presentación de la institución y su propuesta formativa.'], ['Programas', '• Curso 1\n• Curso 2\n• Curso 3']];
+    for (let i = 0; i < cols; i++) {
+      if (i > 0) p.els.push(S({ x: i * cw, y: 20, w: 1, h: h - 40, shape: 'line', fill: '#cbd5e1', stroke: '#cbd5e1', strokeW: 1 }));
+      const cover = i === cols - 1 && template === 'triptico';
+      if (cover) p.els.push(S({ x: i * cw, y: 0, w: cw, h, fill: '#1f45c8' }));
+      p.els.push(T({ x: i * cw + 20, y: cover ? h * 0.35 : 40, w: cw - 40, h: 60, text: titles[i][0], size: cover ? 26 : 20, b: true, color: cover ? '#ffffff' : '#1f45c8', align: cover ? 'center' : 'left' }));
+      p.els.push(T({ x: i * cw + 20, y: cover ? h * 0.35 + 70 : 110, w: cw - 40, h: h * 0.4, text: titles[i][1], size: 13, color: cover ? '#dbeafe' : '#334155', align: cover ? 'center' : 'left' }));
+    }
+    if (template === 'triptico') {
+      const inner: Page = { id: uid(), bg: '#ffffff', els: [] };
+      [['Objetivos', '• Objetivo 1\n• Objetivo 2\n• Objetivo 3'], ['Plan de estudios', 'Módulo 1\nMódulo 2\nMódulo 3\nMódulo 4'], ['Inscripciones', 'Requisitos, valores y formas de pago.']].forEach(([t, b], i) => {
+        if (i > 0) inner.els.push(S({ x: i * cw, y: 20, w: 1, h: h - 40, shape: 'line', fill: '#cbd5e1', stroke: '#cbd5e1', strokeW: 1 }));
+        inner.els.push(T({ x: i * cw + 20, y: 40, w: cw - 40, h: 40, text: t, size: 20, b: true, color: '#1f45c8' }));
+        inner.els.push(T({ x: i * cw + 20, y: 100, w: cw - 40, h: h - 160, text: b, size: 13, color: '#334155' }));
+      });
+      deck.pages = [p, inner];
+      return deck;
+    }
+    p.els.unshift(S({ x: 0, y: 0, w, h: 8, fill: '#10b5a3' }));
   }
   deck.pages = [p];
   return deck;
@@ -129,13 +172,15 @@ export function wrapLines(ctx: { measureText: (t: string) => { width: number } }
   return out;
 }
 
-export async function renderPage(deck: Deck, page: Page, scale = 2): Promise<HTMLCanvasElement> {
-  const c = document.createElement('canvas'); c.width = Math.round(deck.w * scale); c.height = Math.round(deck.h * scale);
+export async function renderPage(deck: Deck, page: Page, scale = 2, bleed = 0): Promise<HTMLCanvasElement> {
+  const c = document.createElement('canvas'); c.width = Math.round((deck.w + 2 * bleed) * scale); c.height = Math.round((deck.h + 2 * bleed) * scale);
   const g = c.getContext('2d')!; g.scale(scale, scale);
-  if (page.bg2) { const gr = g.createLinearGradient(0, 0, deck.w, deck.h); gr.addColorStop(0, page.bg); gr.addColorStop(1, page.bg2); g.fillStyle = gr; } else g.fillStyle = page.bg || '#fff';
-  g.fillRect(0, 0, deck.w, deck.h);
+  if (page.bg2) { const gr = g.createLinearGradient(0, 0, deck.w + 2 * bleed, deck.h + 2 * bleed); gr.addColorStop(0, page.bg); gr.addColorStop(1, page.bg2); g.fillStyle = gr; } else g.fillStyle = page.bg || '#fff';
+  g.fillRect(0, 0, deck.w + 2 * bleed, deck.h + 2 * bleed);
+  g.translate(bleed, bleed);
   for (const e of page.els) {
     g.save(); g.globalAlpha = e.opacity ?? 1;
+    if (e.rot) { const cx = e.x + e.w / 2, cy = e.y + e.h / 2; g.translate(cx, cy); g.rotate((e.rot * Math.PI) / 180); g.translate(-cx, -cy); }
     if (e.type === 'shape') {
       g.fillStyle = e.fill ?? 'transparent'; g.strokeStyle = e.stroke ?? 'transparent'; g.lineWidth = e.strokeW ?? 0;
       g.beginPath();
@@ -174,10 +219,31 @@ export async function exportDeck(deck: Deck, title: string, fmt: string, pageInd
     const c = await renderPage(deck, deck.pages[pageIndex] ?? deck.pages[0], deck.kind === 'pub' ? 3 : 2);
     return new Promise((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error('No se pudo crear la imagen'))), fmt === 'png' ? 'image/png' : 'image/jpeg', 0.92));
   }
+  if (fmt === 'pdf-imprenta') {
+    // Imprenta: fondo extendido 3 mm (sangrado), marcas de corte en las esquinas y área de marcas alrededor
+    const { PDFDocument, rgb } = await import('pdf-lib');
+    const pdf = await PDFDocument.create(); pdf.setTitle(title); pdf.setCreator('SEMATEC Oficina');
+    const M = 28; const W = deck.w + 2 * M, H = deck.h + 2 * M;
+    for (const p of deck.pages) {
+      const c = await renderPage(deck, p, 3, BLEED);
+      const png = await pdf.embedPng(new Uint8Array(await (await new Promise<Blob>((r) => c.toBlob((b) => r(b!), 'image/png'))).arrayBuffer()));
+      const page = pdf.addPage([W, H]);
+      page.drawImage(png, { x: M - BLEED, y: M - BLEED, width: deck.w + 2 * BLEED, height: deck.h + 2 * BLEED });
+      page.setTrimBox(M, M, deck.w, deck.h); page.setBleedBox(M - BLEED, M - BLEED, deck.w + 2 * BLEED, deck.h + 2 * BLEED);
+      const k = rgb(0, 0, 0); const L = 14; const gap = BLEED + 2;
+      for (const [x, y] of [[M, M], [M + deck.w, M], [M, M + deck.h], [M + deck.w, M + deck.h]]) {
+        const sx = x === M ? -1 : 1, sy = y === M ? -1 : 1;
+        page.drawLine({ start: { x: x + sx * gap, y }, end: { x: x + sx * (gap + L), y }, thickness: 0.4, color: k });
+        page.drawLine({ start: { x, y: y + sy * gap }, end: { x, y: y + sy * (gap + L) }, thickness: 0.4, color: k });
+      }
+    }
+    return new Blob([await pdf.save() as BlobPart], { type: 'application/pdf' });
+  }
   if (fmt === 'pdf') {
     const { PDFDocument } = await import('pdf-lib');
     const pdf = await PDFDocument.create(); pdf.setTitle(title); pdf.setCreator('SEMATEC Oficina');
     for (const p of deck.pages) {
+      if (p.hidden && deck.kind === 'slides') continue;
       // Página nítida para imprimir: se dibuja a 3x y se inserta como imagen
       const c = await renderPage(deck, p, 3);
       const png = await pdf.embedPng(new Uint8Array(await (await new Promise<Blob>((r) => c.toBlob((b) => r(b!), 'image/png'))).arrayBuffer()));
@@ -195,7 +261,7 @@ export async function exportDeck(deck: Deck, title: string, fmt: string, pageInd
       if (p.bg2) { const c = await renderPage({ ...deck, pages: [] }, { ...p, els: [] }, 1); s.background = { data: c.toDataURL('image/png') }; }
       else s.background = { color: hexNo(p.bg) ?? 'FFFFFF' };
       for (const e of p.els) {
-        const box = { x: inch(e.x), y: inch(e.y), w: inch(Math.max(1, e.w)), h: inch(Math.max(1, e.h)) };
+        const box = { x: inch(e.x), y: inch(e.y), w: inch(Math.max(1, e.w)), h: inch(Math.max(1, e.h)), rotate: e.rot || undefined, transparency: e.opacity !== undefined && e.opacity < 1 ? Math.round((1 - e.opacity) * 100) : undefined };
         if (e.type === 'text') s.addText(e.text ?? '', { ...box, fontSize: e.size ?? 18, fontFace: e.font ?? 'Arial', color: hexNo(e.color) ?? '111111', bold: e.b, italic: e.i, underline: e.u ? { style: 'sng' } : undefined, align: e.align ?? 'left', valign: e.valign ?? 'top', fill: e.fill ? { color: hexNo(e.fill) ?? 'FFFFFF' } : undefined, margin: 4 });
         else if (e.type === 'image' && e.src) {
           let data = e.src;
@@ -207,6 +273,7 @@ export async function exportDeck(deck: Deck, title: string, fmt: string, pageInd
         }
       }
       if (p.notes) s.addNotes(p.notes);
+      if (p.hidden) (s as unknown as { hidden: boolean }).hidden = true;
     }
     const out = await pptx.write({ outputType: 'blob' });
     return out as Blob;

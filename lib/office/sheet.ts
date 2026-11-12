@@ -5,9 +5,14 @@
  */
 import type { Fmt } from '@/lib/convert/media';
 
-export type CellStyle = { b?: boolean; i?: boolean; u?: boolean; color?: string; bg?: string; align?: 'left' | 'center' | 'right'; fmt?: 'general' | 'number' | 'currency' | 'percent' | 'date' | 'text'; dec?: number; size?: number };
+export type Borders = { t?: boolean; b?: boolean; l?: boolean; r?: boolean };
+export type CellStyle = { b?: boolean; i?: boolean; u?: boolean; color?: string; bg?: string; align?: 'left' | 'center' | 'right'; fmt?: 'general' | 'number' | 'currency' | 'percent' | 'date' | 'text'; dec?: number; size?: number; bd?: Borders };
+/** Formato condicional: si el valor de la celda cumple la condición, se pinta con estos colores. */
+export type CondRule = { range: string; op: '>' | '<' | '>=' | '<=' | '=' | '<>' | 'contains' | 'empty'; v: string; bg?: string; color?: string; b?: boolean };
+/** Filtro: fila de encabezados y texto buscado por columna (las filas que no coinciden se ocultan). */
+export type SheetFilter = { row: number; c1: number; c2: number; q: Record<number, string> };
 export type Cell = { v: string; s?: CellStyle };
-export type Sheet = { name: string; cells: Record<string, Cell>; widths?: Record<number, number>; rows: number; cols: number };
+export type Sheet = { name: string; cells: Record<string, Cell>; widths?: Record<number, number>; rows: number; cols: number; hidden?: boolean; filter?: SheetFilter; cond?: CondRule[] };
 export type Workbook = { sheets: Sheet[] };
 export type Value = number | string | boolean | null | { error: string };
 
@@ -41,7 +46,7 @@ const ES: Record<string, string> = {
   CONCATENAR: 'CONCATENATE', Y: 'AND', O: 'OR', NO: 'NOT', MEDIANA: 'MEDIAN', ENTERO: 'INT', POTENCIA: 'POWER', RAIZ: 'SQRT', MAYUSC: 'UPPER', MINUSC: 'LOWER',
   LARGO: 'LEN', IZQUIERDA: 'LEFT', DERECHA: 'RIGHT', EXTRAE: 'MID', TEXTO: 'TEXT', FECHA: 'DATE', 'AÑO': 'YEAR', MES: 'MONTH', DIA: 'DAY', COINCIDIR: 'MATCH',
   INDICE: 'INDEX', ESBLANCO: 'ISBLANK', ESNUMERO: 'ISNUMBER', RESIDUO: 'MOD', 'K.ESIMO.MAYOR': 'LARGE', 'K.ESIMO.MENOR': 'SMALL', ESPACIOS: 'TRIM', 'NOMPROPIO': 'PROPER',
-  SUSTITUIR: 'SUBSTITUTE', ALEATORIO: 'RAND', 'ALEATORIO.ENTRE': 'RANDBETWEEN', PRODUCTO: 'PRODUCT', ABS: 'ABS', MAX: 'MAX', MIN: 'MIN',
+  SUSTITUIR: 'SUBSTITUTE', ALEATORIO: 'RAND', 'ALEATORIO.ENTRE': 'RANDBETWEEN', PRODUCTO: 'PRODUCT', ABS: 'ABS', MAX: 'MAX', MIN: 'MIN', BUSCARX: 'XLOOKUP', 'SI.ND': 'IFNA', 'COINCIDIRX': 'XMATCH',
 };
 /** Acepta nombres de funciones en español y el separador «;» de Excel en español. */
 export function normalizeFormula(f: string) {
@@ -120,6 +125,25 @@ export function computeWorkbook(wb: Workbook): Record<string, Record<string, Val
       COUNTA: (...args: { value: unknown }[]) => args.reduce((n, a) => n + (Array.isArray(a.value) ? (a.value as unknown[][]).flat().filter((x) => x !== undefined && x !== null && x !== '').length : a.value !== undefined && a.value !== null && a.value !== '' ? 1 : 0), 0),
       COUNTBLANK: (a: { value: unknown }) => (Array.isArray(a.value) ? (a.value as unknown[][]).flat().filter((x) => x === undefined || x === null || x === '').length : 0),
       UPPER: (a: { value: unknown }) => String(a.value ?? '').toUpperCase(),
+      // BUSCARX / XLOOKUP(valor; matriz_buscada; matriz_devuelta; [si_no_se_encuentra]; [modo: 0 exacta, -1 menor, 1 mayor, 2 comodín])
+      XLOOKUP: (look: { value: unknown }, where: { value: unknown }, ret: { value: unknown }, notFound?: { value: unknown }, mode?: { value: unknown }) => {
+        const flat = (x: unknown) => (Array.isArray(x) ? x as unknown[][] : [[x]]);
+        const W = flat(where.value); const R = flat(ret.value);
+        const vertical = W.length >= (W[0]?.length ?? 0);
+        const list = vertical ? W.map((r) => r[0]) : W[0];
+        const key = look.value; const m = Number(mode?.value ?? 0);
+        const eq = (a: unknown, b: unknown) => (typeof a === 'string' && typeof b === 'string' ? a.toLocaleLowerCase('es') === b.toLocaleLowerCase('es') : a === b);
+        let idx = -1;
+        if (m === 2 && typeof key === 'string') { const re = new RegExp(`^${key.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`, 'i'); idx = list.findIndex((x) => re.test(String(x ?? ''))); }
+        else idx = list.findIndex((x) => eq(x, key));
+        if (idx < 0 && (m === -1 || m === 1) && typeof key === 'number') {
+          let best = -1;
+          list.forEach((x, i) => { if (typeof x !== 'number') return; if (m === -1 ? x <= key && (best < 0 || x > (list[best] as number)) : x >= key && (best < 0 || x < (list[best] as number))) best = i; });
+          idx = best;
+        }
+        if (idx < 0) { if (notFound && notFound.value !== undefined && notFound.value !== null) return notFound.value; if (FErr) throw (FErr as unknown as { NA: unknown }).NA; return '#N/A'; }
+        return vertical ? (R[idx]?.[0] ?? null) : (R[0]?.[idx] ?? null);
+      },
       STDEV: (...args: { value: unknown }[]) => {
         const xs = args.flatMap((a) => (Array.isArray(a.value) ? (a.value as unknown[][]).flat() : [a.value])).filter((x): x is number => typeof x === 'number');
         if (xs.length < 2) return 0; const m = xs.reduce((s, x) => s + x, 0) / xs.length;
@@ -143,6 +167,41 @@ function fromEngine(v: unknown): Value {
   if (Array.isArray(v)) return fromEngine((v as unknown[][])[0]?.[0]);
   if (typeof v === 'number' || typeof v === 'string' || typeof v === 'boolean') return v;
   return String(v);
+}
+
+// ---------------------------------------------------------------- formato condicional y filtros
+export function parseRange(a: string): { r1: number; c1: number; r2: number; c2: number } | null {
+  const [x, y] = a.toUpperCase().split(':'); const p = parseAddr(x); const q = parseAddr(y ?? x);
+  return p && q ? { r1: Math.min(p[0], q[0]), c1: Math.min(p[1], q[1]), r2: Math.max(p[0], q[0]), c2: Math.max(p[1], q[1]) } : null;
+}
+export function condMatch(rule: CondRule, v: Value): boolean {
+  if (rule.op === 'empty') return v === null || v === '';
+  if (v === null || typeof v === 'object') return false;
+  const target = parseLiteral(rule.v);
+  if (rule.op === 'contains') return String(v).toLocaleLowerCase('es').includes(rule.v.toLocaleLowerCase('es'));
+  const a = typeof v === 'boolean' ? Number(v) : v; const b = typeof target === 'boolean' ? Number(target) : target;
+  if (typeof a === 'number' && typeof b === 'number') return { '>': a > b, '<': a < b, '>=': a >= b, '<=': a <= b, '=': a === b, '<>': a !== b }[rule.op];
+  const sa = String(a).toLocaleLowerCase('es'), sb = String(b ?? '').toLocaleLowerCase('es');
+  return rule.op === '=' ? sa === sb : rule.op === '<>' ? sa !== sb : false;
+}
+/** Estilo extra que aporta el formato condicional a una celda (o undefined). */
+export function condStyle(sheet: Sheet, r: number, c: number, v: Value): Partial<CellStyle> | undefined {
+  for (const rule of sheet.cond ?? []) {
+    const g = parseRange(rule.range); if (!g || r < g.r1 || r > g.r2 || c < g.c1 || c > g.c2) continue;
+    if (condMatch(rule, v)) return { bg: rule.bg, color: rule.color, b: rule.b || undefined };
+  }
+  return undefined;
+}
+/** Filas visibles según el filtro de la hoja. */
+export function visibleRows(sheet: Sheet, vals: Record<string, Value>, total: number): number[] {
+  const f = sheet.filter; const out: number[] = [];
+  const qs = f ? Object.entries(f.q).filter(([, t]) => t.trim()) : [];
+  for (let r = 0; r < total; r++) {
+    if (!f || r <= f.row || !qs.length) { out.push(r); continue; }
+    const ok = qs.every(([c, t]) => display(vals[addr(r, Number(c))] ?? null).toLocaleLowerCase('es').includes(t.trim().toLocaleLowerCase('es')));
+    if (ok) out.push(r);
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------- formato
@@ -277,7 +336,7 @@ export async function exportWorkbook(wb: Workbook, title: string, fmt: string, s
     const ExcelJS = (await import('exceljs')).default;
     const x = new ExcelJS.Workbook(); x.creator = 'SEMATEC Oficina'; x.title = title;
     for (const s of wb.sheets) {
-      const ws = x.addWorksheet(s.name.replace(/[\\/?*[\]:]/g, '-').slice(0, 31) || 'Hoja');
+      const ws = x.addWorksheet(s.name.replace(/[\\/?*[\]:]/g, '-').slice(0, 31) || 'Hoja', { state: s.hidden ? 'hidden' : 'visible' });
       Object.entries(s.widths ?? {}).forEach(([c, w]) => { ws.getColumn(Number(c) + 1).width = Math.max(4, Math.round(Number(w) / 7.5)); });
       for (const [k, cell] of Object.entries(s.cells)) {
         const p = parseAddr(k); if (!p || (cell.v === '' && !cell.s)) continue;
@@ -290,6 +349,15 @@ export async function exportWorkbook(wb: Workbook, title: string, fmt: string, s
         if (st.bg) xc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${st.bg.slice(1).toUpperCase()}` } };
         if (st.align) xc.alignment = { horizontal: st.align };
         if (st.fmt && NUMFMT[st.fmt]) xc.numFmt = NUMFMT[st.fmt];
+        if (st.bd) { const L = { style: 'thin' as const, color: { argb: 'FF000000' } }; xc.border = { top: st.bd.t ? L : undefined, bottom: st.bd.b ? L : undefined, left: st.bd.l ? L : undefined, right: st.bd.r ? L : undefined }; }
+      }
+      if (s.filter) ws.autoFilter = { from: { row: s.filter.row + 1, column: s.filter.c1 + 1 }, to: { row: s.filter.row + 1, column: s.filter.c2 + 1 } };
+      for (const rule of s.cond ?? []) {
+        const g = parseRange(rule.range); if (!g || rule.op === 'contains' || rule.op === 'empty') continue;
+        const OP: Record<string, string> = { '>': 'greaterThan', '<': 'lessThan', '>=': 'greaterThanOrEqual', '<=': 'lessThanOrEqual', '=': 'equal', '<>': 'notEqual' };
+        const lit = parseLiteral(rule.v);
+        ws.addConditionalFormatting({ ref: `${addr(g.r1, g.c1)}:${addr(g.r2, g.c2)}`, rules: [{ type: 'cellIs', operator: OP[rule.op], priority: 1, formulae: [typeof lit === 'number' ? String(lit) : `"${String(rule.v).replace(/"/g, '""')}"`],
+          style: { fill: rule.bg ? { type: 'pattern', pattern: 'solid', bgColor: { argb: `FF${rule.bg.slice(1).toUpperCase()}` } } : undefined, font: { color: rule.color ? { argb: `FF${rule.color.slice(1).toUpperCase()}` } : undefined, bold: rule.b } } }] as never });
       }
     }
     const buf = await x.xlsx.writeBuffer();

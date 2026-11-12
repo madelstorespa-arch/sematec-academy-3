@@ -25,7 +25,7 @@ async function shrinkPhoto(file: File): Promise<File> {
 }
 
 /** Sube con barra de progreso (PUT al enlace firmado de un solo uso). */
-function putWithProgress(path: string, token: string, file: Blob, mime: string, onProgress?: (pct: number) => void) {
+export function putWithProgress(path: string, token: string, file: Blob, mime: string, onProgress?: (pct: number) => void) {
   return new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/upload/sign/user-files/${path.split('/').map(encodeURIComponent).join('/')}?token=${encodeURIComponent(token)}`);

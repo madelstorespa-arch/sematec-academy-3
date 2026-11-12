@@ -108,7 +108,17 @@ async function odtToHtml(src: Blob) {
 
 // ------------------------------------------------------------- estructura común
 type Run = { text: string; b?: boolean; i?: boolean; u?: boolean; s?: boolean; sup?: boolean; sub?: boolean; color?: string; size?: number; href?: string; br?: boolean; img?: string };
-type Block = { kind: 'p' | 'h' | 'li' | 'quote' | 'hr' | 'table' | 'img'; level?: number; ordered?: boolean; runs: Run[]; align?: string; rows?: Run[][][]; src?: string };
+type Block = { kind: 'p' | 'h' | 'li' | 'quote' | 'hr' | 'table' | 'img' | 'pagebreak'; level?: number; ordered?: boolean; runs: Run[]; align?: string; rows?: Run[][][]; cells?: { span: number; bg?: string }[][]; src?: string };
+
+/** Diseño de página del documento (tamaño, orientación, márgenes, encabezado, pie y numeración). */
+export type DocLayout = { size?: string; orient?: 'v' | 'h'; margin?: string; header?: string; footer?: string; pageNumbers?: boolean };
+/** Tamaños en puntos (1/72 de pulgada). */
+export const DOC_PAGE_PT: Record<string, { label: string; w: number; h: number }> = { a4: { label: 'A4', w: 595.28, h: 841.89 }, carta: { label: 'Carta', w: 612, h: 792 }, oficio: { label: 'Oficio', w: 612, h: 936 } };
+export const DOC_MARGIN_PT: Record<string, { label: string; v: number; h: number }> = { normal: { label: 'Normal', v: 54, h: 63 }, estrecho: { label: 'Estrecho', v: 36, h: 36 }, ancho: { label: 'Ancho', v: 72, h: 96 } };
+export function pageDims(l: DocLayout = {}) {
+  const p = DOC_PAGE_PT[l.size ?? 'a4'] ?? DOC_PAGE_PT.a4; const m = DOC_MARGIN_PT[l.margin ?? 'normal'] ?? DOC_MARGIN_PT.normal;
+  return l.orient === 'h' ? { W: p.h, H: p.w, mv: m.v, mh: m.h } : { W: p.w, H: p.h, mv: m.v, mh: m.h };
+}
 
 const hex = (c: string | null | undefined) => {
   if (!c) return undefined;
@@ -144,7 +154,8 @@ export function htmlToBlocks(html: string): Block[] {
   const blocks: Block[] = [];
   const visit = (el: Element, ordered?: boolean) => {
     const t = el.tagName; const align = (el as HTMLElement).style?.textAlign || undefined;
-    if (/^H[1-6]$/.test(t)) blocks.push({ kind: 'h', level: Number(t[1]), runs: runsOf(el), align });
+    if ((el as HTMLElement).style?.pageBreakAfter === 'always' || (el as HTMLElement).style?.breakAfter === 'page') { if (el.textContent?.trim()) blocks.push({ kind: 'p', runs: runsOf(el), align }); blocks.push({ kind: 'pagebreak', runs: [] }); }
+    else if (/^H[1-6]$/.test(t)) blocks.push({ kind: 'h', level: Number(t[1]), runs: runsOf(el), align });
     else if (t === 'P' || t === 'DIV' && ![...el.children].some((c) => /^(P|H\d|UL|OL|TABLE|DIV)$/.test(c.tagName))) blocks.push({ kind: 'p', runs: runsOf(el), align });
     else if (t === 'UL' || t === 'OL') for (const li of [...el.children]) {
       const nested = [...li.children].filter((c) => c.tagName === 'UL' || c.tagName === 'OL');
@@ -155,7 +166,11 @@ export function htmlToBlocks(html: string): Block[] {
     else if (t === 'BLOCKQUOTE') blocks.push({ kind: 'quote', runs: runsOf(el) });
     else if (t === 'HR') blocks.push({ kind: 'hr', runs: [] });
     else if (t === 'IMG') blocks.push({ kind: 'img', runs: [], src: el.getAttribute('src') ?? '' });
-    else if (t === 'TABLE') blocks.push({ kind: 'table', runs: [], rows: [...el.querySelectorAll('tr')].map((r) => [...r.children].map((c) => runsOf(c))) });
+    else if (t === 'TABLE') {
+      const trs = [...el.querySelectorAll('tr')];
+      blocks.push({ kind: 'table', runs: [], rows: trs.map((r) => [...r.children].map((c) => runsOf(c))),
+        cells: trs.map((r) => [...r.children].map((c) => ({ span: Math.max(1, Number(c.getAttribute('colspan')) || 1), bg: hex((c as HTMLElement).style?.backgroundColor) ?? hex(c.getAttribute('data-background-color')) }))) });
+    }
     else if (t === 'PRE') blocks.push({ kind: 'p', runs: [{ text: el.textContent ?? '' }] });
     else for (const c of [...el.children]) visit(c, ordered);
   };
@@ -203,7 +218,7 @@ async function dataOf(src: string): Promise<{ data: Uint8Array; type: 'png' | 'j
   } catch { return null; }
 }
 
-export async function htmlToDocx(html: string, title: string): Promise<Blob> {
+export async function htmlToDocx(html: string, title: string, layout: DocLayout = {}): Promise<Blob> {
   const d = await import('docx');
   const blocks = htmlToBlocks(html);
   const ALIGN: Record<string, (typeof d.AlignmentType)[keyof typeof d.AlignmentType]> = { center: d.AlignmentType.CENTER, right: d.AlignmentType.RIGHT, justify: d.AlignmentType.JUSTIFIED };
@@ -221,11 +236,15 @@ export async function htmlToDocx(html: string, title: string): Promise<Blob> {
   for (const b of blocks) {
     if (b.kind === 'table') {
       const rows = b.rows ?? []; if (!rows.length) continue;
-      const cols = Math.max(...rows.map((r) => r.length));
-      children.push(new d.Table({ width: { size: 100, type: d.WidthType.PERCENTAGE }, rows: await Promise.all(rows.map(async (r) => new d.TableRow({
-        children: await Promise.all(Array.from({ length: cols }, async (_, i) => new d.TableCell({ children: [new d.Paragraph({ children: await toRuns(r[i] ?? []) })] }))) }))) }));
+      children.push(new d.Table({ width: { size: 100, type: d.WidthType.PERCENTAGE }, rows: await Promise.all(rows.map(async (r, ri) => new d.TableRow({
+        children: await Promise.all(r.map(async (cell, i) => {
+          const meta = b.cells?.[ri]?.[i];
+          return new d.TableCell({ columnSpan: meta && meta.span > 1 ? meta.span : undefined, shading: meta?.bg ? { fill: meta.bg, type: d.ShadingType.CLEAR, color: 'auto' } : undefined,
+            children: [new d.Paragraph({ children: await toRuns(cell) })] });
+        })) }))) }));
       continue;
     }
+    if (b.kind === 'pagebreak') { children.push(new d.Paragraph({ children: [new d.PageBreak()] })); continue; }
     if (b.kind === 'hr') { children.push(new d.Paragraph({ border: { bottom: { style: d.BorderStyle.SINGLE, size: 6, color: '999999', space: 1 } } })); continue; }
     if (b.kind === 'img') { children.push(new d.Paragraph({ children: await toRuns([{ text: '', img: b.src }]) })); continue; }
     children.push(new d.Paragraph({
@@ -240,7 +259,19 @@ export async function htmlToDocx(html: string, title: string): Promise<Blob> {
     title, creator: 'SEMATEC Oficina',
     numbering: { config: [{ reference: 'num', levels: [{ level: 0, format: d.LevelFormat.DECIMAL, text: '%1.', alignment: d.AlignmentType.START, style: { paragraph: { indent: { left: 720, hanging: 360 } } } }] }] },
     styles: { default: { document: { run: { font: 'Calibri', size: 22 } } } },
-    sections: [{ children: children.length ? children : [new d.Paragraph('')] }],
+    sections: [{
+      properties: (() => {
+        const { W, H, mv, mh } = pageDims(layout); const tw = (pt: number) => Math.round(pt * 20);
+        return { page: { size: { width: tw(layout.orient === 'h' ? H : W), height: tw(layout.orient === 'h' ? W : H), orientation: layout.orient === 'h' ? d.PageOrientation.LANDSCAPE : d.PageOrientation.PORTRAIT },
+          margin: { top: tw(mv), bottom: tw(mv), left: tw(mh), right: tw(mh) } } };
+      })(),
+      headers: layout.header?.trim() ? { default: new d.Header({ children: [new d.Paragraph({ alignment: d.AlignmentType.CENTER, children: [new d.TextRun({ text: layout.header.trim(), size: 18, color: '666666' })] })] }) } : undefined,
+      footers: layout.footer?.trim() || layout.pageNumbers ? { default: new d.Footer({ children: [new d.Paragraph({ alignment: d.AlignmentType.CENTER, children: [
+        ...(layout.footer?.trim() ? [new d.TextRun({ text: layout.footer.trim() + (layout.pageNumbers ? '   ·   ' : ''), size: 18, color: '666666' })] : []),
+        ...(layout.pageNumbers ? [new d.TextRun({ children: ['Página ', d.PageNumber.CURRENT, ' de ', d.PageNumber.TOTAL_PAGES], size: 18, color: '666666' })] : []),
+      ] })] }) } : undefined,
+      children: children.length ? children : [new d.Paragraph('')],
+    }],
   });
   return d.Packer.toBlob(doc);
 }
@@ -302,14 +333,15 @@ export function htmlToRtf(html: string): string {
 const winAnsi = (s: string) => s.replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/[–—]/g, '-').replace(/…/g, '...').replace(/•/g, '-')
   .replace(/[^\x09\x0A\x0D\x20-\x7E\xA0-\xFF€]/g, '');
 
-export async function htmlToPdf(html: string, title: string): Promise<Blob> {
+export async function htmlToPdf(html: string, title: string, layout: DocLayout = {}): Promise<Blob> {
   const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
   const pdf = await PDFDocument.create();
   pdf.setTitle(title); pdf.setCreator('SEMATEC Oficina');
   const F = { r: await pdf.embedFont(StandardFonts.Helvetica), b: await pdf.embedFont(StandardFonts.HelveticaBold), i: await pdf.embedFont(StandardFonts.HelveticaOblique), bi: await pdf.embedFont(StandardFonts.HelveticaBoldOblique) };
-  const W = 595.28, H = 841.89, M = 56; const maxW = W - 2 * M;
-  let page = pdf.addPage([W, H]); let y = H - M;
-  const newPage = () => { page = pdf.addPage([W, H]); y = H - M; };
+  const { W, H, mv, mh } = pageDims(layout); const M = mh; const MV = mv + (layout.header?.trim() ? 14 : 0); const MB = mv + (layout.footer?.trim() || layout.pageNumbers ? 14 : 0);
+  const maxW = W - 2 * M;
+  let page = pdf.addPage([W, H]); let y = H - MV;
+  const newPage = () => { page = pdf.addPage([W, H]); y = H - MV; };
   const font = (r: Run) => (r.b && r.i ? F.bi : r.b ? F.b : r.i ? F.i : F.r);
   const col = (h?: string) => (h ? rgb(parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255) : rgb(0.07, 0.07, 0.07));
   /** Escribe un párrafo con ajuste de línea; devuelve la altura usada. */
@@ -331,7 +363,7 @@ export async function htmlToPdf(html: string, title: string): Promise<Blob> {
     }
     const lh = size * 1.4; let used = 0;
     lines.forEach((line, li) => {
-      if (!opts.dryRun && y - lh < M) newPage();
+      if (!opts.dryRun && y - lh < MB) newPage();
       const total = line.reduce((s, w) => s + w.w, 0);
       let x = x0 + (opts.align === 'center' ? (width - total) / 2 : opts.align === 'right' ? width - total : 0);
       if (!opts.dryRun) {
@@ -354,40 +386,52 @@ export async function htmlToPdf(html: string, title: string): Promise<Blob> {
     if (b.kind === 'h') { const sz = [22, 18, 15, 13, 12, 11][(b.level ?? 1) - 1]; y -= 6; para(b.runs.map((r) => ({ ...r, b: true })), sz, { align: b.align }); y -= 4; }
     else if (b.kind === 'li') para(b.runs, 11, { indent: 22, bullet: b.ordered ? `${++num}.` : '-' });
     else if (b.kind === 'quote') { para(b.runs.map((r) => ({ ...r, i: true })), 11, { indent: 24 }); y -= 4; }
-    else if (b.kind === 'hr') { if (y - 12 < M) newPage(); page.drawLine({ start: { x: M, y: y - 6 }, end: { x: W - M, y: y - 6 }, thickness: 0.7, color: rgb(0.6, 0.6, 0.6) }); y -= 14; }
+    else if (b.kind === 'pagebreak') newPage();
+    else if (b.kind === 'hr') { if (y - 12 < MB) newPage(); page.drawLine({ start: { x: M, y: y - 6 }, end: { x: W - M, y: y - 6 }, thickness: 0.7, color: rgb(0.6, 0.6, 0.6) }); y -= 14; }
     else if (b.kind === 'table') {
-      const rows = b.rows ?? []; const cols = Math.max(1, ...rows.map((r) => r.length)); const cw = maxW / cols;
-      for (const r of rows) {
-        const saveY = y;
-        const hRow = Math.max(16, ...Array.from({ length: cols }, (_, i) => para(r[i] ?? [], 9.5, { x: M + i * cw + 4, width: cw - 8, dryRun: true }))) + 6;
-        if (y - hRow < M) newPage();
+      const rows = b.rows ?? [];
+      const spans = rows.map((r, ri) => r.map((_, i) => b.cells?.[ri]?.[i]?.span ?? 1));
+      const cols = Math.max(1, ...spans.map((r) => r.reduce((a, x) => a + x, 0))); const cw = maxW / cols;
+      rows.forEach((r, ri) => {
+        let cx = 0; const geo = r.map((_, i) => { const g = { x: M + cx * cw, w: cw * spans[ri][i] }; cx += spans[ri][i]; return g; });
+        const hRow = Math.max(16, ...r.map((c, i) => para(c, 9.5, { x: geo[i].x + 4, width: geo[i].w - 8, dryRun: true }))) + 6;
+        if (y - hRow < MB) newPage();
         const top = y;
-        for (let i = 0; i < cols; i++) {
-          page.drawRectangle({ x: M + i * cw, y: top - hRow, width: cw, height: hRow, borderColor: rgb(0.6, 0.6, 0.6), borderWidth: 0.6 });
-          y = top - 3; para(r[i] ?? [], 9.5, { x: M + i * cw + 4, width: cw - 8 });
-        }
-        y = top - hRow; void saveY;
-      }
+        r.forEach((c, i) => {
+          const bg = b.cells?.[ri]?.[i]?.bg;
+          page.drawRectangle({ x: geo[i].x, y: top - hRow, width: geo[i].w, height: hRow, borderColor: rgb(0.6, 0.6, 0.6), borderWidth: 0.6, color: bg ? col(bg) : undefined });
+          y = top - 3; para(c, 9.5, { x: geo[i].x + 4, width: geo[i].w - 8 });
+        });
+        y = top - hRow;
+      });
       y -= 8;
     } else if (b.kind === 'img' || b.runs.some((r) => r.img)) {
       for (const src of [b.src, ...b.runs.map((r) => r.img)].filter(Boolean) as string[]) {
         const im = await dataOf(src); if (!im || im.type === 'gif') continue;
         const img = im.type === 'png' ? await pdf.embedPng(im.data) : await pdf.embedJpg(im.data);
         const k = Math.min(1, maxW / img.width, (H - 2 * M) / img.height); const w = img.width * k, h = img.height * k;
-        if (y - h < M) newPage();
+        if (y - h < MB) newPage();
         page.drawImage(img, { x: M, y: y - h, width: w, height: h }); y -= h + 8;
       }
       if (b.runs.some((r) => r.text.trim())) para(b.runs.filter((r) => !r.img), 11, { align: b.align });
     } else { para(b.runs, 11, { align: b.align }); y -= 5; }
   }
+  // Encabezado, pie de página y numeración en todas las páginas
+  const pages = pdf.getPages();
+  pages.forEach((pg, i) => {
+    const grey = rgb(0.4, 0.4, 0.4);
+    if (layout.header?.trim()) { const t = winAnsi(layout.header.trim()); const w = F.r.widthOfTextAtSize(t, 9); pg.drawText(t, { x: (W - w) / 2, y: H - mv + 4, size: 9, font: F.r, color: grey }); }
+    const foot = [layout.footer?.trim() ? winAnsi(layout.footer.trim()) : '', layout.pageNumbers ? `Página ${i + 1} de ${pages.length}` : ''].filter(Boolean).join('   ·   ');
+    if (foot) { const w = F.r.widthOfTextAtSize(foot, 9); pg.drawText(foot, { x: (W - w) / 2, y: mv - 16, size: 9, font: F.r, color: grey }); }
+  });
   return new Blob([await pdf.save() as BlobPart], { type: 'application/pdf' });
 }
 
 /** Guarda un documento HTML en el formato pedido. */
-export async function exportDocument(html: string, title: string, fmt: string): Promise<Blob> {
+export async function exportDocument(html: string, title: string, fmt: string, layout: DocLayout = {}): Promise<Blob> {
   switch (fmt) {
-    case 'docx': return htmlToDocx(html, title);
-    case 'pdf': return htmlToPdf(html, title);
+    case 'docx': return htmlToDocx(html, title, layout);
+    case 'pdf': return htmlToPdf(html, title, layout);
     case 'odt': return htmlToOdt(html, title);
     case 'rtf': return new Blob([htmlToRtf(html)], { type: 'application/rtf' });
     case 'html': return new Blob([fullHtml(html, title)], { type: 'text/html;charset=utf-8' });
