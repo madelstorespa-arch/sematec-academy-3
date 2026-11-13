@@ -40,6 +40,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
               <SelectField label="Programa" name="program_id" required options={programs} />
               <SelectField label="Periodo" name="period_id" required options={periods} defaultValue={periodo} />
             </Grid>
+            <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" name="aula_sections" defaultChecked /> 📚 Inscribirlo en las asignaturas de su nivel (las ve de inmediato en el Aula con sus evaluaciones)</label>
             {can(ctx, 'finance.create') && <EnrollPricing offers={offers} currency={org?.base_currency ?? 'CLP'} benefits={(benefits ?? []) as { id: string; name: string }[]} />}
           </ActionForm>
         </Card>

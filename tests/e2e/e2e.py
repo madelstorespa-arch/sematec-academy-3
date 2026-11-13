@@ -130,6 +130,7 @@ def main():
         go(page, f'{BASE}/app/matriculas')
         sel_re(page, 'select[name=student_id]', 'Prueba Navegador')
         sel_re(page, 'select[name=program_id]', 'TIN')
+        page.uncheck('input[name=aula_sections]')  # en esta prueba la institución inscribe las asignaturas a mano
         page.fill('input[name=amount]', '1200000'); page.fill('input[name=installments]', '4'); page.fill('input[name=first_due]', '2026-08-05')
         page.click('button:has-text("Matricular")')
         m = status_msg(page); check('Matrícula registrada' in m and 'cuotas generados' in m, 'Matrícula con arancel en 4 cuotas')

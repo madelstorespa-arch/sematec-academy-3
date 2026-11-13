@@ -38,6 +38,16 @@ export async function enroll(fd: FormData): Promise<ActionResult> {
         extra += e2 ? ` Atención: la matrícula quedó registrada, pero el arancel NO se generó: ${e2.message}` : ' Arancel y cuotas generados.';
       }
     }
+    // 📚 Inscribirlo en las asignaturas de su nivel: así ve sus cursos y evaluaciones en el Aula
+    if (fd.get('aula_sections') === 'on' && ctx.orgId) {
+      const { data: fx, error: e3 } = await ctx.supabase.rpc('aula_fix_access', { p_org: ctx.orgId, p_student: student });
+      if (e3) extra += ` (No se inscribió en asignaturas: ${/aula_fix_access/.test(e3.message) ? 'falta instalar la actualización «Aula acceso»' : e3.message}.)`;
+      else {
+        const r = fx as { sections: number; not_placed: number; no_offer: number };
+        extra += r.sections ? ` Inscrito en ${r.sections} asignatura(s): ya las ve en el Aula.` : r.no_offer ? ' ⚠ No hay secciones abiertas de su malla en este periodo: créelas en «Secciones y notas» y use «Revisar acceso de estudiantes» en el Aula.' : '';
+        if (r.not_placed) extra += ` ⚠ ${r.not_placed} asignatura(s) sin cupo o con prerrequisito pendiente.`;
+      }
+    }
     revalidatePath('/app/matriculas');
     return ok(`Matrícula registrada.${extra}`);
   });

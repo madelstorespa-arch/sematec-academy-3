@@ -1,7 +1,8 @@
 'use client';
-import { useRef, useState, useTransition, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useTransition, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { enqueue, type OfflineKey } from '@/lib/offline-queue';
+import { showResultToast } from '@/components/result-toast';
 
 type Result = { ok: boolean; message?: string; error?: string; data?: unknown; queued?: boolean };
 
@@ -24,6 +25,12 @@ export function ActionForm({
   const [pending, start] = useTransition();
   const ref = useRef<HTMLFormElement>(null);
   const router = useRouter();
+  // Si el formulario desaparece al guardar (la fila sale de la lista), el resultado se muestra en un aviso flotante
+  const last = useRef<{ r: Result; at: number } | null>(null);
+  useEffect(() => () => {
+    const l = last.current;
+    if (l && !l.r.queued && Date.now() - l.at < 8000) showResultToast(l.r.ok, l.r.ok ? (l.r.message ?? 'Guardado.') : (l.r.error ?? 'Error'));
+  }, []);
   return (
     <form
       ref={ref}
@@ -48,6 +55,7 @@ export function ActionForm({
         start(async () => {
           try {
             const r = await action(fd);
+            last.current = { r, at: Date.now() };
             setResult(r);
             if (r.ok) {
               if (resetOnSuccess) ref.current?.reset();

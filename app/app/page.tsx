@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { getContext, can } from '@/lib/context';
 import { PageHeader, Stat, Card, Empty } from '@/components/ui';
 import { fmtDateTime, fmtMoney } from '@/lib/format';
@@ -6,6 +7,11 @@ import { mailEnabled } from '@/lib/mailer';
 
 export default async function Dashboard() {
   const ctx = await getContext();
+  // Cuenta sin ficha ni rol: si hay una ficha de estudiante con su correo, se vincula sola
+  if (!ctx.studentId && !ctx.teacherId && !ctx.perms.size) {
+    const { data: n } = await ctx.supabase.rpc('claim_my_student_records');
+    if (Number(n) > 0) redirect('/app');
+  }
   const { supabase, orgId } = ctx;
   const count = async (table: string, filter?: (q: any) => any) => {
     let q: any = supabase.from(table).select('*', { count: 'exact', head: true });

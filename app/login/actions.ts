@@ -68,6 +68,8 @@ export async function signIn(fd: FormData): Promise<ActionResult> {
     await supabase.auth.signOut();
     return { ok: false, error: 'La cuenta está bloqueada o suspendida. Contacte a la administración de su institución.' };
   }
+  // Ficha de estudiante registrada con este correo y aún sin cuenta: se vincula sola (ve sus cursos en el Aula)
+  try { await supabase.rpc('claim_my_student_records'); } catch { /* opcional: no impide entrar */ }
   // Página de inicio elegida por la persona en «Mi configuración»
   const home = (profile?.preferences as { home?: string } | null)?.home;
   redirect(next === '/app' && typeof home === 'string' && /^\/app(\/[a-z0-9/_-]*)?$/.test(home) ? home : next);

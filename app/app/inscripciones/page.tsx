@@ -38,6 +38,13 @@ export default async function Page() {
   const admin = ctx.isOwner || ctx.isPlatformAdmin || can(ctx, 'settings.edit');
   const canCreate = can(ctx, 'students.create');
   const canFin = can(ctx, 'finance.create');
+  // Periodos para matricular al aprobar (la carrera elegida queda con sus cursos en el Aula)
+  const canEnroll = can(ctx, 'enrollments.create');
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: pers } = canEnroll ? await sb.from('academic_periods').select('id, name, status, starts_on, ends_on').eq('organization_id', orgId).neq('status', 'closed').gte('ends_on', today).order('starts_on') : { data: [] as any[] };
+  const periodOpts = (pers ?? []).map((p: any) => ({ value: p.id, label: `${p.name}${p.status === 'open' ? ' (abierto)' : ''}` }));
+  const curPeriod = ((pers ?? []).find((p: any) => p.status === 'open' && p.starts_on <= today) ?? (pers ?? []).find((p: any) => p.status === 'open') ?? (pers ?? [])[0])?.id;
+  const progIds = new Set((cfg.programs ?? []).filter((p) => p.group === 'Carreras y programas').map((p) => p.id));
   return (
     <div>
       <PageHeader title="📝 Inscripciones" subtitle="Inscripción general, aparte de los cursos: la persona queda registrada como estudiante con su pago, lista para matricular."
@@ -76,6 +83,8 @@ export default async function Page() {
                         <Field label="Referencia" name="reference" defaultValue={q.reference ?? ''} />
                       </Grid>
                       <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="create_account" defaultChecked /> Crear su cuenta de acceso a la plataforma</label>
+                      {canEnroll && progIds.has(q.form_data?.program_id) && periodOpts.length > 0 && (
+                        <SelectField label={`📚 Matricular en «${q.form_data?.program}» y abrir sus cursos en el Aula`} name="enroll_period" defaultValue={curPeriod} placeholder="No matricular todavía" options={periodOpts} />)}
                       <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="send_email" defaultChecked data-testid="aprobar-enviar-correo" /> ✉ Enviar también por correo (aviso y enlace para crear su contraseña)</label>
                       {!canFin && <p className="text-xs text-amber-700">Para registrar el pago necesita permiso de finanzas.</p>}
                     </ActionForm>

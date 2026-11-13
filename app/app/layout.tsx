@@ -13,6 +13,7 @@ import { BranchSelect } from '@/components/branch-select';
 import { MobileMenu } from '@/components/mobile-menu';
 import { OfflineBar, LogoutButton } from '@/components/offline-bar';
 import { UndoBar } from '@/components/undo-bar';
+import { ResultToast } from '@/components/result-toast';
 import { VersionWatcher } from '@/components/version-watcher';
 import { GlobalSearch } from '@/components/global-search';
 import { ConferenceHost } from '@/components/conference/host';
@@ -76,6 +77,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <OfflineBar userId={ctx.user.id} warmUrls={items.map((i) => i.href)} />
         <VersionWatcher />
         {ctx.orgId && <UndoBar />}
+        <ResultToast />
         {!ctx.org && !ctx.isPlatformAdmin ? (
           <div className="card card-pad max-w-xl">
             <h1 className="text-xl font-bold">Cuenta sin institución asignada</h1>

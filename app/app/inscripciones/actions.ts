@@ -85,6 +85,23 @@ export async function approveRegistrationRequest(fd: FormData): Promise<ActionRe
     if (account) { const { ensureBuyerUser } = await import('@/lib/payments'); user = await ensureBuyerUser(q.email, q.name, `inscripcion:${q.id}`); }
     const { error } = await ctx.supabase.rpc('approve_registration_request', { p_id: id, p_user: user, p_amount: amount, p_method: str(fd, 'method'), p_reference: str(fd, 'reference'), p_notes: str(fd, 'notes') });
     if (error) return fail(error);
+    // 📚 Matrícula en la carrera elegida + asignaturas de su nivel (ve sus cursos y evaluaciones en el Aula)
+    let aula = '';
+    const period = str(fd, 'enroll_period');
+    if (period && can(ctx, 'enrollments.create')) {
+      const { data: rq } = await ctx.supabase.from('registration_requests').select('student_id, form_data').eq('id', id).maybeSingle();
+      const program = (rq?.form_data as { program_id?: string } | null)?.program_id;
+      if (rq?.student_id && program) {
+        const { error: e1 } = await ctx.supabase.rpc('enroll_student', { p_student: rq.student_id, p_program: program, p_period: period });
+        if (e1) aula = ` ⚠ No se pudo matricular: ${e1.message}`;
+        else {
+          const { data: fx, error: e2 } = await ctx.supabase.rpc('aula_fix_access', { p_org: q.organization_id, p_student: rq.student_id });
+          const n = (fx as { sections?: number } | null)?.sections ?? 0;
+          aula = e2 ? ' Matriculado (para inscribir sus asignaturas instale la actualización «Aula acceso»).'
+            : n ? ` Matriculado e inscrito en ${n} asignatura(s): ya las ve en el Aula.` : ' Matriculado (aún no hay secciones abiertas de su malla en el periodo).';
+        }
+      }
+    }
     let mail = '';
     if (fd.get('send_email') === 'on') {
       const intro = `Hola ${q.name.split(' ')[0]}:\n\nVerificamos su pago y su inscripción quedó aprobada. Ya está registrado como estudiante.`;
@@ -94,7 +111,7 @@ export async function approveRegistrationRequest(fd: FormData): Promise<ActionRe
       mail = r.ok ? ` ✉ Se le avisó por correo a ${q.email}.` : ` ⚠ No se pudo enviar el correo: ${r.error}`;
     }
     revalidatePath('/app/inscripciones'); revalidatePath('/app/estudiantes');
-    return ok(`${q.name} quedó inscrito con su pago${account ? ' y su cuenta de acceso' : ''}.${mail}`);
+    return ok(`${q.name} quedó inscrito con su pago${account ? ' y su cuenta de acceso' : ''}.${aula}${mail}`);
   });
 }
 
