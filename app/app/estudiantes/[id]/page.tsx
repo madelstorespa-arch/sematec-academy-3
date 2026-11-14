@@ -121,6 +121,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
                 <Field label="Correo de acceso (usuario)" name="email" type="email" required defaultValue={s.email} />
                 <Field label="Contraseña" name="password" type="password" autoComplete="new-password" placeholder="Mín. 10, con mayúsculas, minúsculas y números" />
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="invite" /> Enviar invitación por correo (requiere SMTP)</label>
+                <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="move" /> Si este correo ya es la cuenta de otra ficha (duplicada), mover la cuenta a esta ficha</label>
               </ActionForm>
               </div>
             )}

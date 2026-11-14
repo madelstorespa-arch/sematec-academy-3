@@ -60,16 +60,33 @@ export async function grantPortalAccess(fd: FormData): Promise<ActionResult> {
     const perm = kind === 'student' ? 'students.edit' : 'teachers.edit';
     if (!can(ctx, perm)) return fail('No tiene permisos para dar acceso.');
     const table = kind === 'student' ? 'students' : 'teachers';
-    const { data: person } = await ctx.supabase.from(table).select('first_names, last_names').eq('id', id).maybeSingle();
+    const { data: person } = await ctx.supabase.from(table).select('first_names, last_names, organization_id').eq('id', id).maybeSingle();
     if (!person) return fail('Ficha no encontrada.');
     const chosen = fd.get('invite') ? null : checkPassword(str(fd, 'password'));
     const user = await ensureAuthUser(email, `${person.first_names} ${person.last_names}`, fd.get('invite') ? 'invite' : 'password', chosen ?? undefined);
+    // Ese correo ya es la cuenta de OTRA ficha de esta institución (ficha duplicada o persona distinta)
+    const { data: other } = await ctx.supabase.from(table).select('id, first_names, last_names, email')
+      .eq('organization_id', person.organization_id).eq('user_id', user.id).neq('id', id).maybeSingle();
+    if (other) {
+      const who = `${other.first_names} ${other.last_names}`.trim();
+      if (!fd.get('move')) {
+        return fail(`El correo ${email} ya es la cuenta de otra ficha de ${kind === 'student' ? 'estudiante' : 'profesor'} en esta institución: «${who}». `
+          + `Si es la misma persona (ficha duplicada), marque «Mover la cuenta a esta ficha» y pulse otra vez «Crear cuenta»; si es otra persona, use un correo distinto.`);
+      }
+      const { error: e0, count } = await ctx.supabase.from(table).update({ user_id: null }, { count: 'exact' }).eq('id', other.id);
+      if (e0) return fail(e0);
+      if (!count) return fail('No se pudo soltar la cuenta de la otra ficha (sin permiso).');
+    }
     const { error } = await ctx.supabase.rpc('link_person_account', { p_kind: kind, p_person: id, p_user: user.id });
     if (error) return fail(error);
+    if (other) {
+      revalidatePath(kind === 'student' ? `/app/estudiantes/${other.id}` : '/app/profesores');
+      return ok(`Cuenta ${email} movida a esta ficha (se quitó de «${`${other.first_names} ${other.last_names}`.trim()}»). Si la otra ficha era un duplicado, puede eliminarla.${!user.created && chosen ? ' Su contraseña sigue siendo la de antes: use «🔑 Cambiar» en esta ficha si necesita una nueva.' : ''}`);
+    }
     revalidatePath(kind === 'student' ? `/app/estudiantes/${id}` : '/app/profesores');
     if ('password' in user && user.password)
       return ok(`Cuenta creada. Usuario: ${email} · contraseña: la que usted escribió. Entréguesela a la persona.`);
-    return ok(user.created ? `Invitación enviada a ${email}.` : `Cuenta existente ${email} vinculada.`);
+    return ok(user.created ? `Invitación enviada a ${email}.` : `Cuenta existente ${email} vinculada.${chosen ? ' Su contraseña sigue siendo la de antes: use «🔑 Cambiar» si necesita una nueva.' : ''}`);
   });
 }
 
